@@ -20,9 +20,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,6 +40,21 @@ import com.example.jiva.data.model.UserRole
 import java.text.SimpleDateFormat
 import java.util.*
 
+// Modern vibrant color scheme
+object JivaColors {
+    val DeepBlue = Color(0xFF1E3A8A)
+    val LightBlue = Color(0xFF3B82F6)
+    val Purple = Color(0xFF8B5CF6)
+    val Pink = Color(0xFFEC4899)
+    val Orange = Color(0xFFF59E0B)
+    val Green = Color(0xFF10B981)
+    val Red = Color(0xFFEF4444)
+    val Teal = Color(0xFF14B8A6)
+    val White = Color(0xFFFFFFFF)
+    val LightGray = Color(0xFFF8FAFC)
+    val CardBackground = Color(0xFFFFFFFF)
+}
+
 /**
  * Data class representing a menu item in the home screen
  */
@@ -43,6 +62,7 @@ data class MenuItem(
     val id: String,
     val title: String,
     val icon: ImageVector,
+    val color: Color,
     val description: String = ""
 )
 
@@ -62,271 +82,239 @@ fun HomeScreen(
     // Get user from session if not provided
     val currentUser = user ?: uiState.currentUser
 
-    // Show success toast when screen is first displayed
+    // Load user session without toast
     LaunchedEffect(Unit) {
-        android.widget.Toast.makeText(context, "Login Successful", android.widget.Toast.LENGTH_SHORT).show()
         viewModel.loadUserSession()
     }
 
-    // Define menu items
+    // Define vibrant menu items with colors
     val menuItems = remember {
         listOf(
             MenuItem(
                 id = "outstanding_report",
                 title = "Outstanding Report",
-                icon = Icons.Default.Assessment,
+                icon = Icons.Default.List,
+                color = JivaColors.Purple,
                 description = "View outstanding payments and dues"
             ),
             MenuItem(
                 id = "ledger",
                 title = "Ledger",
-                icon = Icons.Default.AccountBalance,
+                icon = Icons.Default.AccountBox,
+                color = JivaColors.Green,
                 description = "Account ledger and transactions"
             ),
             MenuItem(
                 id = "stock_report",
                 title = "Stock Report",
-                icon = Icons.Default.Inventory,
+                icon = Icons.Default.Info,
+                color = JivaColors.Orange,
                 description = "Current stock levels and inventory"
             ),
             MenuItem(
                 id = "item_sell_purchase",
                 title = "Item Sell/Purchase",
                 icon = Icons.Default.ShoppingCart,
+                color = JivaColors.Pink,
                 description = "Manage sales and purchases"
             ),
             MenuItem(
                 id = "day_end_report",
                 title = "Day End Report",
-                icon = Icons.Default.Today,
+                icon = Icons.Default.DateRange,
+                color = JivaColors.Teal,
                 description = "Daily summary and closing report"
             ),
             MenuItem(
                 id = "whatsapp_marketing",
                 title = "WhatsApp Bulk Marketing",
-                icon = Icons.Default.Message,
+                icon = Icons.Default.Send,
+                color = JivaColors.Red,
                 description = "Send bulk marketing messages"
             )
         )
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp)
-    ) {
-        // Top App Bar
-        TopAppBar(
-            currentUser = currentUser,
-            onLogout = {
-                viewModel.logout()
-                onLogout()
-            }
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Welcome Section
-        WelcomeSection(currentUser)
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Main Menu Grid
-        MenuGrid(
-            menuItems = menuItems,
-            windowSizeClass = windowSizeClass,
-            onItemClick = onNavigateToScreen
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // System Status
-        SystemStatusCard()
-    }
-}
-
-@Composable
-private fun MenuGrid(
-    menuItems: List<MenuItem>,
-    windowSizeClass: androidx.compose.material3.windowsizeclass.WindowSizeClass,
-    onItemClick: (String) -> Unit
-) {
-    val configuration = LocalConfiguration.current
-    val screenWidth = configuration.screenWidthDp.dp
-
-    // Determine grid columns based on screen size and orientation
-    val columns = when {
-        windowSizeClass.widthSizeClass == WindowWidthSizeClass.Compact -> {
-            if (configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) 3 else 2
-        }
-        windowSizeClass.widthSizeClass == WindowWidthSizeClass.Medium -> 3
-        else -> 4
-    }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            .background(JivaColors.LightGray)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.fillMaxSize()
         ) {
-            Text(
-                text = "Main Menu",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 16.dp)
+            // Modern Header with gradient
+            ModernHeader(
+                currentUser = currentUser,
+                onLogout = {
+                    viewModel.logout()
+                    onLogout()
+                }
             )
 
+            // Main Content
             LazyVerticalGrid(
-                columns = GridCells.Fixed(columns),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.height((menuItems.size / columns + if (menuItems.size % columns > 0) 1 else 0) * 120.dp)
+                columns = GridCells.Adaptive(160.dp),
+                contentPadding = PaddingValues(20.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.weight(1f)
             ) {
                 items(menuItems) { item ->
-                    MenuCard(
+                    ModernMenuCard(
                         menuItem = item,
-                        onClick = { onItemClick(item.id) }
+                        onClick = { onNavigateToScreen(item.id) }
                     )
                 }
             }
+
+            // Footer Branding
+            FooterBranding()
         }
     }
 }
 
 @Composable
-private fun MenuCard(
+private fun ModernHeader(
+    currentUser: User?,
+    onLogout: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(JivaColors.DeepBlue, JivaColors.LightBlue)
+                )
+            )
+            .padding(20.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "JIVA",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.SansSerif,
+                    color = JivaColors.White
+                )
+                Text(
+                    text = "Business Dashboard",
+                    fontSize = 14.sp,
+                    fontFamily = FontFamily.SansSerif,
+                    color = JivaColors.White.copy(alpha = 0.8f)
+                )
+            }
+
+            IconButton(
+                onClick = onLogout,
+                modifier = Modifier
+                    .background(
+                        JivaColors.White.copy(alpha = 0.2f),
+                        CircleShape
+                    )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ExitToApp,
+                    contentDescription = "Logout",
+                    tint = JivaColors.White
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModernMenuCard(
     menuItem: MenuItem,
     onClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(110.dp)
-            .clickable { onClick() },
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            .height(140.dp)
+            .clickable { onClick() }
+            .shadow(
+                elevation = 8.dp,
+                shape = RoundedCornerShape(20.dp),
+                spotColor = menuItem.color.copy(alpha = 0.3f)
+            ),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+            containerColor = JivaColors.CardBackground
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(8.dp),
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(
-                imageVector = menuItem.icon,
-                contentDescription = menuItem.title,
-                modifier = Modifier.size(32.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
+            // Colorful icon background
+            Box(
+                modifier = Modifier
+                    .size(50.dp)
+                    .background(
+                        menuItem.color.copy(alpha = 0.15f),
+                        CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = menuItem.icon,
+                    contentDescription = menuItem.title,
+                    modifier = Modifier.size(28.dp),
+                    tint = menuItem.color
+                )
+            }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             Text(
                 text = menuItem.title,
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Medium,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = FontFamily.SansSerif,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                lineHeight = 14.sp,
-                modifier = Modifier.fillMaxWidth()
+                lineHeight = 16.sp,
+                color = Color(0xFF1F2937)
             )
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TopAppBar(
-    currentUser: User?,
-    onLogout: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+private fun FooterBranding() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(JivaColors.DeepBlue)
+            .padding(16.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "User",
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                    Text(
-                        text = "JIVA Dashboard",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    if (currentUser != null) {
-                        Text(
-                            text = "Welcome, ${currentUser.firstName ?: currentUser.username}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            IconButton(onClick = onLogout) {
-                Icon(
-                    imageVector = Icons.Default.ExitToApp,
-                    contentDescription = "Logout",
-                    tint = MaterialTheme.colorScheme.error
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun WelcomeSection(currentUser: User?) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
+        Text(
+            text = "Powered by JIVA • Business Management System",
+            fontSize = 12.sp,
+            fontFamily = FontFamily.SansSerif,
+            color = JivaColors.White.copy(alpha = 0.8f),
+            textAlign = TextAlign.Center
         )
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "👋",
-                fontSize = 32.sp,
-                modifier = Modifier.padding(end = 12.dp)
-            )
-
-            Column {
-                Text(
-                    text = "Welcome back${if (currentUser?.firstName != null) ", ${currentUser.firstName}" else ""}!",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-
-                Text(
-                    text = "Choose an option from the menu below",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-        }
     }
 }
+
+
+
+
+
+
 
 
 
