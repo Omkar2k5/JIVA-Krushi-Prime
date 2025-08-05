@@ -16,25 +16,49 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = JivaPrimary,
+    onPrimary = Color.White,
+    primaryContainer = JivaPrimaryVariant,
+    onPrimaryContainer = Color.White,
+    secondary = JivaSecondary,
+    onSecondary = Color.Black,
+    secondaryContainer = JivaSecondaryVariant,
+    onSecondaryContainer = Color.White,
+    tertiary = Pink80,
+    onTertiary = Color.Black,
+    background = SurfaceDark,
+    onBackground = Color.White,
+    surface = SurfaceDark,
+    onSurface = Color.White,
+    surfaceVariant = SurfaceVariantDark,
+    onSurfaceVariant = NeutralGray300,
+    error = ErrorRed,
+    onError = Color.White,
+    errorContainer = Color(0xFF93000A),
+    onErrorContainer = Color(0xFFFFDAD6)
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+    primary = JivaPrimary,
     onPrimary = Color.White,
-    onSecondary = Color.White,
+    primaryContainer = Color(0xFFD1E4FF),
+    onPrimaryContainer = Color(0xFF001D36),
+    secondary = JivaSecondary,
+    onSecondary = Color.Black,
+    secondaryContainer = Color(0xFFB2F7FF),
+    onSecondaryContainer = Color(0xFF00363D),
+    tertiary = Pink40,
     onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    background = SurfaceLight,
+    onBackground = NeutralGray900,
+    surface = SurfaceLight,
+    onSurface = NeutralGray900,
+    surfaceVariant = SurfaceVariantLight,
+    onSurfaceVariant = NeutralGray700,
+    error = ErrorRed,
+    onError = Color.White,
+    errorContainer = Color(0xFFFFDAD6),
+    onErrorContainer = Color(0xFF410002)
 )
 
 @Composable

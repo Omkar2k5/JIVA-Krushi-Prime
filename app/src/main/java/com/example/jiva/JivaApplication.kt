@@ -1,6 +1,7 @@
 package com.example.jiva
 
 import android.app.Application
+import com.example.jiva.utils.DeviceCompatibility
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
 
@@ -20,6 +21,14 @@ class JivaApplication : Application() {
         }
         
         Timber.d("JIVA Application started")
+
+        // Log device compatibility information for debugging
+        DeviceCompatibility.logDeviceCompatibility(this)
+        DeviceCompatibility.checkFeatureSupport(this)
+
+        if (DeviceCompatibility.isLowEndDevice()) {
+            Timber.w("Low-end device detected - enabling performance optimizations")
+        }
     }
     
     /**

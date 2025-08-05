@@ -30,12 +30,25 @@ android {
     }
 
     buildTypes {
-        release {
+        debug {
+            isDebuggable = true
             isMinifyEnabled = false
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
+
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+
+            // Performance optimizations for production
+            isDebuggable = false
+            isJniDebuggable = false
+            isRenderscriptDebuggable = false
         }
     }
     compileOptions {
@@ -47,6 +60,14 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+
+    // Packaging options for better compatibility
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
     }
 }
 
