@@ -1,10 +1,9 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
-    alias(libs.plugins.kotlin.kapt)
+    kotlin("kapt")
 }
 
 android {
@@ -19,15 +18,36 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Support for different screen densities and sizes
+        vectorDrawables {
+            useSupportLibrary = true
+        }
+
+        // Ensure compatibility with Android 7+ (API 24+)
+        multiDexEnabled = true
     }
 
     buildTypes {
-        release {
+        debug {
+            isDebuggable = true
             isMinifyEnabled = false
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
+
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+
+            // Performance optimizations for production
+            isDebuggable = false
+            isJniDebuggable = false
+            isRenderscriptDebuggable = false
         }
     }
     compileOptions {
@@ -39,6 +59,10 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.15"
     }
 }
 
@@ -46,6 +70,9 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
+
+    // MultiDex support for Android 7+ compatibility
+    implementation("androidx.multidex:multidex:2.0.1")
 
     // Compose BOM
     implementation(platform(libs.androidx.compose.bom))
@@ -91,4 +118,9 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     debugImplementation(libs.androidx.compose.ui.tooling)
+}
+
+// Allow references to generated code
+kapt {
+    correctErrorTypes = true
 }

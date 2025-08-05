@@ -1,12 +1,9 @@
 package com.example.jiva.data.model
 
-import kotlinx.serialization.Serializable
-
 /**
  * User data model that represents a user in the system
  * This will map to your SQL database table structure later
  */
-@Serializable
 data class User(
     val id: Long = 0,
     val username: String,
@@ -19,7 +16,6 @@ data class User(
     val role: UserRole = UserRole.USER
 )
 
-@Serializable
 enum class UserRole {
     USER,
     ADMIN,
@@ -29,7 +25,6 @@ enum class UserRole {
 /**
  * Authentication request model
  */
-@Serializable
 data class LoginRequest(
     val username: String,
     val password: String
@@ -38,7 +33,6 @@ data class LoginRequest(
 /**
  * Authentication response model
  */
-@Serializable
 data class LoginResponse(
     val success: Boolean,
     val user: User? = null,
@@ -50,7 +44,6 @@ data class LoginResponse(
 /**
  * Session data model for storing user session information
  */
-@Serializable
 data class UserSession(
     val user: User,
     val token: String,
