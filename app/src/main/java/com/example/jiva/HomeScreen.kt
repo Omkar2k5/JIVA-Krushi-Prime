@@ -1,22 +1,31 @@
 package com.example.jiva
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExitToApp
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -27,15 +36,27 @@ import com.example.jiva.data.model.UserRole
 import java.text.SimpleDateFormat
 import java.util.*
 
+/**
+ * Data class representing a menu item in the home screen
+ */
+data class MenuItem(
+    val id: String,
+    val title: String,
+    val icon: ImageVector,
+    val description: String = ""
+)
+
 @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @Composable
 fun HomeScreen(
     user: User? = null,
     onLogout: () -> Unit = {},
+    onNavigateToScreen: (String) -> Unit = {},
     viewModel: HomeViewModel = viewModel { HomeViewModel(DummyAuthRepository()) }
 ) {
     val context = LocalContext.current
     val windowSizeClass = calculateWindowSizeClass(context as androidx.activity.ComponentActivity)
+    val configuration = LocalConfiguration.current
     val uiState by viewModel.uiState.collectAsState()
 
     // Get user from session if not provided
@@ -45,6 +66,48 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         android.widget.Toast.makeText(context, "Login Successful", android.widget.Toast.LENGTH_SHORT).show()
         viewModel.loadUserSession()
+    }
+
+    // Define menu items
+    val menuItems = remember {
+        listOf(
+            MenuItem(
+                id = "outstanding_report",
+                title = "Outstanding Report",
+                icon = Icons.Default.Assessment,
+                description = "View outstanding payments and dues"
+            ),
+            MenuItem(
+                id = "ledger",
+                title = "Ledger",
+                icon = Icons.Default.AccountBalance,
+                description = "Account ledger and transactions"
+            ),
+            MenuItem(
+                id = "stock_report",
+                title = "Stock Report",
+                icon = Icons.Default.Inventory,
+                description = "Current stock levels and inventory"
+            ),
+            MenuItem(
+                id = "item_sell_purchase",
+                title = "Item Sell/Purchase",
+                icon = Icons.Default.ShoppingCart,
+                description = "Manage sales and purchases"
+            ),
+            MenuItem(
+                id = "day_end_report",
+                title = "Day End Report",
+                icon = Icons.Default.Today,
+                description = "Daily summary and closing report"
+            ),
+            MenuItem(
+                id = "whatsapp_marketing",
+                title = "WhatsApp Bulk Marketing",
+                icon = Icons.Default.Message,
+                description = "Send bulk marketing messages"
+            )
+        )
     }
 
     Column(
@@ -62,25 +125,118 @@ fun HomeScreen(
             }
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Welcome Section
         WelcomeSection(currentUser)
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // User Info Card
-        UserInfoCard(currentUser)
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Quick Actions
-        QuickActionsSection()
+        // Main Menu Grid
+        MenuGrid(
+            menuItems = menuItems,
+            windowSizeClass = windowSizeClass,
+            onItemClick = onNavigateToScreen
+        )
 
         Spacer(modifier = Modifier.height(24.dp))
 
         // System Status
         SystemStatusCard()
+    }
+}
+
+@Composable
+private fun MenuGrid(
+    menuItems: List<MenuItem>,
+    windowSizeClass: androidx.compose.material3.windowsizeclass.WindowSizeClass,
+    onItemClick: (String) -> Unit
+) {
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+
+    // Determine grid columns based on screen size and orientation
+    val columns = when {
+        windowSizeClass.widthSizeClass == WindowWidthSizeClass.Compact -> {
+            if (configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) 3 else 2
+        }
+        windowSizeClass.widthSizeClass == WindowWidthSizeClass.Medium -> 3
+        else -> 4
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = "Main Menu",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(columns),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.height((menuItems.size / columns + if (menuItems.size % columns > 0) 1 else 0) * 120.dp)
+            ) {
+                items(menuItems) { item ->
+                    MenuCard(
+                        menuItem = item,
+                        onClick = { onItemClick(item.id) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MenuCard(
+    menuItem: MenuItem,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(110.dp)
+            .clickable { onClick() },
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = menuItem.icon,
+                contentDescription = menuItem.title,
+                modifier = Modifier.size(32.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = menuItem.title,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = 14.sp,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 
@@ -143,150 +299,36 @@ private fun WelcomeSection(currentUser: User?) {
             containerColor = MaterialTheme.colorScheme.primaryContainer
         )
     ) {
-        Column(
-            modifier = Modifier.padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "🎉",
-                fontSize = 48.sp,
-                modifier = Modifier.padding(bottom = 16.dp)
+                text = "👋",
+                fontSize = 32.sp,
+                modifier = Modifier.padding(end = 12.dp)
             )
 
-            Text(
-                text = "Welcome to JIVA!",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "You have successfully logged in and your session is active.",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun UserInfoCard(currentUser: User?) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp)
-        ) {
-            Text(
-                text = "User Information",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            if (currentUser != null) {
-                UserInfoRow("Username", currentUser.username)
-                UserInfoRow("Email", currentUser.email ?: "Not provided")
-                UserInfoRow("Full Name", "${currentUser.firstName ?: ""} ${currentUser.lastName ?: ""}".trim().ifEmpty { "Not provided" })
-                UserInfoRow("Role", currentUser.role.name.lowercase().replaceFirstChar { it.uppercase() })
-                UserInfoRow("Status", if (currentUser.isActive) "Active" else "Inactive")
-
-                if (currentUser.lastLoginAt != null) {
-                    val dateFormat = SimpleDateFormat("MMM dd, yyyy 'at' HH:mm", Locale.getDefault())
-                    UserInfoRow("Last Login", dateFormat.format(Date(currentUser.lastLoginAt)))
-                }
-            } else {
+            Column {
                 Text(
-                    text = "Loading user information...",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = "Welcome back${if (currentUser?.firstName != null) ", ${currentUser.firstName}" else ""}!",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+
+                Text(
+                    text = "Choose an option from the menu below",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(top = 4.dp)
                 )
             }
         }
     }
 }
 
-@Composable
-private fun UserInfoRow(label: String, value: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.weight(1f),
-            textAlign = TextAlign.End
-        )
-    }
-}
 
-@Composable
-private fun QuickActionsSection() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp)
-        ) {
-            Text(
-                text = "Quick Actions",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                ActionButton(
-                    text = "Profile",
-                    onClick = { /* TODO: Navigate to profile */ },
-                    modifier = Modifier.weight(1f)
-                )
-                ActionButton(
-                    text = "Settings",
-                    onClick = { /* TODO: Navigate to settings */ },
-                    modifier = Modifier.weight(1f)
-                )
-                ActionButton(
-                    text = "Help",
-                    onClick = { /* TODO: Navigate to help */ },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ActionButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier = modifier
-    ) {
-        Text(text)
-    }
-}
 
 @Composable
 private fun SystemStatusCard() {
@@ -353,9 +395,9 @@ private fun StatusRow(label: String, status: String, isOnline: Boolean?) {
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, device = "spec:width=411dp,height=891dp")
 @Composable
-fun HomeScreenPreview() {
+fun HomeScreenPhonePreview() {
     MaterialTheme {
         HomeScreen(
             user = User(
@@ -365,7 +407,26 @@ fun HomeScreenPreview() {
                 firstName = "Demo",
                 lastName = "User",
                 role = UserRole.USER
-            )
+            ),
+            onNavigateToScreen = { /* Preview - no navigation */ }
+        )
+    }
+}
+
+@Preview(showBackground = true, device = "spec:width=1280dp,height=800dp,dpi=240")
+@Composable
+fun HomeScreenTabletPreview() {
+    MaterialTheme {
+        HomeScreen(
+            user = User(
+                id = 1,
+                username = "demo",
+                email = "demo@jiva.com",
+                firstName = "Demo",
+                lastName = "User",
+                role = UserRole.USER
+            ),
+            onNavigateToScreen = { /* Preview - no navigation */ }
         )
     }
 }

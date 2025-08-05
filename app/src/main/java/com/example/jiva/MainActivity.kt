@@ -14,7 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.jiva.screens.*
 import com.example.jiva.ui.theme.MyApplicationTheme
+import timber.log.Timber
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,7 +55,54 @@ fun JivaApp() {
         }
         
         composable("home") {
-            HomeScreen()
+            HomeScreen(
+                onLogout = {
+                    navController.navigate("login") {
+                        // Clear the home screen from the back stack
+                        popUpTo("home") { inclusive = true }
+                    }
+                },
+                onNavigateToScreen = { screenId ->
+                    navController.navigate(screenId)
+                }
+            )
+        }
+
+        // Menu item screens
+        composable("outstanding_report") {
+            OutstandingReportScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        composable("ledger") {
+            LedgerScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        composable("stock_report") {
+            StockReportScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        composable("item_sell_purchase") {
+            ItemSellPurchaseScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        composable("day_end_report") {
+            DayEndReportScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        composable("whatsapp_marketing") {
+            WhatsAppMarketingScreen(
+                onBackClick = { navController.popBackStack() }
+            )
         }
     }
 }
