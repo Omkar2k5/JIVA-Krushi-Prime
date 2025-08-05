@@ -9,6 +9,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.pow
 
 /**
  * Accessibility utilities for better app usability
@@ -90,7 +91,7 @@ object Accessibility {
             return if (component <= 0.03928f) {
                 component / 12.92f
             } else {
-                kotlin.math.pow((component + 0.055f) / 1.055f, 2.4f).toFloat()
+                pow((component + 0.055f) / 1.055f, 2.4f).toFloat()
             }
         }
         
