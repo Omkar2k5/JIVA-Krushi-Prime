@@ -317,7 +317,8 @@ private fun LoginContent(
             onClick = onLogin,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp),
+                .height(56.dp)
+                .contentDescription(Accessibility.ContentDescriptions.LOGIN_BUTTON),
             enabled = !uiState.isLoading &&
                      !uiState.isRateLimited &&
                      uiState.username.isNotBlank() &&

@@ -6,6 +6,7 @@ import com.example.jiva.data.model.LoginRequest
 import com.example.jiva.data.model.User
 import com.example.jiva.data.repository.AuthRepository
 import com.example.jiva.utils.PerformanceMonitor
+import com.example.jiva.utils.SecurityUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,13 +34,12 @@ class LoginViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
-    private val maxLoginAttempts = 5
-    private var lastAttemptTime = 0L
-    private val rateLimitDuration = 30000L // 30 seconds
+    private val rateLimiter = SecurityUtils.RateLimiter(maxAttempts = 5, timeWindowMs = 30000L)
 
     fun updateUsername(username: String) {
+        val sanitizedUsername = SecurityUtils.sanitizeInput(username)
         _uiState.value = _uiState.value.copy(
-            username = username.trim(),
+            username = sanitizedUsername,
             errorMessage = null
         )
     }
@@ -53,17 +53,19 @@ class LoginViewModel @Inject constructor(
 
     fun login() {
         val currentState = _uiState.value
+        val userIdentifier = currentState.username.lowercase()
 
         // Check rate limiting
-        if (isRateLimited()) {
+        if (!rateLimiter.isAllowed(userIdentifier)) {
+            val remainingTime = rateLimiter.getRemainingTime(userIdentifier)
             _uiState.value = currentState.copy(
-                errorMessage = "Too many login attempts. Please wait 30 seconds.",
+                errorMessage = "Too many login attempts. Please wait ${remainingTime / 1000} seconds.",
                 isRateLimited = true
             )
             return
         }
 
-        // Validate input
+        // Validate input format
         if (currentState.username.isBlank()) {
             _uiState.value = currentState.copy(
                 errorMessage = "Username is required"
@@ -71,9 +73,23 @@ class LoginViewModel @Inject constructor(
             return
         }
 
+        if (!SecurityUtils.isValidUsername(currentState.username)) {
+            _uiState.value = currentState.copy(
+                errorMessage = "Invalid username format"
+            )
+            return
+        }
+
         if (currentState.password.isBlank()) {
             _uiState.value = currentState.copy(
                 errorMessage = "Password is required"
+            )
+            return
+        }
+
+        if (!SecurityUtils.isValidPassword(currentState.password)) {
+            _uiState.value = currentState.copy(
+                errorMessage = "Password must be at least 6 characters"
             )
             return
         }
@@ -93,6 +109,9 @@ class LoginViewModel @Inject constructor(
                     username = currentState.username,
                     password = currentState.password
                 )
+
+                // Record login attempt for rate limiting
+                rateLimiter.recordAttempt(userIdentifier)
 
                 val result = PerformanceMonitor.measureNetworkOperation("User Login") {
                     authRepository.login(loginRequest)
@@ -129,21 +148,14 @@ class LoginViewModel @Inject constructor(
     private fun handleLoginFailure(message: String) {
         val currentState = _uiState.value
         val newAttemptCount = currentState.attemptCount + 1
-        lastAttemptTime = System.currentTimeMillis()
 
         _uiState.value = currentState.copy(
             isLoading = false,
             isLoginSuccessful = false,
             errorMessage = message,
             attemptCount = newAttemptCount,
-            isRateLimited = newAttemptCount >= maxLoginAttempts
+            isRateLimited = newAttemptCount >= 5
         )
-    }
-
-    private fun isRateLimited(): Boolean {
-        val currentState = _uiState.value
-        return currentState.attemptCount >= maxLoginAttempts &&
-               (System.currentTimeMillis() - lastAttemptTime) < rateLimitDuration
     }
 
     fun clearError() {
