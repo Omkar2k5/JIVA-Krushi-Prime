@@ -124,6 +124,7 @@ class DummyAuthRepository @Inject constructor(
     override suspend fun logout(): Result<Unit> {
         return try {
             _currentSession.value = null
+            userPreferencesDataStore.clearUserSession()
             Timber.d("User logged out successfully")
             Result.success(Unit)
         } catch (e: Exception) {
@@ -133,7 +134,25 @@ class DummyAuthRepository @Inject constructor(
     }
     
     override suspend fun getCurrentSession(): UserSession? {
-        return _currentSession.value?.takeIf { isSessionValid(it) }
+        // First check in-memory session
+        val memorySession = _currentSession.value?.takeIf { isSessionValid(it) }
+        if (memorySession != null) {
+            return memorySession
+        }
+
+        // If no valid in-memory session, check DataStore
+        return try {
+            val persistedSession = userPreferencesDataStore.getUserSession().first()
+            if (persistedSession != null && isSessionValid(persistedSession)) {
+                _currentSession.value = persistedSession
+                persistedSession
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error retrieving session from DataStore")
+            null
+        }
     }
     
     override fun observeCurrentSession(): Flow<UserSession?> {
@@ -172,5 +191,6 @@ class DummyAuthRepository @Inject constructor(
     
     override suspend fun clearSession() {
         _currentSession.value = null
+        userPreferencesDataStore.clearUserSession()
     }
 }

@@ -19,6 +19,14 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Support for different screen densities and sizes
+        vectorDrawables {
+            useSupportLibrary = true
+        }
+
+        // Support for multiple languages (add as needed)
+        resourceConfigurations += listOf("en", "es", "fr", "de", "zh", "ja", "ko")
     }
 
     buildTypes {

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.jiva.data.model.LoginRequest
 import com.example.jiva.data.model.User
 import com.example.jiva.data.repository.AuthRepository
+import com.example.jiva.utils.PerformanceMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -86,12 +87,16 @@ class LoginViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
+                PerformanceMonitor.logMemoryUsage("Login Start")
+
                 val loginRequest = LoginRequest(
                     username = currentState.username,
                     password = currentState.password
                 )
 
-                val result = authRepository.login(loginRequest)
+                val result = PerformanceMonitor.measureNetworkOperation("User Login") {
+                    authRepository.login(loginRequest)
+                }
 
                 result.fold(
                     onSuccess = { response ->
@@ -104,6 +109,7 @@ class LoginViewModel @Inject constructor(
                                 user = response.user,
                                 attemptCount = 0
                             )
+                            PerformanceMonitor.logMemoryUsage("Login Success")
                         } else {
                             handleLoginFailure(response.message ?: "Login failed")
                         }
