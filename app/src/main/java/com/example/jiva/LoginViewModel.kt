@@ -5,13 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.example.jiva.data.model.LoginRequest
 import com.example.jiva.data.model.User
 import com.example.jiva.data.repository.AuthRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
-import javax.inject.Inject
 
 data class LoginUiState(
     val username: String = "",
@@ -24,8 +22,7 @@ data class LoginUiState(
     val isRateLimited: Boolean = false
 )
 
-@HiltViewModel
-class LoginViewModel @Inject constructor(
+class LoginViewModel(
     private val authRepository: AuthRepository
 ) : ViewModel() {
 

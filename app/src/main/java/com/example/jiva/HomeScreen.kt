@@ -20,7 +20,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.jiva.data.repository.DummyAuthRepository
 import com.example.jiva.data.model.User
 import com.example.jiva.data.model.UserRole
 import java.text.SimpleDateFormat
@@ -31,7 +32,7 @@ import java.util.*
 fun HomeScreen(
     user: User? = null,
     onLogout: () -> Unit = {},
-    viewModel: HomeViewModel = hiltViewModel()
+    viewModel: HomeViewModel = viewModel { HomeViewModel(DummyAuthRepository()) }
 ) {
     val context = LocalContext.current
     val windowSizeClass = calculateWindowSizeClass(context as androidx.activity.ComponentActivity)

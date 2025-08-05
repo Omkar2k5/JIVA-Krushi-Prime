@@ -7,15 +7,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
 import java.util.UUID
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Dummy implementation of AuthRepository for development
  * This will be replaced with your SQL database implementation later
  */
-@Singleton
-class DummyAuthRepository @Inject constructor() : AuthRepository {
+class DummyAuthRepository() : AuthRepository {
     
     // Dummy users database - replace with SQL database later
     private val dummyUsers = listOf(

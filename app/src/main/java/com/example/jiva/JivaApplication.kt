@@ -2,11 +2,8 @@ package com.example.jiva
 
 import android.app.Application
 import androidx.multidex.MultiDexApplication
-import com.example.jiva.utils.DeviceCompatibility
-import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
 
-@HiltAndroidApp
 class JivaApplication : MultiDexApplication() {
     
     override fun onCreate() {
@@ -29,6 +26,10 @@ class JivaApplication : MultiDexApplication() {
         }
         
         Timber.d("JIVA Application started")
+
+        // Log basic device information
+        Timber.d("Device Info: ${android.os.Build.MODEL} (${android.os.Build.MANUFACTURER})")
+        Timber.d("Android Version: ${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT})")
     }
     
     /**
