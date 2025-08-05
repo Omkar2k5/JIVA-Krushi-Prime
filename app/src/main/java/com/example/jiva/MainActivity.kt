@@ -5,21 +5,29 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.jiva.ui.theme.MyApplicationTheme
+import dagger.hilt.android.AndroidEntryPoint
+import timber.log.Timber
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Install splash screen
+        installSplashScreen()
+
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        Timber.d("MainActivity created")
+
         setContent {
             MyApplicationTheme {
                 Surface(
@@ -51,9 +59,16 @@ fun JivaApp() {
                 }
             )
         }
-        
+
         composable("home") {
-            HomeScreen()
+            HomeScreen(
+                onLogout = {
+                    navController.navigate("login") {
+                        // Clear the home screen from the back stack
+                        popUpTo("home") { inclusive = true }
+                    }
+                }
+            )
         }
     }
 }

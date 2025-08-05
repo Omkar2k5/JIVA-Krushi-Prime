@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.jiva.ui.theme.Accessibility
+import com.example.jiva.utils.DeviceCompatibility
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3WindowSizeClassApi::class)
 @Composable
@@ -128,14 +130,21 @@ private fun CompactLoginLayout(
     onLogin: () -> Unit,
     focusManager: androidx.compose.ui.focus.FocusManager
 ) {
+    val screenPadding = DeviceCompatibility.getScreenPadding()
+    val isLandscape = DeviceCompatibility.isLandscape()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp)
+            .padding(screenPadding)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = if (isLandscape) Arrangement.Top else Arrangement.Center
     ) {
+        if (isLandscape) {
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
         LoginContent(
             uiState = uiState,
             onUsernameChange = onUsernameChange,
@@ -155,6 +164,9 @@ private fun ExpandedLoginLayout(
     onLogin: () -> Unit,
     focusManager: androidx.compose.ui.focus.FocusManager
 ) {
+    val screenPadding = DeviceCompatibility.getScreenPadding()
+    val contentMaxWidth = DeviceCompatibility.getContentMaxWidth()
+
     Row(
         modifier = Modifier.fillMaxSize(),
         horizontalArrangement = Arrangement.Center,
@@ -162,12 +174,12 @@ private fun ExpandedLoginLayout(
     ) {
         Card(
             modifier = Modifier
-                .width(400.dp)
-                .padding(32.dp),
+                .widthIn(max = contentMaxWidth)
+                .padding(screenPadding),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(
-                modifier = Modifier.padding(32.dp),
+                modifier = Modifier.padding(screenPadding),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 LoginContent(
@@ -222,7 +234,8 @@ private fun LoginContent(
             singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 16.dp),
+                .padding(bottom = 16.dp)
+                .contentDescription(Accessibility.ContentDescriptions.USERNAME_FIELD),
             enabled = !uiState.isLoading && !uiState.isRateLimited,
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Text,
@@ -231,7 +244,10 @@ private fun LoginContent(
             keyboardActions = KeyboardActions(
                 onNext = { focusManager.moveFocus(FocusDirection.Down) }
             ),
-            isError = uiState.errorMessage != null && uiState.username.isBlank()
+            isError = uiState.errorMessage != null && uiState.username.isBlank(),
+            supportingText = if (uiState.errorMessage != null && uiState.username.isBlank()) {
+                { Text("Username is required") }
+            } else null
         )
 
         // Password Field
@@ -242,16 +258,23 @@ private fun LoginContent(
             singleLine = true,
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             trailingIcon = {
-                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                IconButton(
+                    onClick = { passwordVisible = !passwordVisible },
+                    modifier = Modifier.contentDescription(
+                        if (passwordVisible) Accessibility.ContentDescriptions.HIDE_PASSWORD
+                        else Accessibility.ContentDescriptions.SHOW_PASSWORD
+                    )
+                ) {
                     Icon(
                         imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                        contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                        contentDescription = null // Content description is on the button
                     )
                 }
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 24.dp),
+                .padding(bottom = 24.dp)
+                .contentDescription(Accessibility.ContentDescriptions.PASSWORD_FIELD),
             enabled = !uiState.isLoading && !uiState.isRateLimited,
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
@@ -263,7 +286,10 @@ private fun LoginContent(
                     onLogin()
                 }
             ),
-            isError = uiState.errorMessage != null && uiState.password.isBlank()
+            isError = uiState.errorMessage != null && uiState.password.isBlank(),
+            supportingText = if (uiState.errorMessage != null && uiState.password.isBlank()) {
+                { Text("Password is required") }
+            } else null
         )
 
         // Rate limiting warning
@@ -291,7 +317,8 @@ private fun LoginContent(
             onClick = onLogin,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp),
+                .height(56.dp)
+                .contentDescription(Accessibility.ContentDescriptions.LOGIN_BUTTON),
             enabled = !uiState.isLoading &&
                      !uiState.isRateLimited &&
                      uiState.username.isNotBlank() &&

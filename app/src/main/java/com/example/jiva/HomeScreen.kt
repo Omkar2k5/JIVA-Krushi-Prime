@@ -1,7 +1,9 @@
 package com.example.jiva
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExitToApp
@@ -331,7 +333,7 @@ private fun StatusRow(label: String, status: String, isOnline: Boolean?) {
                         .size(8.dp)
                         .background(
                             color = if (isOnline) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                            shape = androidx.compose.foundation.shape.CircleShape
+                            shape = CircleShape
                         )
                 )
                 Spacer(modifier = Modifier.width(8.dp))
