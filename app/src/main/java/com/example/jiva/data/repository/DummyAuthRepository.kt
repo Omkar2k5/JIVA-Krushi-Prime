@@ -1,10 +1,12 @@
 package com.example.jiva.data.repository
 
+import com.example.jiva.data.datastore.UserPreferencesDataStore
 import com.example.jiva.data.model.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import timber.log.Timber
 import java.util.UUID
 import javax.inject.Inject
@@ -15,7 +17,9 @@ import javax.inject.Singleton
  * This will be replaced with your SQL database implementation later
  */
 @Singleton
-class DummyAuthRepository @Inject constructor() : AuthRepository {
+class DummyAuthRepository @Inject constructor(
+    private val userPreferencesDataStore: UserPreferencesDataStore
+) : AuthRepository {
     
     // Dummy users database - replace with SQL database later
     private val dummyUsers = listOf(
@@ -86,8 +90,11 @@ class DummyAuthRepository @Inject constructor() : AuthRepository {
                     token = token,
                     expiresAt = expiresAt
                 )
-                
+
                 _currentSession.value = session
+
+                // Persist session to DataStore for app restart survival
+                userPreferencesDataStore.saveUserSession(session)
                 
                 Timber.d("Login successful for user: ${request.username}")
                 Result.success(
