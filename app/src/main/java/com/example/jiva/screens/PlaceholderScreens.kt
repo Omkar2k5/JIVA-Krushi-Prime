@@ -90,11 +90,7 @@ fun PlaceholderScreen(
 // Individual screen composables
 @Composable
 fun OutstandingReportScreen(onBackClick: () -> Unit = {}) {
-    PlaceholderScreen(
-        title = "Outstanding Report",
-        description = "View and manage outstanding payments, dues, and pending transactions from customers and suppliers.",
-        onBackClick = onBackClick
-    )
+    OutstandingReportScreenImpl(onBackClick = onBackClick)
 }
 
 @Composable

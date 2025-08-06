@@ -291,6 +291,7 @@ private fun ModernMenuCard(
     }
 }
 
+
 @Composable
 private fun FooterBranding() {
     Box(
@@ -309,13 +310,6 @@ private fun FooterBranding() {
         )
     }
 }
-
-
-
-
-
-
-
 
 
 @Composable
@@ -401,6 +395,7 @@ fun HomeScreenPhonePreview() {
     }
 }
 
+
 @Preview(showBackground = true, device = "spec:width=1280dp,height=800dp,dpi=240")
 @Composable
 fun HomeScreenTabletPreview() {
@@ -418,3 +413,4 @@ fun HomeScreenTabletPreview() {
         )
     }
 }
+
