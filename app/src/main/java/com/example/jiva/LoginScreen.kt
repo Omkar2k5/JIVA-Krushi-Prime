@@ -1,5 +1,6 @@
 package com.example.jiva
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
@@ -18,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -199,6 +201,15 @@ private fun LoginContent(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // App Logo
+        Image(
+            painter = painterResource(id = R.drawable.logo),
+            contentDescription = "JIVA Logo",
+            modifier = Modifier
+                .size(120.dp)
+                .padding(bottom = 16.dp)
+        )
+
         // App Title
         Text(
             text = "JIVA",
