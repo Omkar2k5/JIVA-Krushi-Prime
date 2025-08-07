@@ -554,42 +554,7 @@ fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
                             }
                         }
 
-                        Divider(
-                            color = JivaColors.White.copy(alpha = 0.3f),
-                            thickness = 1.dp
-                        )
 
-                        // Action info
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = "💡 Quick Actions:",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = JivaColors.White.copy(alpha = 0.9f)
-                            )
-                            Text(
-                                text = "• Use date filters to view specific periods",
-                                fontSize = 12.sp,
-                                color = JivaColors.White.copy(alpha = 0.8f)
-                            )
-                            Text(
-                                text = "• Enter account details for specific account ledger",
-                                fontSize = 12.sp,
-                                color = JivaColors.White.copy(alpha = 0.8f)
-                            )
-                            Text(
-                                text = "• Red entries indicate pending transactions",
-                                fontSize = 12.sp,
-                                color = JivaColors.White.copy(alpha = 0.8f)
-                            )
-                            Text(
-                                text = "• Use Print button to export to Excel",
-                                fontSize = 12.sp,
-                                color = JivaColors.White.copy(alpha = 0.8f)
-                            )
-                        }
                     }
                 }
             }

@@ -694,54 +694,7 @@ fun SalesReportScreenImpl(onBackClick: () -> Unit = {}) {
                 }
             }
 
-            // Footer Tips Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = JivaColors.DeepBlue
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Text(
-                            text = "💡 Report Management Tips:",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = JivaColors.White
-                        )
 
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = "• Use date range to analyze specific periods",
-                                fontSize = 12.sp,
-                                color = JivaColors.White.copy(alpha = 0.8f)
-                            )
-                            Text(
-                                text = "• Filter by party name for customer-specific reports",
-                                fontSize = 12.sp,
-                                color = JivaColors.White.copy(alpha = 0.8f)
-                            )
-                            Text(
-                                text = "• Use HSN filter for tax compliance reports",
-                                fontSize = 12.sp,
-                                color = JivaColors.White.copy(alpha = 0.8f)
-                            )
-                            Text(
-                                text = "• Reset filters to view all transactions",
-                                fontSize = 12.sp,
-                                color = JivaColors.White.copy(alpha = 0.8f)
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 }

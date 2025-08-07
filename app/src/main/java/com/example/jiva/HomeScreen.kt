@@ -231,7 +231,11 @@ private fun ModernHeader(
             }
 
             IconButton(
-                onClick = onLogout,
+                onClick = {
+                    // Add debug logging
+                    println("Logout button clicked")
+                    onLogout()
+                },
                 modifier = Modifier
                     .background(
                         JivaColors.White.copy(alpha = 0.2f),
@@ -239,7 +243,7 @@ private fun ModernHeader(
                     )
             ) {
                 Icon(
-                    imageVector = Icons.Default.ExitToApp,
+                    imageVector = Icons.Default.Close,
                     contentDescription = "Logout",
                     tint = JivaColors.White
                 )

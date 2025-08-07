@@ -523,54 +523,7 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                 }
             }
 
-            // Footer Summary Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = JivaColors.DeepBlue
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Text(
-                            text = "💡 Stock Management Tips:",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = JivaColors.White
-                        )
 
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = "• Use filters to find specific items quickly",
-                                fontSize = 12.sp,
-                                color = JivaColors.White.copy(alpha = 0.8f)
-                            )
-                            Text(
-                                text = "• Monitor closing stock levels for reordering",
-                                fontSize = 12.sp,
-                                color = JivaColors.White.copy(alpha = 0.8f)
-                            )
-                            Text(
-                                text = "• Track valuation for inventory management",
-                                fontSize = 12.sp,
-                                color = JivaColors.White.copy(alpha = 0.8f)
-                            )
-                            Text(
-                                text = "• Use Print button to export detailed reports",
-                                fontSize = 12.sp,
-                                color = JivaColors.White.copy(alpha = 0.8f)
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 }

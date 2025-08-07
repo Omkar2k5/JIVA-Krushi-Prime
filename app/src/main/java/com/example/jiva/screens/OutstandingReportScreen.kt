@@ -543,42 +543,7 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                             )
                         }
 
-                        Divider(
-                            color = JivaColors.White.copy(alpha = 0.3f),
-                            thickness = 1.dp
-                        )
 
-                        // Action info
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = "💡 Quick Actions:",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = JivaColors.White.copy(alpha = 0.9f)
-                            )
-                            Text(
-                                text = "• Select entries using checkboxes to send messages",
-                                fontSize = 12.sp,
-                                color = JivaColors.White.copy(alpha = 0.8f)
-                            )
-                            Text(
-                                text = "• Use 'Select All' to choose all filtered entries",
-                                fontSize = 12.sp,
-                                color = JivaColors.White.copy(alpha = 0.8f)
-                            )
-                            Text(
-                                text = "• Tap Calculate for Interest Calculation",
-                                fontSize = 12.sp,
-                                color = JivaColors.White.copy(alpha = 0.8f)
-                            )
-                            Text(
-                                text = "• Use Print button to Export Report",
-                                fontSize = 12.sp,
-                                color = JivaColors.White.copy(alpha = 0.8f)
-                            )
-                        }
                     }
                 }
             }
