@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -144,11 +145,12 @@ fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
             onPrintClick = { /* TODO: Implement print */ }
         )
 
-        // Main content
+        // Main content with performance optimizations
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            userScrollEnabled = true
         ) {
             // Filter Controls Card
             item {
@@ -407,11 +409,11 @@ fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
                 }
             }
 
-            // Data Table Card
+            // Data Table Header Card
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
                     colors = CardDefaults.cardColors(containerColor = JivaColors.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
@@ -428,12 +430,35 @@ fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
 
                         // Table Header
                         LedgerTableHeader()
-
-                        // Table Data
-                        filteredEntries.forEach { entry ->
-                            LedgerTableRow(entry = entry, showDetails = showItemDetails)
-                        }
                     }
+                }
+            }
+
+            // Table Data Items with keys for performance
+            items(
+                items = filteredEntries,
+                key = { entry -> "${entry.entryDate}_${entry.particular}_${entry.entryNo}" }
+            ) { entry ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RectangleShape,
+                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                ) {
+                    LedgerTableRow(entry = entry, showDetails = showItemDetails)
+                }
+            }
+
+            // Table Footer Card
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
+                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    // Empty footer for visual completion
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
 

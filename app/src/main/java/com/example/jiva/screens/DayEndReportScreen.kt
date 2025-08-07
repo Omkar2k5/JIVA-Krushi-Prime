@@ -143,11 +143,12 @@ fun DayEndReportScreenImpl(onBackClick: () -> Unit = {}) {
             }
         }
 
-        // Main content
+        // Main content with performance optimizations
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            userScrollEnabled = true
         ) {
             // Key Metrics Cards
             item {

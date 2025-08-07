@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -154,11 +155,12 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
             }
         }
 
-        // Main content
+        // Main content with performance optimizations
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            userScrollEnabled = true
         ) {
             // Message Input Card
             item {
@@ -266,11 +268,11 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
                 }
             }
 
-            // Customer Table Card
+            // Customer Table Header Card
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
                     colors = CardDefaults.cardColors(containerColor = JivaColors.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
@@ -287,19 +289,41 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
 
                         // Table Header
                         CustomerTableHeader()
-
-                        // Table Data
-                        customerContacts.forEachIndexed { index, contact ->
-                            CustomerTableRow(
-                                contact = contact,
-                                onSelectionChanged = { isSelected ->
-                                    customerContacts[index] = contact.copy(isSelected = isSelected)
-                                    // Update selectAll state based on current selections
-                                    selectAll = customerContacts.all { it.isSelected }
-                                }
-                            )
-                        }
                     }
+                }
+            }
+
+            // Customer Table Data Items with keys for performance
+            items(
+                items = customerContacts.withIndex().toList(),
+                key = { (_, contact) -> contact.accountNumber }
+            ) { (index, contact) ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RectangleShape,
+                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                ) {
+                    CustomerTableRow(
+                        contact = contact,
+                        onSelectionChanged = { isSelected ->
+                            customerContacts[index] = contact.copy(isSelected = isSelected)
+                            // Update selectAll state based on current selections
+                            selectAll = customerContacts.all { it.isSelected }
+                        }
+                    )
+                }
+            }
+
+            // Table Footer Card
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
+                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
 

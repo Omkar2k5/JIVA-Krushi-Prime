@@ -121,11 +121,12 @@ fun SalesReportScreenImpl(onBackClick: () -> Unit = {}) {
             onPrintClick = { /* TODO: Implement print */ }
         )
 
-        // Main content
+        // Main content with performance optimizations
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            userScrollEnabled = true
         ) {
             // Filter Controls Card
             item {

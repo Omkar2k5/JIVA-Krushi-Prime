@@ -3,6 +3,7 @@ package com.example.jiva
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -156,15 +157,19 @@ fun HomeScreen(
                 }
             )
 
-            // Main Content - Responsive Grid
+            // Main Content - Responsive Grid with Performance Optimizations
             LazyVerticalGrid(
                 columns = GridCells.Fixed(ScreenUtils.getGridColumns()),
                 contentPadding = PaddingValues(ScreenUtils.getResponsivePadding()),
                 horizontalArrangement = Arrangement.spacedBy(ScreenUtils.getSpacing()),
                 verticalArrangement = Arrangement.spacedBy(ScreenUtils.getSpacing()),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                userScrollEnabled = true
             ) {
-                items(menuItems) { item ->
+                items(
+                    items = menuItems,
+                    key = { item -> item.id }
+                ) { item ->
                     ModernMenuCard(
                         menuItem = item,
                         onClick = { onNavigateToScreen(item.id) }
@@ -261,7 +266,10 @@ private fun ModernMenuCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(140.dp)
-            .clickable { onClick() }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { onClick() }
             .shadow(
                 elevation = 8.dp,
                 shape = RoundedCornerShape(20.dp),
