@@ -182,15 +182,20 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
                         OutlinedTextField(
                             value = messageText,
                             onValueChange = { messageText = it },
-                            placeholder = { 
-                                Text("Enter your WhatsApp message here...\n\nExample:\nDear Customer,\nThank you for your business with JIVA.\nWe have exciting offers for you!\n\nBest regards,\nJIVA Team") 
+                            placeholder = {
+                                Text("Enter your WhatsApp message here...")
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(150.dp),
                             shape = RoundedCornerShape(12.dp),
                             maxLines = 8,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.Black,
+                                unfocusedTextColor = Color.Black,
+                                cursorColor = JivaColors.Purple
+                            )
                         )
 
                         // Character count

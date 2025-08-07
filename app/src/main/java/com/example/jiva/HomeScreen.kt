@@ -181,6 +181,10 @@ private fun ModernHeader(
     currentUser: User?,
     onLogout: () -> Unit
 ) {
+    // Dummy client name - in real app this would come from database
+    val clientName = "Tushar Elinje"
+    val businessType = "Agricultural Business"
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -203,20 +207,20 @@ private fun ModernHeader(
                 // App Logo
                 Image(
                     painter = painterResource(id = R.drawable.logo),
-                    contentDescription = "JIVA Logo",
+                    contentDescription = "Business Logo",
                     modifier = Modifier.size(48.dp)
                 )
 
                 Column {
                     Text(
-                        text = "JIVA",
-                        fontSize = 28.sp,
+                        text = clientName,
+                        fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.SansSerif,
                         color = JivaColors.White
                     )
                     Text(
-                        text = "Business Dashboard",
+                        text = businessType,
                         fontSize = 14.sp,
                         fontFamily = FontFamily.SansSerif,
                         color = JivaColors.White.copy(alpha = 0.8f)
