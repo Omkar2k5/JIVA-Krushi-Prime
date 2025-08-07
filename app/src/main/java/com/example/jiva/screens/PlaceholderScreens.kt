@@ -95,11 +95,7 @@ fun OutstandingReportScreen(onBackClick: () -> Unit = {}) {
 
 @Composable
 fun LedgerScreen(onBackClick: () -> Unit = {}) {
-    PlaceholderScreen(
-        title = "Ledger",
-        description = "Access detailed account ledgers, transaction history, and financial records for comprehensive bookkeeping.",
-        onBackClick = onBackClick
-    )
+    LedgerReportScreenImpl(onBackClick = onBackClick)
 }
 
 @Composable

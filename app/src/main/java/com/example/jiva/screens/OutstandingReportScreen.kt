@@ -21,21 +21,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.jiva.JivaColors
 
-// Modern vibrant color scheme
-object JivaColors {
-    val DeepBlue = Color(0xFF1E3A8A)
-    val LightBlue = Color(0xFF3B82F6)
-    val Purple = Color(0xFF8B5CF6)
-    val Pink = Color(0xFFEC4899)
-    val Orange = Color(0xFFF59E0B)
-    val Green = Color(0xFF10B981)
-    val Red = Color(0xFFEF4444)
-    val Teal = Color(0xFF14B8A6)
-    val White = Color(0xFFFFFFFF)
-    val LightGray = Color(0xFFF8FAFC)
-    val CardBackground = Color(0xFFFFFFFF)
-}
+
 
 // Data model for Outstanding Report entries
 data class OutstandingEntry(
