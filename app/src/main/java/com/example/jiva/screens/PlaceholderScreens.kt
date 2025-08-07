@@ -115,11 +115,7 @@ fun DayEndReportScreen(onBackClick: () -> Unit = {}) {
 
 @Composable
 fun WhatsAppMarketingScreen(onBackClick: () -> Unit = {}) {
-    PlaceholderScreen(
-        title = "WhatsApp Bulk Marketing",
-        description = "Send bulk marketing messages, promotional offers, and customer communications via WhatsApp.",
-        onBackClick = onBackClick
-    )
+    WhatsAppBulkMessageScreenImpl(onBackClick = onBackClick)
 }
 
 @Preview(showBackground = true)
