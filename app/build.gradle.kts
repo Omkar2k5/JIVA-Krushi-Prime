@@ -10,8 +10,8 @@ android {
 
     defaultConfig {
         applicationId = "com.example.jiva"
-        minSdk = 24
-        targetSdk = 35
+        minSdk = 24  // Android 7.0 (API 24)
+        targetSdk = 35  // Android 15 (API 35)
         versionCode = 1
         versionName = "1.0"
 
@@ -24,6 +24,10 @@ android {
 
         // Ensure compatibility with Android 7+ (API 24+)
         multiDexEnabled = true
+
+        // Performance optimizations
+        renderscriptTargetApi = 24
+        renderscriptSupportModeEnabled = true
     }
 
     buildTypes {
@@ -45,15 +49,22 @@ android {
             // Performance optimizations for production
             isDebuggable = false
             isJniDebuggable = false
-            isRenderscriptDebuggable = false
+
+            // Additional optimizations
+            isCrunchPngs = true
         }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions {
         jvmTarget = "11"
+        freeCompilerArgs += listOf(
+            "-opt-in=kotlin.RequiresOptIn",
+            "-Xjvm-default=all"
+        )
     }
     buildFeatures {
         compose = true
@@ -71,6 +82,12 @@ dependencies {
 
     // MultiDex support for Android 7+ compatibility
     implementation("androidx.multidex:multidex:2.0.1")
+
+    // Core library desugaring for Android 7+ compatibility
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+
+    // Performance monitoring
+    implementation("androidx.startup:startup-runtime:1.1.1")
 
     // Compose BOM
     implementation(platform(libs.androidx.compose.bom))

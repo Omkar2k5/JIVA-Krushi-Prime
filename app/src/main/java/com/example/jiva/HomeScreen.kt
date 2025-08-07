@@ -39,6 +39,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.jiva.data.repository.DummyAuthRepository
 import com.example.jiva.data.model.User
 import com.example.jiva.data.model.UserRole
+import com.example.jiva.utils.ScreenUtils
+import com.example.jiva.utils.PerformanceUtils
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -154,12 +156,12 @@ fun HomeScreen(
                 }
             )
 
-            // Main Content
+            // Main Content - Responsive Grid
             LazyVerticalGrid(
-                columns = GridCells.Adaptive(160.dp),
-                contentPadding = PaddingValues(20.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                columns = GridCells.Fixed(ScreenUtils.getGridColumns()),
+                contentPadding = PaddingValues(ScreenUtils.getResponsivePadding()),
+                horizontalArrangement = Arrangement.spacedBy(ScreenUtils.getSpacing()),
+                verticalArrangement = Arrangement.spacedBy(ScreenUtils.getSpacing()),
                 modifier = Modifier.weight(1f)
             ) {
                 items(menuItems) { item ->
@@ -193,7 +195,7 @@ private fun ModernHeader(
                     colors = listOf(JivaColors.DeepBlue, JivaColors.LightBlue)
                 )
             )
-            .padding(20.dp)
+            .padding(ScreenUtils.getResponsivePadding())
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
