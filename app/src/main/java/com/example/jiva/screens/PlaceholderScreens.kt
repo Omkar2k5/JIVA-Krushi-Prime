@@ -110,11 +110,7 @@ fun ItemSellPurchaseScreen(onBackClick: () -> Unit = {}) {
 
 @Composable
 fun DayEndReportScreen(onBackClick: () -> Unit = {}) {
-    PlaceholderScreen(
-        title = "Day End Report",
-        description = "Generate comprehensive daily summary reports including sales, purchases, and closing balances.",
-        onBackClick = onBackClick
-    )
+    DayEndReportScreenImpl(onBackClick = onBackClick)
 }
 
 @Composable
