@@ -1,0 +1,303 @@
+package com.example.jiva.components
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.jiva.JivaColors
+import com.example.jiva.R
+import com.example.jiva.utils.ScreenUtils
+
+/**
+ * Responsive header component for all report screens
+ * Adapts to different screen sizes and orientations
+ */
+@Composable
+fun ResponsiveReportHeader(
+    title: String,
+    subtitle: String,
+    onBackClick: () -> Unit = {},
+    onPrintClick: () -> Unit = {},
+    showPrintButton: Boolean = true
+) {
+    val isCompactScreen = ScreenUtils.isCompactScreen()
+    val screenSize = ScreenUtils.getScreenSize()
+    val orientation = ScreenUtils.getOrientation()
+    
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(JivaColors.DeepBlue, JivaColors.Purple)
+                )
+            )
+            .padding(ScreenUtils.getResponsivePadding())
+    ) {
+        if (isCompactScreen && orientation == ScreenUtils.Orientation.PORTRAIT) {
+            // Compact layout for small screens
+            CompactHeaderLayout(
+                title = title,
+                subtitle = subtitle,
+                onBackClick = onBackClick,
+                onPrintClick = onPrintClick,
+                showPrintButton = showPrintButton
+            )
+        } else {
+            // Standard layout for larger screens
+            StandardHeaderLayout(
+                title = title,
+                subtitle = subtitle,
+                onBackClick = onBackClick,
+                onPrintClick = onPrintClick,
+                showPrintButton = showPrintButton
+            )
+        }
+    }
+}
+
+@Composable
+private fun CompactHeaderLayout(
+    title: String,
+    subtitle: String,
+    onBackClick: () -> Unit,
+    onPrintClick: () -> Unit,
+    showPrintButton: Boolean
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // First row: Back button, Logo, Title
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            IconButton(
+                onClick = onBackClick,
+                modifier = Modifier
+                    .background(
+                        JivaColors.White.copy(alpha = 0.2f),
+                        RoundedCornerShape(8.dp)
+                    )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Back",
+                    tint = JivaColors.White
+                )
+            }
+            
+            Image(
+                painter = painterResource(id = R.drawable.logo),
+                contentDescription = "Logo",
+                modifier = Modifier.size(32.dp)
+            )
+            
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.SansSerif,
+                    color = JivaColors.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = subtitle,
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.SansSerif,
+                    color = JivaColors.White.copy(alpha = 0.8f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        
+        // Second row: Print button (if enabled)
+        if (showPrintButton) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                ResponsivePrintButton(
+                    onClick = onPrintClick,
+                    isCompact = true
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StandardHeaderLayout(
+    title: String,
+    subtitle: String,
+    onBackClick: () -> Unit,
+    onPrintClick: () -> Unit,
+    showPrintButton: Boolean
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.weight(1f)
+        ) {
+            IconButton(
+                onClick = onBackClick,
+                modifier = Modifier
+                    .background(
+                        JivaColors.White.copy(alpha = 0.2f),
+                        RoundedCornerShape(8.dp)
+                    )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Back",
+                    tint = JivaColors.White
+                )
+            }
+            
+            Image(
+                painter = painterResource(id = R.drawable.logo),
+                contentDescription = "Logo",
+                modifier = Modifier.size(32.dp)
+            )
+            
+            Column {
+                Text(
+                    text = title,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.SansSerif,
+                    color = JivaColors.White
+                )
+                Text(
+                    text = subtitle,
+                    fontSize = 14.sp,
+                    fontFamily = FontFamily.SansSerif,
+                    color = JivaColors.White.copy(alpha = 0.8f)
+                )
+            }
+        }
+        
+        if (showPrintButton) {
+            ResponsivePrintButton(
+                onClick = onPrintClick,
+                isCompact = false
+            )
+        }
+    }
+}
+
+@Composable
+private fun ResponsivePrintButton(
+    onClick: () -> Unit,
+    isCompact: Boolean
+) {
+    val buttonHeight = if (isCompact) 40.dp else ScreenUtils.getButtonHeight()
+    val iconSize = if (isCompact) 16.dp else ScreenUtils.getIconSize()
+    val fontSize = if (isCompact) 12.sp else 14.sp
+    
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = JivaColors.White.copy(alpha = 0.2f)
+        ),
+        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier
+            .height(buttonHeight)
+            .widthIn(min = if (isCompact) 100.dp else 120.dp),
+        contentPadding = PaddingValues(
+            horizontal = if (isCompact) 12.dp else 16.dp,
+            vertical = 8.dp
+        )
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(if (isCompact) 4.dp else 8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Share,
+                contentDescription = "Print",
+                tint = JivaColors.White,
+                modifier = Modifier.size(iconSize)
+            )
+            Text(
+                text = "PRINT",
+                color = JivaColors.White,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = fontSize,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+/**
+ * Responsive WhatsApp button for Day End Report
+ */
+@Composable
+fun ResponsiveWhatsAppButton(
+    onClick: () -> Unit,
+    isCompact: Boolean = ScreenUtils.isCompactScreen()
+) {
+    val buttonHeight = if (isCompact) 40.dp else ScreenUtils.getButtonHeight()
+    val iconSize = if (isCompact) 16.dp else ScreenUtils.getIconSize()
+    val fontSize = if (isCompact) 12.sp else 14.sp
+    
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = JivaColors.Green
+        ),
+        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier
+            .height(buttonHeight)
+            .widthIn(min = if (isCompact) 100.dp else 140.dp),
+        contentPadding = PaddingValues(
+            horizontal = if (isCompact) 12.dp else 16.dp,
+            vertical = 8.dp
+        )
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(if (isCompact) 4.dp else 8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Send,
+                contentDescription = "WhatsApp",
+                tint = JivaColors.White,
+                modifier = Modifier.size(iconSize)
+            )
+            Text(
+                text = "WhatsApp",
+                color = JivaColors.White,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = fontSize,
+                maxLines = 1
+            )
+        }
+    }
+}

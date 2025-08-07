@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.jiva.JivaColors
 import com.example.jiva.R
+import com.example.jiva.components.ResponsiveReportHeader
 
 // Data model for Sales/Purchase Report entries
 data class SalesReportEntry(
@@ -112,88 +113,13 @@ fun SalesReportScreenImpl(onBackClick: () -> Unit = {}) {
             .fillMaxSize()
             .background(JivaColors.LightGray)
     ) {
-        // Header with gradient background
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(JivaColors.DeepBlue, JivaColors.Purple)
-                    )
-                )
-                .padding(20.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    IconButton(
-                        onClick = onBackClick,
-                        modifier = Modifier
-                            .background(
-                                JivaColors.White.copy(alpha = 0.2f),
-                                RoundedCornerShape(8.dp)
-                            )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back",
-                            tint = JivaColors.White
-                        )
-                    }
-                    
-                    // App Logo
-                    Image(
-                        painter = painterResource(id = R.drawable.logo),
-                        contentDescription = "JIVA Logo",
-                        modifier = Modifier.size(32.dp)
-                    )
-                    
-                    Column {
-                        Text(
-                            text = "Sales & Purchase Report",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.SansSerif,
-                            color = JivaColors.White
-                        )
-                        Text(
-                            text = "Detailed transaction reports and analysis",
-                            fontSize = 14.sp,
-                            fontFamily = FontFamily.SansSerif,
-                            color = JivaColors.White.copy(alpha = 0.8f)
-                        )
-                    }
-                }
-                
-                // Print button
-                Button(
-                    onClick = { /* TODO: Implement print */ },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = JivaColors.White.copy(alpha = 0.2f)
-                    ),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Share,
-                        contentDescription = "Print",
-                        tint = JivaColors.White,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "PRINT",
-                        color = JivaColors.White,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
-        }
+        // Responsive Header
+        ResponsiveReportHeader(
+            title = "Sales & Purchase Report",
+            subtitle = "Detailed transaction reports and analysis",
+            onBackClick = onBackClick,
+            onPrintClick = { /* TODO: Implement print */ }
+        )
 
         // Main content
         LazyColumn(

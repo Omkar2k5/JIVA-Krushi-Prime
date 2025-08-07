@@ -243,7 +243,7 @@ private fun ModernHeader(
                     )
             ) {
                 Icon(
-                    imageVector = Icons.Default.Close,
+                    imageVector = Icons.Default.ExitToApp,
                     contentDescription = "Logout",
                     tint = JivaColors.White
                 )

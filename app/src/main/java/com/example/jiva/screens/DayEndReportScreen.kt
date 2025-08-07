@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.jiva.JivaColors
 import com.example.jiva.R
+import com.example.jiva.components.ResponsiveWhatsAppButton
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -124,47 +125,20 @@ fun DayEndReportScreenImpl(onBackClick: () -> Unit = {}) {
                     }
                 }
 
-                // Second row: WhatsApp button (responsive design)
+                // Second row: Responsive WhatsApp button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
-                    Button(
+                    ResponsiveWhatsAppButton(
                         onClick = {
                             // TODO: Send WhatsApp message to self
                             // For now, this would generate a dummy message template
                             val whatsappMessage = generateDayEndWhatsAppMessage(dayEndData, netProfit)
                             // In real implementation, this would open WhatsApp with the message
                             // or send via WhatsApp Business API
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = JivaColors.Green
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .height(48.dp)
-                            .widthIn(min = 120.dp, max = 200.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Send,
-                                contentDescription = "Send WhatsApp",
-                                tint = JivaColors.White,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                text = "WhatsApp",
-                                color = JivaColors.White,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 13.sp,
-                                maxLines = 1
-                            )
                         }
-                    }
+                    )
                 }
             }
         }
