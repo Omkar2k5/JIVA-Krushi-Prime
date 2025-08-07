@@ -100,11 +100,7 @@ fun LedgerScreen(onBackClick: () -> Unit = {}) {
 
 @Composable
 fun StockReportScreen(onBackClick: () -> Unit = {}) {
-    PlaceholderScreen(
-        title = "Stock Report",
-        description = "Monitor current stock levels, inventory movements, and generate detailed stock reports for better inventory management.",
-        onBackClick = onBackClick
-    )
+    StockReportScreenImpl(onBackClick = onBackClick)
 }
 
 @Composable
