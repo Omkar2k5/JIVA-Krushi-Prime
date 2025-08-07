@@ -72,14 +72,14 @@ fun DayEndReportScreenImpl(onBackClick: () -> Unit = {}) {
                         colors = listOf(JivaColors.DeepBlue, JivaColors.Purple)
                     )
                 )
-                .padding(20.dp)
+                .padding(16.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                // First row: Back button, Logo, Title
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -97,57 +97,74 @@ fun DayEndReportScreenImpl(onBackClick: () -> Unit = {}) {
                             tint = JivaColors.White
                         )
                     }
-                    
+
                     // App Logo
                     Image(
                         painter = painterResource(id = R.drawable.logo),
                         contentDescription = "JIVA Logo",
                         modifier = Modifier.size(32.dp)
                     )
-                    
-                    Column {
+
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
                         Text(
                             text = "Day End Report",
-                            fontSize = 24.sp,
+                            fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.SansSerif,
                             color = JivaColors.White
                         )
                         Text(
                             text = "Daily business summary - $currentDate",
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             fontFamily = FontFamily.SansSerif,
                             color = JivaColors.White.copy(alpha = 0.8f)
                         )
                     }
                 }
-                
-                // WhatsApp button
-                Button(
-                    onClick = {
-                        // TODO: Send WhatsApp message to self
-                        // For now, this would generate a dummy message template
-                        val whatsappMessage = generateDayEndWhatsAppMessage(dayEndData, netProfit)
-                        // In real implementation, this would open WhatsApp with the message
-                        // or send via WhatsApp Business API
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = JivaColors.Green
-                    ),
-                    shape = RoundedCornerShape(8.dp)
+
+                // Second row: WhatsApp button (responsive design)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Send,
-                        contentDescription = "WhatsApp",
-                        tint = JivaColors.White,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "WhatsApp",
-                        color = JivaColors.White,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Button(
+                        onClick = {
+                            // TODO: Send WhatsApp message to self
+                            // For now, this would generate a dummy message template
+                            val whatsappMessage = generateDayEndWhatsAppMessage(dayEndData, netProfit)
+                            // In real implementation, this would open WhatsApp with the message
+                            // or send via WhatsApp Business API
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = JivaColors.Green
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .height(48.dp)
+                            .widthIn(min = 120.dp, max = 200.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Send,
+                                contentDescription = "Send WhatsApp",
+                                tint = JivaColors.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "WhatsApp",
+                                color = JivaColors.White,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp,
+                                maxLines = 1
+                            )
+                        }
+                    }
                 }
             }
         }
