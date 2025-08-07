@@ -105,11 +105,7 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
 
 @Composable
 fun ItemSellPurchaseScreen(onBackClick: () -> Unit = {}) {
-    PlaceholderScreen(
-        title = "Item Sell/Purchase",
-        description = "Manage sales transactions, purchase orders, and item-wise trading operations with real-time updates.",
-        onBackClick = onBackClick
-    )
+    SalesReportScreenImpl(onBackClick = onBackClick)
 }
 
 @Composable
