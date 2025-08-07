@@ -54,7 +54,7 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
     var selectedEntries by remember { mutableStateOf(setOf<String>()) }
     var selectAll by remember { mutableStateOf(false) }
 
-    // Dummy data
+    // Dummy data with more entries for better search testing
     val allEntries = remember {
         listOf(
             OutstandingEntry("001", "ABC Traders", "9876543210", 5000.0, 2000.0, 1500.0, 5500.0, "North", "123 Main St"),
@@ -62,17 +62,26 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
             OutstandingEntry("003", "PQR Industries", "9876543212", 8000.0, 3000.0, 2000.0, 9000.0, "East", "789 Pine Rd"),
             OutstandingEntry("004", "LMN Corporation", "9876543213", 2000.0, 500.0, 1000.0, 1500.0, "West", "321 Elm St"),
             OutstandingEntry("005", "DEF Enterprises", "9876543214", 6000.0, 2500.0, 1000.0, 7500.0, "North", "654 Maple Dr"),
-            OutstandingEntry("006", "GHI Solutions", "9876543215", 4000.0, 1500.0, 2000.0, 3500.0, "South", "987 Cedar Ln")
+            OutstandingEntry("006", "GHI Solutions", "9876543215", 4000.0, 1500.0, 2000.0, 3500.0, "South", "987 Cedar Ln"),
+            OutstandingEntry("025", "Aman Shaikh", "9876543216", 11000.0, 400.0, 2400.0, 13000.0, "North", "789 Business St"),
+            OutstandingEntry("007", "Tech Solutions", "9876543217", 7500.0, 1200.0, 800.0, 8300.0, "East", "456 Tech Park"),
+            OutstandingEntry("008", "Medical Supplies", "9876543218", 4500.0, 800.0, 1200.0, 4300.0, "West", "321 Health Ave"),
+            OutstandingEntry("009", "Food Distributors", "9876543219", 6200.0, 1500.0, 900.0, 6700.0, "South", "654 Food St")
         )
     }
 
     // Filtered entries based on search and area
     val filteredEntries = remember(partyNameSearch, selectedArea, allEntries) {
         allEntries.filter { entry ->
+            // Party name search - searches in both account name and account ID
             val matchesSearch = if (partyNameSearch.isBlank()) true
-                else entry.accountName.contains(partyNameSearch, ignoreCase = true)
+                else entry.accountName.contains(partyNameSearch, ignoreCase = true) ||
+                     entry.acId.contains(partyNameSearch, ignoreCase = true)
+
+            // Area filter
             val matchesArea = if (selectedArea == "All") true
                 else entry.area == selectedArea
+
             matchesSearch && matchesArea
         }
     }
@@ -331,7 +340,7 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                 OutlinedTextField(
                                     value = partyNameSearch,
                                     onValueChange = { partyNameSearch = it },
-                                    placeholder = { Text("Search party name...") },
+                                    placeholder = { Text("Search by name or ID...") },
                                     trailingIcon = {
                                         IconButton(onClick = { partyNameSearch = "" }) {
                                             Icon(

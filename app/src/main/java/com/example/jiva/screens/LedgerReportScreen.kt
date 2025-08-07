@@ -50,24 +50,35 @@ fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
     var fromDate by remember { mutableStateOf("01/04/2025") }
     var toDate by remember { mutableStateOf("31/03/2026") }
     var showItemDetails by remember { mutableStateOf(false) }
-    var accountNumber by remember { mutableStateOf("25") }
-    var accountName by remember { mutableStateOf("Aman Shaikh") }
+    var accountNumber by remember { mutableStateOf("") }
+    var accountName by remember { mutableStateOf("") }
     
     // Date picker states
     var showFromDatePicker by remember { mutableStateOf(false) }
     var showToDatePicker by remember { mutableStateOf(false) }
 
-    // Dummy data
+    // Dummy data with multiple accounts for search testing
     val allEntries = remember {
         listOf(
-            LedgerEntry("01-Apr-2025", "", "", "Opening Balance", 11000.0, 0.0, "", "", true),
-            LedgerEntry("05-Aug-2025", "Credit Sale", "1", "Cash Amount Cre...", 0.0, 400.0, "1", ""),
-            LedgerEntry("05-Aug-2025", "Credit Sale", "1", "Credit Sale No:1", 2400.0, 0.0, "1", "Rogar 100ml -12,"),
-            LedgerEntry("10-Aug-2025", "Payment", "2", "Payment Received", 0.0, 1000.0, "2", "Cash payment"),
-            LedgerEntry("15-Sep-2025", "Credit Sale", "3", "Credit Sale No:3", 1500.0, 0.0, "3", "Medicine -5,"),
-            LedgerEntry("20-Oct-2025", "Payment", "4", "Payment Received", 0.0, 500.0, "4", "Bank transfer"),
-            LedgerEntry("31-Mar-2026", "", "", "Total", 14900.0, 1900.0, "", "", true),
-            LedgerEntry("31-Mar-2026", "", "", "Closing Balance", 13000.0, 0.0, "", "", true)
+            // Account 25 - Aman Shaikh entries
+            LedgerEntry("01-Apr-2025", "", "", "Opening Balance - Aman Shaikh (25)", 11000.0, 0.0, "25", "", true),
+            LedgerEntry("05-Aug-2025", "Credit Sale", "1", "Cash Amount Credit - Aman Shaikh", 0.0, 400.0, "25", "Account: 25"),
+            LedgerEntry("05-Aug-2025", "Credit Sale", "1", "Credit Sale No:1 - Aman Shaikh", 2400.0, 0.0, "25", "Rogar 100ml -12, Account: 25"),
+            LedgerEntry("10-Aug-2025", "Payment", "2", "Payment Received - Aman Shaikh", 0.0, 1000.0, "25", "Cash payment, Account: 25"),
+
+            // Account 001 - ABC Traders entries
+            LedgerEntry("01-Apr-2025", "", "", "Opening Balance - ABC Traders (001)", 5000.0, 0.0, "001", "", true),
+            LedgerEntry("15-Sep-2025", "Credit Sale", "3", "Credit Sale No:3 - ABC Traders", 1500.0, 0.0, "001", "Medicine -5, Account: 001"),
+            LedgerEntry("20-Oct-2025", "Payment", "4", "Payment Received - ABC Traders", 0.0, 500.0, "001", "Bank transfer, Account: 001"),
+
+            // Account 002 - XYZ Suppliers entries
+            LedgerEntry("01-Apr-2025", "", "", "Opening Balance - XYZ Suppliers (002)", 3000.0, 0.0, "002", "", true),
+            LedgerEntry("12-Nov-2025", "Purchase", "5", "Purchase from XYZ Suppliers", 0.0, 2000.0, "002", "Inventory purchase, Account: 002"),
+            LedgerEntry("25-Dec-2025", "Payment", "6", "Payment to XYZ Suppliers", 1800.0, 0.0, "002", "Supplier payment, Account: 002"),
+
+            // Totals and closing (these will be calculated dynamically in real implementation)
+            LedgerEntry("31-Mar-2026", "", "", "Total", 24700.0, 3900.0, "", "", true),
+            LedgerEntry("31-Mar-2026", "", "", "Closing Balance", 20800.0, 0.0, "", "", true)
         )
     }
 
@@ -94,10 +105,20 @@ fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
                 entryDateParsed >= fromDateParsed && entryDateParsed <= toDateParsed
             } else true
             
-            // Account filter (simplified - in real app would be more sophisticated)
+            // Account filter - searches in multiple fields for better matching
             val accountMatches = if (accountNumber.isNotBlank() || accountName.isNotBlank()) {
-                entry.particular.contains(accountName, ignoreCase = true) ||
-                entry.manualNo == accountNumber
+                val numberMatch = if (accountNumber.isNotBlank()) {
+                    entry.manualNo.contains(accountNumber, ignoreCase = true) ||
+                    entry.particular.contains("($accountNumber)", ignoreCase = true) ||
+                    entry.details.contains("Account: $accountNumber", ignoreCase = true)
+                } else true
+
+                val nameMatch = if (accountName.isNotBlank()) {
+                    entry.particular.contains(accountName, ignoreCase = true) ||
+                    entry.details.contains(accountName, ignoreCase = true)
+                } else true
+
+                numberMatch && nameMatch
             } else true
             
             dateInRange && accountMatches
@@ -340,6 +361,7 @@ fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
                                     OutlinedTextField(
                                         value = accountNumber,
                                         onValueChange = { accountNumber = it },
+                                        placeholder = { Text("Enter account number") },
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                         modifier = Modifier.fillMaxWidth(),
                                         shape = RoundedCornerShape(8.dp),
@@ -372,6 +394,7 @@ fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
                                 OutlinedTextField(
                                     value = accountName,
                                     onValueChange = { accountName = it },
+                                    placeholder = { Text("Enter account name") },
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(8.dp),
                                     singleLine = true
