@@ -2,6 +2,8 @@ package com.example.jiva.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -492,7 +494,7 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
 private fun OutstandingTableHeader() {
     Row(
         modifier = Modifier
-            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
             .background(
                 JivaColors.LightGray,
                 RoundedCornerShape(8.dp)
@@ -501,9 +503,9 @@ private fun OutstandingTableHeader() {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Checkbox column header
+        // Checkbox column header - Fixed width
         Box(
-            modifier = Modifier.weight(0.5f),
+            modifier = Modifier.width(50.dp),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -513,14 +515,14 @@ private fun OutstandingTableHeader() {
                 modifier = Modifier.size(16.dp)
             )
         }
-        TableHeaderCell("AC ID", modifier = Modifier.weight(0.8f))
-        TableHeaderCell("Account Name", modifier = Modifier.weight(2f))
-        TableHeaderCell("Mobile", modifier = Modifier.weight(1.2f))
-        TableHeaderCell("Opening", modifier = Modifier.weight(1f))
-        TableHeaderCell("CR", modifier = Modifier.weight(1f))
-        TableHeaderCell("DR", modifier = Modifier.weight(1f))
-        TableHeaderCell("Closing", modifier = Modifier.weight(1f))
-        TableHeaderCell("Area", modifier = Modifier.weight(0.8f))
+        TableHeaderCell("AC ID", modifier = Modifier.width(80.dp))
+        TableHeaderCell("Account Name", modifier = Modifier.width(150.dp))
+        TableHeaderCell("Mobile", modifier = Modifier.width(120.dp))
+        TableHeaderCell("Opening", modifier = Modifier.width(100.dp))
+        TableHeaderCell("CR", modifier = Modifier.width(100.dp))
+        TableHeaderCell("DR", modifier = Modifier.width(100.dp))
+        TableHeaderCell("Closing", modifier = Modifier.width(120.dp))
+        TableHeaderCell("Area", modifier = Modifier.width(100.dp))
     }
 }
 
@@ -544,44 +546,46 @@ private fun OutstandingTableRow(
     isSelected: Boolean,
     onSelectionChange: (Boolean) -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp, horizontal = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Checkbox column
-        Box(
-            modifier = Modifier.weight(0.5f),
-            contentAlignment = Alignment.Center
+    Column {
+        Row(
+            modifier = Modifier
+                .horizontalScroll(rememberScrollState())
+                .padding(vertical = 8.dp, horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Checkbox(
-                checked = isSelected,
-                onCheckedChange = onSelectionChange,
-                colors = CheckboxDefaults.colors(checkedColor = JivaColors.Purple),
-                modifier = Modifier.size(20.dp)
+            // Checkbox column - Fixed width
+            Box(
+                modifier = Modifier.width(50.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = onSelectionChange,
+                    colors = CheckboxDefaults.colors(checkedColor = JivaColors.Purple),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            TableCell(entry.acId, modifier = Modifier.width(80.dp))
+            TableCell(entry.accountName, modifier = Modifier.width(150.dp))
+            TableCell(entry.mobile, modifier = Modifier.width(120.dp))
+            TableCell("₹${String.format("%.0f", entry.opening)}", modifier = Modifier.width(100.dp))
+            TableCell("₹${String.format("%.0f", entry.cr)}", modifier = Modifier.width(100.dp))
+            TableCell("₹${String.format("%.0f", entry.dr)}", modifier = Modifier.width(100.dp))
+            TableCell(
+                text = "₹${String.format("%.0f", entry.closingBalance)}",
+                modifier = Modifier.width(120.dp),
+                color = if (entry.closingBalance >= 0) JivaColors.Green else JivaColors.Red
             )
+            TableCell(entry.area, modifier = Modifier.width(100.dp))
         }
-        TableCell(entry.acId, modifier = Modifier.weight(0.8f))
-        TableCell(entry.accountName, modifier = Modifier.weight(2f))
-        TableCell(entry.mobile, modifier = Modifier.weight(1.2f))
-        TableCell("₹${String.format("%.0f", entry.opening)}", modifier = Modifier.weight(1f))
-        TableCell("₹${String.format("%.0f", entry.cr)}", modifier = Modifier.weight(1f))
-        TableCell("₹${String.format("%.0f", entry.dr)}", modifier = Modifier.weight(1f))
-        TableCell(
-            text = "₹${String.format("%.0f", entry.closingBalance)}",
-            modifier = Modifier.weight(1f),
-            color = if (entry.closingBalance >= 0) JivaColors.Green else JivaColors.Red
-        )
-        TableCell(entry.area, modifier = Modifier.weight(0.8f))
-    }
 
-    Divider(
-        color = JivaColors.LightGray,
-        thickness = 0.5.dp,
-        modifier = Modifier.padding(horizontal = 12.dp)
-    )
+        Divider(
+            color = JivaColors.LightGray,
+            thickness = 0.5.dp,
+            modifier = Modifier.padding(horizontal = 12.dp)
+        )
+    }
 }
 
 @Composable

@@ -3,6 +3,8 @@ package com.example.jiva.screens
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -517,7 +519,7 @@ fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
 private fun LedgerTableHeader() {
     Row(
         modifier = Modifier
-            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
             .background(
                 JivaColors.LightGray,
                 RoundedCornerShape(8.dp)
@@ -526,14 +528,14 @@ private fun LedgerTableHeader() {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        LedgerHeaderCell("Date", modifier = Modifier.weight(1.2f))
-        LedgerHeaderCell("Type", modifier = Modifier.weight(1f))
-        LedgerHeaderCell("No", modifier = Modifier.weight(0.6f))
-        LedgerHeaderCell("Particular", modifier = Modifier.weight(2f))
-        LedgerHeaderCell("DR", modifier = Modifier.weight(1f))
-        LedgerHeaderCell("CR", modifier = Modifier.weight(1f))
-        LedgerHeaderCell("Manual", modifier = Modifier.weight(0.8f))
-        LedgerHeaderCell("Details", modifier = Modifier.weight(1.5f))
+        LedgerHeaderCell("Date", modifier = Modifier.width(100.dp))
+        LedgerHeaderCell("Type", modifier = Modifier.width(80.dp))
+        LedgerHeaderCell("No", modifier = Modifier.width(70.dp))
+        LedgerHeaderCell("Particular", modifier = Modifier.width(180.dp))
+        LedgerHeaderCell("DR", modifier = Modifier.width(100.dp))
+        LedgerHeaderCell("CR", modifier = Modifier.width(100.dp))
+        LedgerHeaderCell("Manual", modifier = Modifier.width(80.dp))
+        LedgerHeaderCell("Details", modifier = Modifier.width(150.dp))
     }
 }
 
@@ -577,32 +579,32 @@ private fun LedgerTableRow(
     Column {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
                 .background(backgroundColor, RoundedCornerShape(4.dp))
                 .padding(vertical = 8.dp, horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            LedgerCell(entry.entryDate, modifier = Modifier.weight(1.2f), color = textColor, fontWeight = fontWeight)
-            LedgerCell(entry.entryType, modifier = Modifier.weight(1f), color = textColor, fontWeight = fontWeight)
-            LedgerCell(entry.entryNo, modifier = Modifier.weight(0.6f), color = textColor, fontWeight = fontWeight)
-            LedgerCell(entry.particular, modifier = Modifier.weight(2f), color = textColor, fontWeight = fontWeight)
+            LedgerCell(entry.entryDate, modifier = Modifier.width(100.dp), color = textColor, fontWeight = fontWeight)
+            LedgerCell(entry.entryType, modifier = Modifier.width(80.dp), color = textColor, fontWeight = fontWeight)
+            LedgerCell(entry.entryNo, modifier = Modifier.width(70.dp), color = textColor, fontWeight = fontWeight)
+            LedgerCell(entry.particular, modifier = Modifier.width(180.dp), color = textColor, fontWeight = fontWeight)
             LedgerCell(
                 text = if (entry.dr > 0) "₹${String.format("%.0f", entry.dr)}" else "",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.width(100.dp),
                 color = textColor,
                 fontWeight = fontWeight
             )
             LedgerCell(
                 text = if (entry.cr > 0) "₹${String.format("%.0f", entry.cr)}" else "",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.width(100.dp),
                 color = textColor,
                 fontWeight = fontWeight
             )
-            LedgerCell(entry.manualNo, modifier = Modifier.weight(0.8f), color = textColor, fontWeight = fontWeight)
+            LedgerCell(entry.manualNo, modifier = Modifier.width(80.dp), color = textColor, fontWeight = fontWeight)
             LedgerCell(
                 text = if (showDetails) entry.details else "",
-                modifier = Modifier.weight(1.5f),
+                modifier = Modifier.width(150.dp),
                 color = textColor,
                 fontWeight = fontWeight
             )

@@ -3,6 +3,8 @@ package com.example.jiva.screens
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -459,7 +461,7 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
 private fun StockTableHeader() {
     Row(
         modifier = Modifier
-            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
             .background(
                 JivaColors.LightGray,
                 RoundedCornerShape(8.dp)
@@ -468,18 +470,18 @@ private fun StockTableHeader() {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        StockHeaderCell("Item ID", modifier = Modifier.weight(0.8f))
-        StockHeaderCell("Item Name", modifier = Modifier.weight(1.5f))
-        StockHeaderCell("Opening", modifier = Modifier.weight(0.8f))
-        StockHeaderCell("IN Qty", modifier = Modifier.weight(0.8f))
-        StockHeaderCell("Out Qty", modifier = Modifier.weight(0.8f))
-        StockHeaderCell("Closing", modifier = Modifier.weight(0.8f))
-        StockHeaderCell("Avg Rate", modifier = Modifier.weight(0.8f))
-        StockHeaderCell("Valuation", modifier = Modifier.weight(1f))
-        StockHeaderCell("Type", modifier = Modifier.weight(0.8f))
-        StockHeaderCell("Company", modifier = Modifier.weight(1f))
-        StockHeaderCell("CGST", modifier = Modifier.weight(0.6f))
-        StockHeaderCell("SGST", modifier = Modifier.weight(0.6f))
+        StockHeaderCell("Item ID", modifier = Modifier.width(80.dp))
+        StockHeaderCell("Item Name", modifier = Modifier.width(150.dp))
+        StockHeaderCell("Opening", modifier = Modifier.width(80.dp))
+        StockHeaderCell("IN Qty", modifier = Modifier.width(80.dp))
+        StockHeaderCell("Out Qty", modifier = Modifier.width(80.dp))
+        StockHeaderCell("Closing", modifier = Modifier.width(80.dp))
+        StockHeaderCell("Avg Rate", modifier = Modifier.width(80.dp))
+        StockHeaderCell("Valuation", modifier = Modifier.width(100.dp))
+        StockHeaderCell("Type", modifier = Modifier.width(80.dp))
+        StockHeaderCell("Company", modifier = Modifier.width(100.dp))
+        StockHeaderCell("CGST", modifier = Modifier.width(60.dp))
+        StockHeaderCell("SGST", modifier = Modifier.width(60.dp))
     }
 }
 
@@ -502,23 +504,23 @@ private fun StockTableRow(entry: StockEntry) {
     Column {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
                 .padding(vertical = 8.dp, horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            StockCell(entry.itemId, modifier = Modifier.weight(0.8f))
-            StockCell(entry.itemName, modifier = Modifier.weight(1.5f))
-            StockCell("${entry.openingStock.toInt()}", modifier = Modifier.weight(0.8f))
-            StockCell("${entry.inQty.toInt()}", modifier = Modifier.weight(0.8f))
-            StockCell("${entry.outQty.toInt()}", modifier = Modifier.weight(0.8f))
-            StockCell("${entry.closingStock.toInt()}", modifier = Modifier.weight(0.8f))
-            StockCell("₹${String.format("%.2f", entry.avgRate)}", modifier = Modifier.weight(0.8f))
-            StockCell("₹${String.format("%.2f", entry.valuation)}", modifier = Modifier.weight(1f))
-            StockCell(entry.itemType, modifier = Modifier.weight(0.8f))
-            StockCell(entry.companyName, modifier = Modifier.weight(1f))
-            StockCell("${entry.cgst}%", modifier = Modifier.weight(0.6f))
-            StockCell("${entry.sgst}%", modifier = Modifier.weight(0.6f))
+            StockCell(entry.itemId, modifier = Modifier.width(80.dp))
+            StockCell(entry.itemName, modifier = Modifier.width(150.dp))
+            StockCell("${entry.openingStock.toInt()}", modifier = Modifier.width(80.dp))
+            StockCell("${entry.inQty.toInt()}", modifier = Modifier.width(80.dp))
+            StockCell("${entry.outQty.toInt()}", modifier = Modifier.width(80.dp))
+            StockCell("${entry.closingStock.toInt()}", modifier = Modifier.width(80.dp))
+            StockCell("₹${String.format("%.2f", entry.avgRate)}", modifier = Modifier.width(80.dp))
+            StockCell("₹${String.format("%.2f", entry.valuation)}", modifier = Modifier.width(100.dp))
+            StockCell(entry.itemType, modifier = Modifier.width(80.dp))
+            StockCell(entry.companyName, modifier = Modifier.width(100.dp))
+            StockCell("${entry.cgst}%", modifier = Modifier.width(60.dp))
+            StockCell("${entry.sgst}%", modifier = Modifier.width(60.dp))
         }
 
         HorizontalDivider(
