@@ -413,11 +413,11 @@ fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
                 }
             }
 
-            // Data Table Header Card
+            // Data Table Card
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = JivaColors.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
@@ -432,7 +432,7 @@ fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
 
-                        // Horizontally scrollable table header
+                        // Horizontally scrollable table
                         val tableScrollState = rememberScrollState()
 
                         Column(
@@ -440,24 +440,21 @@ fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
                                 .fillMaxWidth()
                                 .horizontalScroll(tableScrollState)
                         ) {
+                            // Table Header
                             LedgerTableHeader()
+
+                            // Table Rows
+                            filteredEntries.forEach { entry ->
+                                LedgerTableRow(entry = entry, showDetails = showItemDetails)
+                            }
+
+                            // Total Row
+                            LedgerTotalRow(
+                                totalDebit = totalDr,
+                                totalCredit = totalCr
+                            )
                         }
                     }
-                }
-            }
-
-            // Table Data Items with keys for performance
-            items(
-                items = filteredEntries,
-                key = { entry -> "${entry.entryDate}_${entry.particular}_${entry.entryNo}" }
-            ) { entry ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RectangleShape,
-                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                ) {
-                    LedgerTableRow(entry = entry, showDetails = showItemDetails)
                 }
             }
         }
@@ -562,11 +559,62 @@ private fun LedgerCell(
         fontSize = 11.sp,
         color = color,
         fontWeight = fontWeight,
-        textAlign = TextAlign.Start,
-        maxLines = 2,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier
     )
+}
+
+@Composable
+private fun LedgerTotalRow(
+    totalDebit: Double,
+    totalCredit: Double
+) {
+    Row(
+        modifier = Modifier
+            .background(
+                JivaColors.DeepBlue.copy(alpha = 0.1f),
+                RoundedCornerShape(8.dp)
+            )
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Date column
+        LedgerCell("-", Modifier.width(100.dp), JivaColors.DeepBlue)
+        // Type column
+        LedgerCell("-", Modifier.width(80.dp), JivaColors.DeepBlue)
+        // No column
+        LedgerCell("-", Modifier.width(70.dp), JivaColors.DeepBlue)
+        // Particular column with TOTAL text
+        Text(
+            text = "TOTAL",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = JivaColors.DeepBlue,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.width(180.dp)
+        )
+        // DR column
+        LedgerCell(
+            text = "₹${String.format("%.2f", totalDebit)}",
+            modifier = Modifier.width(100.dp),
+            color = JivaColors.Red
+        )
+        // CR column
+        LedgerCell(
+            text = "₹${String.format("%.2f", totalCredit)}",
+            modifier = Modifier.width(100.dp),
+            color = JivaColors.Green
+        )
+        // Manual column
+        LedgerCell("-", Modifier.width(80.dp), JivaColors.DeepBlue)
+        // Details column
+        LedgerCell("-", Modifier.width(150.dp), JivaColors.DeepBlue)
+    }
 }
 
 @Composable

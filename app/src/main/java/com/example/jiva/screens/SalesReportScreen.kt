@@ -710,22 +710,44 @@ private fun SalesReportTotalRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Date column
+        SalesReportCell("-", Modifier.width(80.dp), JivaColors.DeepBlue)
+        // Party column
+        SalesReportCell("-", Modifier.width(120.dp), JivaColors.DeepBlue)
+        // GSTIN column
+        SalesReportCell("-", Modifier.width(100.dp), JivaColors.DeepBlue)
+        // Type column
+        SalesReportCell("-", Modifier.width(80.dp), JivaColors.DeepBlue)
+        // Ref column
+        SalesReportCell("-", Modifier.width(60.dp), JivaColors.DeepBlue)
+        // Item column with TOTAL text
         Text(
             text = "TOTAL",
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             color = JivaColors.DeepBlue,
             textAlign = TextAlign.Center,
-            modifier = Modifier.width(570.dp) // Date + Party + GSTIN + Type + Ref + Item + HSN + Category columns
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.width(150.dp)
         )
+        // HSN column
+        SalesReportCell("-", Modifier.width(70.dp), JivaColors.DeepBlue)
+        // Category column
+        SalesReportCell("-", Modifier.width(80.dp), JivaColors.DeepBlue)
+        // Qty column
         SalesReportCell("${totalQty.toInt()}", Modifier.width(60.dp), JivaColors.DeepBlue)
-        SalesReportCell("-", Modifier.width(60.dp), JivaColors.DeepBlue) // Unit column
-        SalesReportCell("-", Modifier.width(80.dp), JivaColors.DeepBlue) // Rate column
+        // Unit column
+        SalesReportCell("-", Modifier.width(60.dp), JivaColors.DeepBlue)
+        // Rate column
+        SalesReportCell("-", Modifier.width(80.dp), JivaColors.DeepBlue)
+        // Amount column
         SalesReportCell(
             text = "₹${String.format("%.2f", totalAmount)}",
             modifier = Modifier.width(100.dp),
             color = JivaColors.Green
         )
+        // Discount column
         SalesReportCell(
             text = "₹${String.format("%.2f", totalDiscount)}",
             modifier = Modifier.width(80.dp),
