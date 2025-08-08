@@ -38,10 +38,11 @@ import com.example.jiva.data.repository.DummyAuthRepository
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
-    viewModel: LoginViewModel = viewModel { LoginViewModel(DummyAuthRepository()) }
+    viewModel: LoginViewModel? = null
 ) {
-    val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val actualViewModel: LoginViewModel = viewModel ?: viewModel { LoginViewModel(DummyAuthRepository()) }
+    val uiState by actualViewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
 
     // Calculate window size for responsive design
@@ -51,7 +52,7 @@ fun LoginScreen(
     LaunchedEffect(uiState.isLoginSuccessful) {
         if (uiState.isLoginSuccessful) {
             onLoginSuccess()
-            viewModel.resetLoginSuccess()
+            actualViewModel.resetLoginSuccess()
         }
     }
 
@@ -67,7 +68,7 @@ fun LoginScreen(
     LaunchedEffect(uiState.isRateLimited) {
         if (uiState.isRateLimited) {
             kotlinx.coroutines.delay(30000) // 30 seconds
-            viewModel.resetRateLimit()
+            actualViewModel.resetRateLimit()
         }
     }
 
@@ -78,9 +79,11 @@ fun LoginScreen(
                 // Phone layout
                 CompactLoginLayout(
                     uiState = uiState,
-                    onUsernameChange = viewModel::updateUsername,
-                    onPasswordChange = viewModel::updatePassword,
-                    onLogin = viewModel::login,
+                    onUsernameChange = actualViewModel::updateUsername,
+                    onPasswordChange = actualViewModel::updatePassword,
+                    onLogin = actualViewModel::login,
+                    onRememberMeChange = actualViewModel::updateRememberMe,
+                    onAutoLoginChange = actualViewModel::updateAutoLogin,
                     focusManager = focusManager
                 )
             }
@@ -88,9 +91,11 @@ fun LoginScreen(
                 // Tablet/Desktop layout
                 ExpandedLoginLayout(
                     uiState = uiState,
-                    onUsernameChange = viewModel::updateUsername,
-                    onPasswordChange = viewModel::updatePassword,
-                    onLogin = viewModel::login,
+                    onUsernameChange = actualViewModel::updateUsername,
+                    onPasswordChange = actualViewModel::updatePassword,
+                    onLogin = actualViewModel::login,
+                    onRememberMeChange = actualViewModel::updateRememberMe,
+                    onAutoLoginChange = actualViewModel::updateAutoLogin,
                     focusManager = focusManager
                 )
             }
@@ -101,7 +106,7 @@ fun LoginScreen(
             LaunchedEffect(showSnackbar) {
                 kotlinx.coroutines.delay(3000)
                 showSnackbar = false
-                viewModel.clearError()
+                actualViewModel.clearError()
             }
 
             Snackbar(
@@ -111,7 +116,7 @@ fun LoginScreen(
                 action = {
                     TextButton(onClick = {
                         showSnackbar = false
-                        viewModel.clearError()
+                        actualViewModel.clearError()
                     }) {
                         Text("Dismiss")
                     }
@@ -129,6 +134,8 @@ private fun CompactLoginLayout(
     onUsernameChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onLogin: () -> Unit,
+    onRememberMeChange: (Boolean) -> Unit,
+    onAutoLoginChange: (Boolean) -> Unit,
     focusManager: androidx.compose.ui.focus.FocusManager
 ) {
     Column(
@@ -144,6 +151,8 @@ private fun CompactLoginLayout(
             onUsernameChange = onUsernameChange,
             onPasswordChange = onPasswordChange,
             onLogin = onLogin,
+            onRememberMeChange = onRememberMeChange,
+            onAutoLoginChange = onAutoLoginChange,
             focusManager = focusManager,
             modifier = Modifier.fillMaxWidth()
         )
@@ -156,6 +165,8 @@ private fun ExpandedLoginLayout(
     onUsernameChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onLogin: () -> Unit,
+    onRememberMeChange: (Boolean) -> Unit,
+    onAutoLoginChange: (Boolean) -> Unit,
     focusManager: androidx.compose.ui.focus.FocusManager
 ) {
     Row(
@@ -178,6 +189,8 @@ private fun ExpandedLoginLayout(
                     onUsernameChange = onUsernameChange,
                     onPasswordChange = onPasswordChange,
                     onLogin = onLogin,
+                    onRememberMeChange = onRememberMeChange,
+                    onAutoLoginChange = onAutoLoginChange,
                     focusManager = focusManager,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -192,6 +205,8 @@ private fun LoginContent(
     onUsernameChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onLogin: () -> Unit,
+    onRememberMeChange: (Boolean) -> Unit,
+    onAutoLoginChange: (Boolean) -> Unit,
     focusManager: androidx.compose.ui.focus.FocusManager,
     modifier: Modifier = Modifier
 ) {
@@ -298,6 +313,51 @@ private fun LoginContent(
             }
         }
 
+        // Remember Me and Auto-Login Checkboxes
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Checkbox(
+                    checked = uiState.rememberMe,
+                    onCheckedChange = onRememberMeChange,
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = JivaColors.Purple
+                    )
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Remember username",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Checkbox(
+                    checked = uiState.autoLogin,
+                    onCheckedChange = onAutoLoginChange,
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = JivaColors.Purple
+                    )
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Auto-login (Keep me signed in)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
         // Login Button
         Button(
             onClick = onLogin,
@@ -305,11 +365,12 @@ private fun LoginContent(
                 .fillMaxWidth()
                 .height(56.dp),
             enabled = !uiState.isLoading &&
+                     !uiState.isAutoLoggingIn &&
                      !uiState.isRateLimited &&
                      uiState.username.isNotBlank() &&
                      uiState.password.isNotBlank()
         ) {
-            if (uiState.isLoading) {
+            if (uiState.isLoading || uiState.isAutoLoggingIn) {
                 Row(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
@@ -319,7 +380,9 @@ private fun LoginContent(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Signing in...")
+                    Text(
+                        text = if (uiState.isAutoLoggingIn) "Auto-signing in..." else "Signing in..."
+                    )
                 }
             } else {
                 Text(

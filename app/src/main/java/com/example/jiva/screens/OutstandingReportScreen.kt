@@ -420,31 +420,40 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
 
-                        // Table Header
-                        OutstandingTableHeader()
+                        // Create shared scroll state for the entire table
+                        val tableScrollState = rememberScrollState()
 
-                        // Table Data
-                        filteredEntries.forEach { entry ->
-                            OutstandingTableRow(
-                                entry = entry,
-                                isSelected = selectedEntries.contains(entry.acId),
-                                onSelectionChange = { isSelected ->
-                                    selectedEntries = if (isSelected) {
-                                        selectedEntries + entry.acId
-                                    } else {
-                                        selectedEntries - entry.acId
-                                    }
-                                }
+                        Column(
+                            modifier = Modifier.horizontalScroll(tableScrollState)
+                        ) {
+                            // Table Header
+                            OutstandingTableHeader(scrollState = tableScrollState)
+
+                            // Table Data
+                            filteredEntries.forEach { entry ->
+                                OutstandingTableRow(
+                                    entry = entry,
+                                    isSelected = selectedEntries.contains(entry.acId),
+                                    onSelectionChange = { isSelected ->
+                                        selectedEntries = if (isSelected) {
+                                            selectedEntries + entry.acId
+                                        } else {
+                                            selectedEntries - entry.acId
+                                        }
+                                    },
+                                    scrollState = tableScrollState
+                                )
+                            }
+
+                            // Total Row
+                            OutstandingTotalRow(
+                                totalOpening = totalOpening,
+                                totalCr = totalCr,
+                                totalDr = totalDr,
+                                totalBalance = totalBalance,
+                                scrollState = tableScrollState
                             )
                         }
-
-                        // Total Row
-                        OutstandingTotalRow(
-                            totalOpening = totalOpening,
-                            totalCr = totalCr,
-                            totalDr = totalDr,
-                            totalBalance = totalBalance
-                        )
                     }
                 }
             }
@@ -491,10 +500,9 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
 }
 
 @Composable
-private fun OutstandingTableHeader() {
+private fun OutstandingTableHeader(scrollState: androidx.compose.foundation.ScrollState) {
     Row(
         modifier = Modifier
-            .horizontalScroll(rememberScrollState())
             .background(
                 JivaColors.LightGray,
                 RoundedCornerShape(8.dp)
@@ -544,12 +552,12 @@ private fun TableHeaderCell(text: String, modifier: Modifier = Modifier) {
 private fun OutstandingTableRow(
     entry: OutstandingEntry,
     isSelected: Boolean,
-    onSelectionChange: (Boolean) -> Unit
+    onSelectionChange: (Boolean) -> Unit,
+    scrollState: androidx.compose.foundation.ScrollState
 ) {
     Column {
         Row(
             modifier = Modifier
-                .horizontalScroll(rememberScrollState())
                 .padding(vertical = 8.dp, horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -610,7 +618,8 @@ private fun OutstandingTotalRow(
     totalOpening: Double,
     totalCr: Double,
     totalDr: Double,
-    totalBalance: Double
+    totalBalance: Double,
+    scrollState: androidx.compose.foundation.ScrollState
 ) {
     Row(
         modifier = Modifier

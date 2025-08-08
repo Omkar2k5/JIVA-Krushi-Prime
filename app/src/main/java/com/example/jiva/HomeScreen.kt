@@ -41,6 +41,7 @@ import com.example.jiva.data.repository.DummyAuthRepository
 import com.example.jiva.data.model.User
 import com.example.jiva.data.model.UserRole
 import com.example.jiva.utils.ScreenUtils
+import com.example.jiva.utils.AuthUtils
 import com.example.jiva.utils.PerformanceUtils
 import java.text.SimpleDateFormat
 import java.util.*
@@ -77,19 +78,20 @@ fun HomeScreen(
     user: User? = null,
     onLogout: () -> Unit = {},
     onNavigateToScreen: (String) -> Unit = {},
-    viewModel: HomeViewModel = viewModel { HomeViewModel(DummyAuthRepository()) }
+    viewModel: HomeViewModel? = null
 ) {
     val context = LocalContext.current
+    val actualViewModel: HomeViewModel = viewModel ?: viewModel { HomeViewModel(DummyAuthRepository()) }
     val windowSizeClass = calculateWindowSizeClass(context as androidx.activity.ComponentActivity)
     val configuration = LocalConfiguration.current
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by actualViewModel.uiState.collectAsState()
 
     // Get user from session if not provided
     val currentUser = user ?: uiState.currentUser
 
     // Load user session without toast
     LaunchedEffect(Unit) {
-        viewModel.loadUserSession()
+        actualViewModel.loadUserSession()
     }
 
     // Define vibrant menu items with colors
@@ -152,7 +154,7 @@ fun HomeScreen(
             ModernHeader(
                 currentUser = currentUser,
                 onLogout = {
-                    viewModel.logout()
+                    actualViewModel.logout()
                     onLogout()
                 }
             )
@@ -188,6 +190,7 @@ private fun ModernHeader(
     currentUser: User?,
     onLogout: () -> Unit
 ) {
+    val context = LocalContext.current
     // Dummy client name - in real app this would come from database
     val clientName = "Tushar Elinje"
     val businessType = "Agricultural Business"
@@ -237,9 +240,10 @@ private fun ModernHeader(
 
             IconButton(
                 onClick = {
-                    // Add debug logging
-                    println("Logout button clicked")
-                    onLogout()
+                    // Clear saved credentials and logout
+                    AuthUtils.logout(context) {
+                        onLogout()
+                    }
                 },
                 modifier = Modifier
                     .background(

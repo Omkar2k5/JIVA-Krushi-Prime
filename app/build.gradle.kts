@@ -89,6 +89,9 @@ dependencies {
     // Performance monitoring
     implementation("androidx.startup:startup-runtime:1.1.1")
 
+    // Security - Encrypted SharedPreferences
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
     // Compose BOM
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

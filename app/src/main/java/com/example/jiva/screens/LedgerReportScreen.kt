@@ -147,6 +147,9 @@ fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
             onPrintClick = { /* TODO: Implement print */ }
         )
 
+        // Create shared scroll state for the entire table
+        val tableScrollState = rememberScrollState()
+
         // Main content with performance optimizations
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -431,7 +434,7 @@ fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
                         )
 
                         // Table Header
-                        LedgerTableHeader()
+                        LedgerTableHeader(scrollState = tableScrollState)
                     }
                 }
             }
@@ -447,7 +450,7 @@ fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
                     colors = CardDefaults.cardColors(containerColor = JivaColors.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
-                    LedgerTableRow(entry = entry, showDetails = showItemDetails)
+                    LedgerTableRow(entry = entry, showDetails = showItemDetails, scrollState = tableScrollState)
                 }
             }
 
@@ -516,10 +519,10 @@ fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
 }
 
 @Composable
-private fun LedgerTableHeader() {
+private fun LedgerTableHeader(scrollState: androidx.compose.foundation.ScrollState) {
     Row(
         modifier = Modifier
-            .horizontalScroll(rememberScrollState())
+            .horizontalScroll(scrollState)
             .background(
                 JivaColors.LightGray,
                 RoundedCornerShape(8.dp)
@@ -556,7 +559,8 @@ private fun LedgerHeaderCell(text: String, modifier: Modifier = Modifier) {
 @Composable
 private fun LedgerTableRow(
     entry: LedgerEntry,
-    showDetails: Boolean
+    showDetails: Boolean,
+    scrollState: androidx.compose.foundation.ScrollState
 ) {
     val backgroundColor = if (entry.isSpecialRow) {
         JivaColors.DeepBlue.copy(alpha = 0.1f)
@@ -579,7 +583,7 @@ private fun LedgerTableRow(
     Column {
         Row(
             modifier = Modifier
-                .horizontalScroll(rememberScrollState())
+                .horizontalScroll(scrollState)
                 .background(backgroundColor, RoundedCornerShape(4.dp))
                 .padding(vertical = 8.dp, horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),

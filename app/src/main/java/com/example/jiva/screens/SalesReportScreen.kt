@@ -605,20 +605,28 @@ fun SalesReportScreenImpl(onBackClick: () -> Unit = {}) {
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
 
-                        // Table Header
-                        SalesReportTableHeader()
+                        // Create shared scroll state for the entire table
+                        val tableScrollState = rememberScrollState()
 
-                        // Table Data
-                        filteredEntries.forEach { entry ->
-                            SalesReportTableRow(entry = entry)
+                        Column(
+                            modifier = Modifier.horizontalScroll(tableScrollState)
+                        ) {
+                            // Table Header
+                            SalesReportTableHeader(scrollState = tableScrollState)
+
+                            // Table Data
+                            filteredEntries.forEach { entry ->
+                                SalesReportTableRow(entry = entry, scrollState = tableScrollState)
+                            }
+
+                            // Total Row
+                            SalesReportTotalRow(
+                                totalQty = totalQty,
+                                totalAmount = totalAmount,
+                                totalDiscount = totalDiscount,
+                                scrollState = tableScrollState
+                            )
                         }
-
-                        // Total Row
-                        SalesReportTotalRow(
-                            totalQty = totalQty,
-                            totalAmount = totalAmount,
-                            totalDiscount = totalDiscount
-                        )
                     }
                 }
             }
@@ -629,10 +637,9 @@ fun SalesReportScreenImpl(onBackClick: () -> Unit = {}) {
 }
 
 @Composable
-private fun SalesReportTableHeader() {
+private fun SalesReportTableHeader(scrollState: androidx.compose.foundation.ScrollState) {
     Row(
         modifier = Modifier
-            .horizontalScroll(rememberScrollState())
             .background(
                 JivaColors.LightGray,
                 RoundedCornerShape(8.dp)
@@ -672,11 +679,10 @@ private fun SalesReportHeaderCell(text: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun SalesReportTableRow(entry: SalesReportEntry) {
+private fun SalesReportTableRow(entry: SalesReportEntry, scrollState: androidx.compose.foundation.ScrollState) {
     Column {
         Row(
             modifier = Modifier
-                .horizontalScroll(rememberScrollState())
                 .padding(vertical = 6.dp, horizontal = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -725,7 +731,8 @@ private fun SalesReportCell(
 private fun SalesReportTotalRow(
     totalQty: Double,
     totalAmount: Double,
-    totalDiscount: Double
+    totalDiscount: Double,
+    scrollState: androidx.compose.foundation.ScrollState
 ) {
     Row(
         modifier = Modifier

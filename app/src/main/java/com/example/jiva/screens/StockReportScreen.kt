@@ -432,22 +432,30 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
 
-                        // Table Header
-                        StockTableHeader()
+                        // Create shared scroll state for the entire table
+                        val tableScrollState = rememberScrollState()
 
-                        // Table Data
-                        filteredEntries.forEach { entry ->
-                            StockTableRow(entry = entry)
+                        Column(
+                            modifier = Modifier.horizontalScroll(tableScrollState)
+                        ) {
+                            // Table Header
+                            StockTableHeader(scrollState = tableScrollState)
+
+                            // Table Data
+                            filteredEntries.forEach { entry ->
+                                StockTableRow(entry = entry, scrollState = tableScrollState)
+                            }
+
+                            // Total Row
+                            StockTotalRow(
+                                totalOpeningStock = totalOpeningStock,
+                                totalInQty = totalInQty,
+                                totalOutQty = totalOutQty,
+                                totalClosingStock = totalClosingStock,
+                                totalValuation = totalValuation,
+                                scrollState = tableScrollState
+                            )
                         }
-
-                        // Total Row
-                        StockTotalRow(
-                            totalOpeningStock = totalOpeningStock,
-                            totalInQty = totalInQty,
-                            totalOutQty = totalOutQty,
-                            totalClosingStock = totalClosingStock,
-                            totalValuation = totalValuation
-                        )
                     }
                 }
             }
@@ -458,10 +466,9 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
 }
 
 @Composable
-private fun StockTableHeader() {
+private fun StockTableHeader(scrollState: androidx.compose.foundation.ScrollState) {
     Row(
         modifier = Modifier
-            .horizontalScroll(rememberScrollState())
             .background(
                 JivaColors.LightGray,
                 RoundedCornerShape(8.dp)
@@ -500,11 +507,10 @@ private fun StockHeaderCell(text: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun StockTableRow(entry: StockEntry) {
+private fun StockTableRow(entry: StockEntry, scrollState: androidx.compose.foundation.ScrollState) {
     Column {
         Row(
             modifier = Modifier
-                .horizontalScroll(rememberScrollState())
                 .padding(vertical = 8.dp, horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -554,7 +560,8 @@ private fun StockTotalRow(
     totalInQty: Double,
     totalOutQty: Double,
     totalClosingStock: Double,
-    totalValuation: Double
+    totalValuation: Double,
+    scrollState: androidx.compose.foundation.ScrollState
 ) {
     Row(
         modifier = Modifier
