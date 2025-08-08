@@ -573,26 +573,27 @@ fun SalesReportScreenImpl(onBackClick: () -> Unit = {}) {
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
 
-                        // Create shared scroll state for the entire table
+                        // Horizontally scrollable table
                         val tableScrollState = rememberScrollState()
 
                         Column(
-                            modifier = Modifier.horizontalScroll(tableScrollState)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(tableScrollState)
                         ) {
                             // Table Header
-                            SalesReportTableHeader(scrollState = tableScrollState)
+                            SalesReportTableHeader()
 
-                            // Table Data
+                            // Table Rows
                             filteredEntries.forEach { entry ->
-                                SalesReportTableRow(entry = entry, scrollState = tableScrollState)
+                                SalesReportTableRow(entry = entry)
                             }
 
                             // Total Row
                             SalesReportTotalRow(
                                 totalQty = totalQty,
                                 totalAmount = totalAmount,
-                                totalDiscount = totalDiscount,
-                                scrollState = tableScrollState
+                                totalDiscount = totalDiscount
                             )
                         }
                     }
@@ -603,30 +604,30 @@ fun SalesReportScreenImpl(onBackClick: () -> Unit = {}) {
 }
 
 @Composable
-private fun SalesReportTableHeader(scrollState: androidx.compose.foundation.ScrollState) {
+private fun SalesReportTableHeader() {
     Row(
         modifier = Modifier
             .background(
                 JivaColors.LightGray,
                 RoundedCornerShape(8.dp)
             )
-            .padding(8.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        SalesReportHeaderCell("Date", modifier = Modifier.width(80.dp))
-        SalesReportHeaderCell("Party", modifier = Modifier.width(120.dp))
-        SalesReportHeaderCell("GSTIN", modifier = Modifier.width(100.dp))
-        SalesReportHeaderCell("Type", modifier = Modifier.width(80.dp))
-        SalesReportHeaderCell("Ref", modifier = Modifier.width(60.dp))
-        SalesReportHeaderCell("Item", modifier = Modifier.width(150.dp))
-        SalesReportHeaderCell("HSN", modifier = Modifier.width(70.dp))
-        SalesReportHeaderCell("Category", modifier = Modifier.width(80.dp))
-        SalesReportHeaderCell("Qty", modifier = Modifier.width(60.dp))
-        SalesReportHeaderCell("Unit", modifier = Modifier.width(60.dp))
-        SalesReportHeaderCell("Rate", modifier = Modifier.width(80.dp))
-        SalesReportHeaderCell("Amount", modifier = Modifier.width(100.dp))
-        SalesReportHeaderCell("Discount", modifier = Modifier.width(80.dp))
+        SalesReportHeaderCell("Date", Modifier.width(80.dp))
+        SalesReportHeaderCell("Party", Modifier.width(120.dp))
+        SalesReportHeaderCell("GSTIN", Modifier.width(100.dp))
+        SalesReportHeaderCell("Type", Modifier.width(80.dp))
+        SalesReportHeaderCell("Ref", Modifier.width(60.dp))
+        SalesReportHeaderCell("Item", Modifier.width(150.dp))
+        SalesReportHeaderCell("HSN", Modifier.width(70.dp))
+        SalesReportHeaderCell("Category", Modifier.width(80.dp))
+        SalesReportHeaderCell("Qty", Modifier.width(60.dp))
+        SalesReportHeaderCell("Unit", Modifier.width(60.dp))
+        SalesReportHeaderCell("Rate", Modifier.width(80.dp))
+        SalesReportHeaderCell("Amount", Modifier.width(100.dp))
+        SalesReportHeaderCell("Discount", Modifier.width(80.dp))
     }
 }
 
@@ -645,27 +646,27 @@ private fun SalesReportHeaderCell(text: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun SalesReportTableRow(entry: SalesReportEntry, scrollState: androidx.compose.foundation.ScrollState) {
+private fun SalesReportTableRow(entry: SalesReportEntry) {
     Column {
         Row(
             modifier = Modifier
-                .padding(vertical = 6.dp, horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                .padding(vertical = 8.dp, horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            SalesReportCell(entry.trDate, modifier = Modifier.width(80.dp))
-            SalesReportCell(entry.partyName, modifier = Modifier.width(120.dp))
-            SalesReportCell(entry.gstin, modifier = Modifier.width(100.dp))
-            SalesReportCell(entry.entryType, modifier = Modifier.width(80.dp))
-            SalesReportCell(entry.refNo, modifier = Modifier.width(60.dp))
-            SalesReportCell(entry.itemName, modifier = Modifier.width(150.dp))
-            SalesReportCell(entry.hsnNo, modifier = Modifier.width(70.dp))
-            SalesReportCell(entry.itemType, modifier = Modifier.width(80.dp))
-            SalesReportCell("${entry.qty.toInt()}", modifier = Modifier.width(60.dp))
-            SalesReportCell(entry.unit, modifier = Modifier.width(60.dp))
-            SalesReportCell("₹${String.format("%.0f", entry.rate)}", modifier = Modifier.width(80.dp))
-            SalesReportCell("₹${String.format("%.2f", entry.amount)}", modifier = Modifier.width(100.dp))
-            SalesReportCell("₹${String.format("%.0f", entry.discount)}", modifier = Modifier.width(80.dp))
+            SalesReportCell(entry.trDate, Modifier.width(80.dp))
+            SalesReportCell(entry.partyName, Modifier.width(120.dp))
+            SalesReportCell(entry.gstin, Modifier.width(100.dp))
+            SalesReportCell(entry.entryType, Modifier.width(80.dp))
+            SalesReportCell(entry.refNo, Modifier.width(60.dp))
+            SalesReportCell(entry.itemName, Modifier.width(150.dp))
+            SalesReportCell(entry.hsnNo, Modifier.width(70.dp))
+            SalesReportCell(entry.itemType, Modifier.width(80.dp))
+            SalesReportCell("${entry.qty.toInt()}", Modifier.width(60.dp))
+            SalesReportCell(entry.unit, Modifier.width(60.dp))
+            SalesReportCell("₹${String.format("%.0f", entry.rate)}", Modifier.width(80.dp))
+            SalesReportCell("₹${String.format("%.2f", entry.amount)}", Modifier.width(100.dp))
+            SalesReportCell("₹${String.format("%.0f", entry.discount)}", Modifier.width(80.dp))
         }
 
         HorizontalDivider(
@@ -697,39 +698,37 @@ private fun SalesReportCell(
 private fun SalesReportTotalRow(
     totalQty: Double,
     totalAmount: Double,
-    totalDiscount: Double,
-    scrollState: androidx.compose.foundation.ScrollState
+    totalDiscount: Double
 ) {
     Row(
         modifier = Modifier
-            .fillMaxWidth()
             .background(
                 JivaColors.DeepBlue.copy(alpha = 0.1f),
                 RoundedCornerShape(8.dp)
             )
-            .padding(8.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = "TOTAL",
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             color = JivaColors.DeepBlue,
             textAlign = TextAlign.Center,
-            modifier = Modifier.weight(6.5f)
+            modifier = Modifier.width(570.dp) // Date + Party + GSTIN + Type + Ref + Item + HSN + Category columns
         )
-        SalesReportCell("${totalQty.toInt()}", modifier = Modifier.weight(0.6f), color = JivaColors.DeepBlue)
-        Spacer(modifier = Modifier.weight(0.6f)) // Unit column
-        Spacer(modifier = Modifier.weight(0.8f)) // Rate column
+        SalesReportCell("${totalQty.toInt()}", Modifier.width(60.dp), JivaColors.DeepBlue)
+        SalesReportCell("-", Modifier.width(60.dp), JivaColors.DeepBlue) // Unit column
+        SalesReportCell("-", Modifier.width(80.dp), JivaColors.DeepBlue) // Rate column
         SalesReportCell(
             text = "₹${String.format("%.2f", totalAmount)}",
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.width(100.dp),
             color = JivaColors.Green
         )
         SalesReportCell(
             text = "₹${String.format("%.2f", totalDiscount)}",
-            modifier = Modifier.weight(0.8f),
+            modifier = Modifier.width(80.dp),
             color = JivaColors.Orange
         )
     }

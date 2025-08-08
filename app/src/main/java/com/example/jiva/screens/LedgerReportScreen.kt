@@ -432,8 +432,16 @@ fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
 
-                        // Table Header
-                        LedgerTableHeader(scrollState = tableScrollState)
+                        // Horizontally scrollable table header
+                        val tableScrollState = rememberScrollState()
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(tableScrollState)
+                        ) {
+                            LedgerTableHeader()
+                        }
                     }
                 }
             }
@@ -449,7 +457,7 @@ fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
                     colors = CardDefaults.cardColors(containerColor = JivaColors.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
-                    LedgerTableRow(entry = entry, showDetails = showItemDetails, scrollState = tableScrollState)
+                    LedgerTableRow(entry = entry, showDetails = showItemDetails)
                 }
             }
         }
@@ -457,26 +465,25 @@ fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
 }
 
 @Composable
-private fun LedgerTableHeader(scrollState: androidx.compose.foundation.ScrollState) {
+private fun LedgerTableHeader() {
     Row(
         modifier = Modifier
-            .horizontalScroll(scrollState)
             .background(
                 JivaColors.LightGray,
                 RoundedCornerShape(8.dp)
             )
-            .padding(12.dp),
+            .padding(vertical = 12.dp, horizontal = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        LedgerHeaderCell("Date", modifier = Modifier.width(100.dp))
-        LedgerHeaderCell("Type", modifier = Modifier.width(80.dp))
-        LedgerHeaderCell("No", modifier = Modifier.width(70.dp))
-        LedgerHeaderCell("Particular", modifier = Modifier.width(180.dp))
-        LedgerHeaderCell("DR", modifier = Modifier.width(100.dp))
-        LedgerHeaderCell("CR", modifier = Modifier.width(100.dp))
-        LedgerHeaderCell("Manual", modifier = Modifier.width(80.dp))
-        LedgerHeaderCell("Details", modifier = Modifier.width(150.dp))
+        LedgerHeaderCell("Date", Modifier.width(100.dp))
+        LedgerHeaderCell("Type", Modifier.width(80.dp))
+        LedgerHeaderCell("No", Modifier.width(70.dp))
+        LedgerHeaderCell("Particular", Modifier.width(180.dp))
+        LedgerHeaderCell("DR", Modifier.width(100.dp))
+        LedgerHeaderCell("CR", Modifier.width(100.dp))
+        LedgerHeaderCell("Manual", Modifier.width(80.dp))
+        LedgerHeaderCell("Details", Modifier.width(150.dp))
     }
 }
 
@@ -497,8 +504,7 @@ private fun LedgerHeaderCell(text: String, modifier: Modifier = Modifier) {
 @Composable
 private fun LedgerTableRow(
     entry: LedgerEntry,
-    showDetails: Boolean,
-    scrollState: androidx.compose.foundation.ScrollState
+    showDetails: Boolean
 ) {
     // Consistent styling for all rows like other tables
     val textColor = Color(0xFF374151)
@@ -507,8 +513,7 @@ private fun LedgerTableRow(
     Column {
         Row(
             modifier = Modifier
-                .horizontalScroll(scrollState)
-                .padding(vertical = 8.dp, horizontal = 12.dp),
+                .padding(vertical = 8.dp, horizontal = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -537,13 +542,11 @@ private fun LedgerTableRow(
             )
         }
 
-        if (!entry.isSpecialRow) {
-            Divider(
-                color = JivaColors.LightGray,
-                thickness = 0.5.dp,
-                modifier = Modifier.padding(horizontal = 12.dp)
-            )
-        }
+        HorizontalDivider(
+            color = JivaColors.LightGray,
+            thickness = 0.5.dp,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        )
     }
 }
 

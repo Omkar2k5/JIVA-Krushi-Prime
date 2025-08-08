@@ -431,18 +431,20 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
 
-                        // Create shared scroll state for the entire table
+                        // Horizontally scrollable table
                         val tableScrollState = rememberScrollState()
 
                         Column(
-                            modifier = Modifier.horizontalScroll(tableScrollState)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(tableScrollState)
                         ) {
                             // Table Header
-                            StockTableHeader(scrollState = tableScrollState)
+                            StockTableHeader()
 
-                            // Table Data
+                            // Table Rows
                             filteredEntries.forEach { entry ->
-                                StockTableRow(entry = entry, scrollState = tableScrollState)
+                                StockTableRow(entry = entry)
                             }
 
                             // Total Row
@@ -451,8 +453,7 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                                 totalInQty = totalInQty,
                                 totalOutQty = totalOutQty,
                                 totalClosingStock = totalClosingStock,
-                                totalValuation = totalValuation,
-                                scrollState = tableScrollState
+                                totalValuation = totalValuation
                             )
                         }
                     }
@@ -463,14 +464,14 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
 }
 
 @Composable
-private fun StockTableHeader(scrollState: androidx.compose.foundation.ScrollState) {
+private fun StockTableHeader() {
     Row(
         modifier = Modifier
             .background(
                 JivaColors.LightGray,
                 RoundedCornerShape(8.dp)
             )
-            .padding(12.dp),
+            .padding(vertical = 12.dp, horizontal = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -504,32 +505,32 @@ private fun StockHeaderCell(text: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun StockTableRow(entry: StockEntry, scrollState: androidx.compose.foundation.ScrollState) {
+private fun StockTableRow(entry: StockEntry) {
     Column {
         Row(
             modifier = Modifier
-                .padding(vertical = 8.dp, horizontal = 12.dp),
+                .padding(vertical = 8.dp, horizontal = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            StockCell(entry.itemId, modifier = Modifier.width(80.dp))
-            StockCell(entry.itemName, modifier = Modifier.width(150.dp))
-            StockCell("${entry.openingStock.toInt()}", modifier = Modifier.width(80.dp))
-            StockCell("${entry.inQty.toInt()}", modifier = Modifier.width(80.dp))
-            StockCell("${entry.outQty.toInt()}", modifier = Modifier.width(80.dp))
-            StockCell("${entry.closingStock.toInt()}", modifier = Modifier.width(80.dp))
-            StockCell("₹${String.format("%.2f", entry.avgRate)}", modifier = Modifier.width(80.dp))
-            StockCell("₹${String.format("%.2f", entry.valuation)}", modifier = Modifier.width(100.dp))
-            StockCell(entry.itemType, modifier = Modifier.width(80.dp))
-            StockCell(entry.companyName, modifier = Modifier.width(100.dp))
-            StockCell("${entry.cgst}%", modifier = Modifier.width(60.dp))
-            StockCell("${entry.sgst}%", modifier = Modifier.width(60.dp))
+            StockCell(entry.itemId, Modifier.width(80.dp))
+            StockCell(entry.itemName, Modifier.width(150.dp))
+            StockCell("${entry.openingStock.toInt()}", Modifier.width(80.dp))
+            StockCell("${entry.inQty.toInt()}", Modifier.width(80.dp))
+            StockCell("${entry.outQty.toInt()}", Modifier.width(80.dp))
+            StockCell("${entry.closingStock.toInt()}", Modifier.width(80.dp))
+            StockCell("₹${String.format("%.2f", entry.avgRate)}", Modifier.width(80.dp))
+            StockCell("₹${String.format("%.2f", entry.valuation)}", Modifier.width(100.dp))
+            StockCell(entry.itemType, Modifier.width(80.dp))
+            StockCell(entry.companyName, Modifier.width(100.dp))
+            StockCell("${entry.cgst}%", Modifier.width(60.dp))
+            StockCell("${entry.sgst}%", Modifier.width(60.dp))
         }
 
         HorizontalDivider(
             color = JivaColors.LightGray,
             thickness = 0.5.dp,
-            modifier = Modifier.padding(horizontal = 12.dp)
+            modifier = Modifier.padding(horizontal = 8.dp)
         )
     }
 }
@@ -557,17 +558,15 @@ private fun StockTotalRow(
     totalInQty: Double,
     totalOutQty: Double,
     totalClosingStock: Double,
-    totalValuation: Double,
-    scrollState: androidx.compose.foundation.ScrollState
+    totalValuation: Double
 ) {
     Row(
         modifier = Modifier
-            .fillMaxWidth()
             .background(
                 JivaColors.DeepBlue.copy(alpha = 0.1f),
                 RoundedCornerShape(8.dp)
             )
-            .padding(12.dp),
+            .padding(vertical = 12.dp, horizontal = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -577,18 +576,22 @@ private fun StockTotalRow(
             fontWeight = FontWeight.Bold,
             color = JivaColors.DeepBlue,
             textAlign = TextAlign.Center,
-            modifier = Modifier.weight(2.3f)
+            modifier = Modifier.width(230.dp) // Item ID + Item Name columns
         )
-        StockCell("${totalOpeningStock.toInt()}", modifier = Modifier.weight(0.8f), color = JivaColors.DeepBlue)
-        StockCell("${totalInQty.toInt()}", modifier = Modifier.weight(0.8f), color = JivaColors.DeepBlue)
-        StockCell("${totalOutQty.toInt()}", modifier = Modifier.weight(0.8f), color = JivaColors.DeepBlue)
-        StockCell("${totalClosingStock.toInt()}", modifier = Modifier.weight(0.8f), color = JivaColors.DeepBlue)
-        StockCell("-", modifier = Modifier.weight(0.8f), color = JivaColors.DeepBlue) // Avg Rate column
+        StockCell("${totalOpeningStock.toInt()}", Modifier.width(80.dp), JivaColors.DeepBlue)
+        StockCell("${totalInQty.toInt()}", Modifier.width(80.dp), JivaColors.DeepBlue)
+        StockCell("${totalOutQty.toInt()}", Modifier.width(80.dp), JivaColors.DeepBlue)
+        StockCell("${totalClosingStock.toInt()}", Modifier.width(80.dp), JivaColors.DeepBlue)
+        StockCell("-", Modifier.width(80.dp), JivaColors.DeepBlue) // Avg Rate column
         StockCell(
             text = "₹${String.format("%.2f", totalValuation)}",
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.width(100.dp),
             color = JivaColors.Green
         )
+        StockCell("-", Modifier.width(80.dp), JivaColors.DeepBlue) // Type column
+        StockCell("-", Modifier.width(100.dp), JivaColors.DeepBlue) // Company column
+        StockCell("-", Modifier.width(60.dp), JivaColors.DeepBlue) // CGST column
+        StockCell("-", Modifier.width(60.dp), JivaColors.DeepBlue) // SGST column
     }
 }
 
