@@ -12,12 +12,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.example.jiva.JivaColors
 import com.example.jiva.R
 import com.example.jiva.utils.ScreenUtils
@@ -30,14 +34,21 @@ import com.example.jiva.utils.ScreenUtils
 fun ResponsiveReportHeader(
     title: String,
     subtitle: String,
-    onBackClick: () -> Unit = {},
-    onPrintClick: () -> Unit = {},
-    showPrintButton: Boolean = true
+    onBackClick: () -> Unit = {}
 ) {
     val isCompactScreen = ScreenUtils.isCompactScreen()
     val screenSize = ScreenUtils.getScreenSize()
     val orientation = ScreenUtils.getOrientation()
-    
+
+    // Get status bar height
+    val view = LocalView.current
+    val density = LocalDensity.current
+    val statusBarHeight = with(density) {
+        ViewCompat.getRootWindowInsets(view)
+            ?.getInsets(WindowInsetsCompat.Type.statusBars())
+            ?.top?.toDp() ?: 24.dp
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -46,25 +57,26 @@ fun ResponsiveReportHeader(
                     colors = listOf(JivaColors.DeepBlue, JivaColors.Purple)
                 )
             )
-            .padding(ScreenUtils.getResponsivePadding())
+            .padding(
+                top = statusBarHeight + 8.dp,
+                start = 16.dp,
+                end = 16.dp,
+                bottom = 16.dp
+            )
     ) {
         if (isCompactScreen && orientation == ScreenUtils.Orientation.PORTRAIT) {
             // Compact layout for small screens
             CompactHeaderLayout(
                 title = title,
                 subtitle = subtitle,
-                onBackClick = onBackClick,
-                onPrintClick = onPrintClick,
-                showPrintButton = showPrintButton
+                onBackClick = onBackClick
             )
         } else {
             // Standard layout for larger screens
             StandardHeaderLayout(
                 title = title,
                 subtitle = subtitle,
-                onBackClick = onBackClick,
-                onPrintClick = onPrintClick,
-                showPrintButton = showPrintButton
+                onBackClick = onBackClick
             )
         }
     }
@@ -74,9 +86,7 @@ fun ResponsiveReportHeader(
 private fun CompactHeaderLayout(
     title: String,
     subtitle: String,
-    onBackClick: () -> Unit,
-    onPrintClick: () -> Unit,
-    showPrintButton: Boolean
+    onBackClick: () -> Unit
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -130,19 +140,6 @@ private fun CompactHeaderLayout(
                 )
             }
         }
-        
-        // Second row: Print button (if enabled)
-        if (showPrintButton) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                ResponsivePrintButton(
-                    onClick = onPrintClick,
-                    isCompact = true
-                )
-            }
-        }
     }
 }
 
@@ -150,9 +147,7 @@ private fun CompactHeaderLayout(
 private fun StandardHeaderLayout(
     title: String,
     subtitle: String,
-    onBackClick: () -> Unit,
-    onPrintClick: () -> Unit,
-    showPrintButton: Boolean
+    onBackClick: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -201,59 +196,10 @@ private fun StandardHeaderLayout(
                 )
             }
         }
-        
-        if (showPrintButton) {
-            ResponsivePrintButton(
-                onClick = onPrintClick,
-                isCompact = false
-            )
-        }
     }
 }
 
-@Composable
-private fun ResponsivePrintButton(
-    onClick: () -> Unit,
-    isCompact: Boolean
-) {
-    val buttonHeight = if (isCompact) 40.dp else ScreenUtils.getButtonHeight()
-    val iconSize = if (isCompact) 16.dp else ScreenUtils.getIconSize()
-    val fontSize = if (isCompact) 12.sp else 14.sp
-    
-    Button(
-        onClick = onClick,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = JivaColors.White.copy(alpha = 0.2f)
-        ),
-        shape = RoundedCornerShape(8.dp),
-        modifier = Modifier
-            .height(buttonHeight)
-            .widthIn(min = if (isCompact) 100.dp else 120.dp),
-        contentPadding = PaddingValues(
-            horizontal = if (isCompact) 12.dp else 16.dp,
-            vertical = 8.dp
-        )
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(if (isCompact) 4.dp else 8.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Share,
-                contentDescription = "Print",
-                tint = JivaColors.White,
-                modifier = Modifier.size(iconSize)
-            )
-            Text(
-                text = "PRINT",
-                color = JivaColors.White,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = fontSize,
-                maxLines = 1
-            )
-        }
-    }
-}
+
 
 /**
  * Responsive WhatsApp button for Day End Report
