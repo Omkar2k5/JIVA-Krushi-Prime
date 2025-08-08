@@ -315,18 +315,6 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
                 }
             }
 
-            // Table Footer Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
-                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-            }
-
             // Send Button Card
             item {
                 Card(

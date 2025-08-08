@@ -630,8 +630,6 @@ fun SalesReportScreenImpl(onBackClick: () -> Unit = {}) {
                     }
                 }
             }
-
-
         }
     }
 }

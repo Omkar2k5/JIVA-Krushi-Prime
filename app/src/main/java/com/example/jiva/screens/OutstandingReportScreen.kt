@@ -457,44 +457,6 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                     }
                 }
             }
-
-            // Summary Footer Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = JivaColors.DeepBlue
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Total Balance Amount",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = JivaColors.White
-                            )
-                            Text(
-                                text = "₹${String.format("%.2f", totalBalance)}",
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = JivaColors.White
-                            )
-                        }
-
-
-                    }
-                }
-            }
         }
     }
 }

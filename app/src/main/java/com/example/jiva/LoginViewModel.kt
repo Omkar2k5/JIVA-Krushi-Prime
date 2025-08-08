@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.jiva.data.model.LoginRequest
 import com.example.jiva.data.model.User
 import com.example.jiva.data.repository.AuthRepository
-import com.example.jiva.utils.CredentialManager
+import com.example.jiva.utils.FileCredentialManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,7 +39,7 @@ class LoginViewModel(
     private var lastAttemptTime = 0L
     private val rateLimitDuration = 30000L // 30 seconds
 
-    private val credentialManager = context?.let { CredentialManager.getInstance(it) }
+    private val fileCredentialManager = context?.let { FileCredentialManager.getInstance(it) }
 
     fun updateUsername(username: String) {
         _uiState.value = _uiState.value.copy(
@@ -191,10 +191,10 @@ class LoginViewModel(
      * Load saved credentials and check for auto-login
      */
     private fun loadSavedCredentials() {
-        credentialManager?.let { manager ->
+        fileCredentialManager?.let { manager ->
             viewModelScope.launch {
                 try {
-                    val credentials = manager.getCredentials()
+                    val credentials = manager.loadCredentials()
                     if (credentials != null) {
                         _uiState.value = _uiState.value.copy(
                             username = if (credentials.rememberMe) credentials.username else "",
@@ -217,7 +217,7 @@ class LoginViewModel(
     /**
      * Perform automatic login with saved credentials
      */
-    private fun performAutoLogin(credentials: CredentialManager.LoginCredentials) {
+    private fun performAutoLogin(credentials: FileCredentialManager.UserCredentials) {
         viewModelScope.launch {
             try {
                 _uiState.value = _uiState.value.copy(
@@ -247,7 +247,7 @@ class LoginViewModel(
                             Timber.d("Auto-login successful for user: ${response.user.username}")
                         } else {
                             // Auto-login failed, clear credentials and show login form
-                            credentialManager?.clearCredentials()
+                            fileCredentialManager?.clearCredentials()
                             _uiState.value = _uiState.value.copy(
                                 isLoading = false,
                                 isAutoLoggingIn = false,
@@ -260,7 +260,7 @@ class LoginViewModel(
                     },
                     onFailure = { exception ->
                         // Auto-login failed, clear credentials and show login form
-                        credentialManager?.clearCredentials()
+                        fileCredentialManager?.clearCredentials()
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             isAutoLoggingIn = false,
@@ -273,7 +273,7 @@ class LoginViewModel(
                 )
             } catch (e: Exception) {
                 Timber.e(e, "Auto-login error")
-                credentialManager?.clearCredentials()
+                fileCredentialManager?.clearCredentials()
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     isAutoLoggingIn = false,
@@ -290,7 +290,7 @@ class LoginViewModel(
     private suspend fun saveCredentialsIfNeeded() {
         val currentState = _uiState.value
         if (currentState.rememberMe || currentState.autoLogin) {
-            credentialManager?.let { manager ->
+            fileCredentialManager?.let { manager ->
                 val success = manager.saveCredentials(
                     username = currentState.username,
                     password = currentState.password,
@@ -299,9 +299,9 @@ class LoginViewModel(
                 )
 
                 if (success) {
-                    Timber.d("Credentials saved successfully")
+                    Timber.d("Credentials saved successfully to file")
                 } else {
-                    Timber.w("Failed to save credentials")
+                    Timber.w("Failed to save credentials to file")
                 }
             }
         }
@@ -313,9 +313,9 @@ class LoginViewModel(
     fun logout() {
         viewModelScope.launch {
             try {
-                credentialManager?.clearCredentials()
+                fileCredentialManager?.clearCredentials()
                 _uiState.value = LoginUiState() // Reset to initial state
-                Timber.d("Logout successful, credentials cleared")
+                Timber.d("Logout successful, credentials file cleared")
             } catch (e: Exception) {
                 Timber.e(e, "Error during logout")
             }

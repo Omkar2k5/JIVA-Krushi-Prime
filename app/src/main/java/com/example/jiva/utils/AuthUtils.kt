@@ -4,23 +4,28 @@ import android.content.Context
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 /**
  * Utility functions for authentication operations
  */
 object AuthUtils {
-    
+
     /**
-     * Perform logout by clearing saved credentials
+     * Perform logout by clearing saved credentials from file
      */
     fun logout(context: Context, onComplete: () -> Unit = {}) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val credentialManager = CredentialManager.getInstance(context)
-                credentialManager.clearCredentials()
-                println("Logout: Credentials cleared successfully")
+                val fileCredentialManager = FileCredentialManager.getInstance(context)
+                val success = fileCredentialManager.clearCredentials()
+                if (success) {
+                    Timber.d("Logout: Credentials file cleared successfully")
+                } else {
+                    Timber.w("Logout: Failed to clear credentials file")
+                }
             } catch (e: Exception) {
-                println("Logout: Error clearing credentials - ${e.message}")
+                Timber.e(e, "Logout: Error clearing credentials file")
             } finally {
                 // Switch back to main thread for UI operations
                 CoroutineScope(Dispatchers.Main).launch {

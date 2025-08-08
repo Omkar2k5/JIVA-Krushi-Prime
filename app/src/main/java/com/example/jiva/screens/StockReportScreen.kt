@@ -459,8 +459,6 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                     }
                 }
             }
-
-
         }
     }
 }

@@ -453,67 +453,6 @@ fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
                     LedgerTableRow(entry = entry, showDetails = showItemDetails, scrollState = tableScrollState)
                 }
             }
-
-            // Table Footer Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
-                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    // Empty footer for visual completion
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-            }
-
-            // Summary Footer Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = JivaColors.DeepBlue
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Total",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = JivaColors.White
-                            )
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(24.dp)
-                            ) {
-                                Text(
-                                    text = "Debit: ₹${String.format("%.2f", totalDr)}",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = JivaColors.White
-                                )
-                                Text(
-                                    text = "Credit: ₹${String.format("%.2f", totalCr)}",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = JivaColors.White
-                                )
-                            }
-                        }
-
-
-                    }
-                }
-            }
         }
     }
 }

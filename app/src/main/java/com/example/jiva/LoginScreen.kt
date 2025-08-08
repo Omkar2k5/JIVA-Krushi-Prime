@@ -41,7 +41,7 @@ fun LoginScreen(
     viewModel: LoginViewModel? = null
 ) {
     val context = LocalContext.current
-    val actualViewModel: LoginViewModel = viewModel ?: viewModel { LoginViewModel(DummyAuthRepository()) }
+    val actualViewModel: LoginViewModel = viewModel ?: viewModel { LoginViewModel(DummyAuthRepository(), context) }
     val uiState by actualViewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
 

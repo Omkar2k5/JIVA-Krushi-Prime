@@ -28,7 +28,7 @@ import com.example.jiva.data.repository.DummyAuthRepository
 import com.example.jiva.data.model.LoginRequest
 import com.example.jiva.screens.*
 import com.example.jiva.ui.theme.MyApplicationTheme
-import com.example.jiva.utils.CredentialManager
+import com.example.jiva.utils.FileCredentialManager
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -147,14 +147,17 @@ fun SplashScreen(
     LaunchedEffect(Unit) {
         scope.launch {
             try {
-                val credentialManager = CredentialManager.getInstance(context)
-                val shouldAutoLogin = credentialManager.shouldAutoLogin()
+                // Add a small delay to show the splash screen
+                kotlinx.coroutines.delay(1000)
+
+                val fileCredentialManager = FileCredentialManager.getInstance(context)
+                val shouldAutoLogin = fileCredentialManager.shouldAutoLogin()
 
                 if (shouldAutoLogin) {
                     Timber.d("Auto-login enabled, attempting auto-login")
 
-                    // Get saved credentials
-                    val credentials = credentialManager.getCredentials()
+                    // Get saved credentials from file
+                    val credentials = fileCredentialManager.loadCredentials()
                     if (credentials != null) {
                         // Perform auto-login
                         val authRepository = DummyAuthRepository()
@@ -170,19 +173,19 @@ fun SplashScreen(
                                     Timber.d("Auto-login successful, navigating to home")
                                     onNavigateToHome()
                                 } else {
-                                    Timber.w("Auto-login failed, clearing credentials")
-                                    credentialManager.clearCredentials()
+                                    Timber.w("Auto-login failed, clearing credentials file")
+                                    fileCredentialManager.clearCredentials()
                                     onNavigateToLogin()
                                 }
                             },
                             onFailure = { exception ->
                                 Timber.w("Auto-login failed with exception: ${exception.message}")
-                                credentialManager.clearCredentials()
+                                fileCredentialManager.clearCredentials()
                                 onNavigateToLogin()
                             }
                         )
                     } else {
-                        Timber.w("No credentials found for auto-login")
+                        Timber.w("No credentials found in file for auto-login")
                         onNavigateToLogin()
                     }
                 } else {
