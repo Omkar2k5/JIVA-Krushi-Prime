@@ -489,52 +489,21 @@ fun SalesReportScreenImpl(onBackClick: () -> Unit = {}) {
                             }
 
                             Button(
-                                onClick = { /* TODO: Print report */ },
+                                onClick = { /* TODO: Share report */ },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = JivaColors.Purple
+                                    containerColor = Color(0xFF25D366) // WhatsApp green
                                 ),
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Share,
-                                    contentDescription = "Print",
+                                    contentDescription = "Share",
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "PRINT",
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-
-                            Button(
-                                onClick = {
-                                    // Reset all filters
-                                    startDate = "01/04/2025"
-                                    endDate = "31/03/2026"
-                                    selectedItemType = "All Types"
-                                    selectedReportFor = "Sale"
-                                    partyName = ""
-                                    itemName = ""
-                                    selectedCompany = "All Types"
-                                    selectedExempted = "All"
-                                    hsnNo = ""
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = JivaColors.Orange
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = "Reset",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "RESET",
+                                    text = "SHARE",
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
@@ -580,75 +549,6 @@ fun SalesReportScreenImpl(onBackClick: () -> Unit = {}) {
                                 fontWeight = FontWeight.Bold,
                                 color = JivaColors.White
                             )
-                        }
-                    }
-                }
-            }
-
-            // Action Buttons
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        // Print Button
-                        Button(
-                            onClick = { /* TODO: Implement print functionality */ },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = JivaColors.DeepBlue
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = "Print",
-                                    tint = JivaColors.White
-                                )
-                                Text(
-                                    text = "Print Report",
-                                    color = JivaColors.White,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-
-                        // WhatsApp Button
-                        Button(
-                            onClick = { /* TODO: Implement WhatsApp share */ },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF25D366) // WhatsApp green
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Share,
-                                    contentDescription = "Share on WhatsApp",
-                                    tint = JivaColors.White
-                                )
-                                Text(
-                                    text = "WhatsApp",
-                                    color = JivaColors.White,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
                         }
                     }
                 }

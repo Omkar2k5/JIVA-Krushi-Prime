@@ -28,6 +28,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -36,6 +38,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.jiva.data.repository.DummyAuthRepository
 import com.example.jiva.data.model.User
@@ -195,6 +199,15 @@ private fun ModernHeader(
     val clientName = "Tushar Elinje"
     val businessType = "Agricultural Business"
 
+    // Get status bar height
+    val view = LocalView.current
+    val density = LocalDensity.current
+    val statusBarHeight = with(density) {
+        ViewCompat.getRootWindowInsets(view)
+            ?.getInsets(WindowInsetsCompat.Type.statusBars())
+            ?.top?.toDp() ?: 24.dp
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -203,7 +216,12 @@ private fun ModernHeader(
                     colors = listOf(JivaColors.DeepBlue, JivaColors.LightBlue)
                 )
             )
-            .padding(ScreenUtils.getResponsivePadding())
+            .padding(
+                top = statusBarHeight + 8.dp,
+                start = 16.dp,
+                end = 16.dp,
+                bottom = 16.dp
+            )
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),

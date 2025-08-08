@@ -15,12 +15,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.example.jiva.JivaColors
 import com.example.jiva.R
 import com.example.jiva.components.ResponsiveWhatsAppButton
@@ -59,6 +63,15 @@ fun DayEndReportScreenImpl(onBackClick: () -> Unit = {}) {
     val netProfit = dayEndData.totalSale - dayEndData.totalPurchase
     val cashFlow = dayEndData.cashReceived - dayEndData.cashInHand
 
+    // Get status bar height
+    val view = LocalView.current
+    val density = LocalDensity.current
+    val statusBarHeight = with(density) {
+        ViewCompat.getRootWindowInsets(view)
+            ?.getInsets(WindowInsetsCompat.Type.statusBars())
+            ?.top?.toDp() ?: 24.dp
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -73,71 +86,56 @@ fun DayEndReportScreenImpl(onBackClick: () -> Unit = {}) {
                         colors = listOf(JivaColors.DeepBlue, JivaColors.Purple)
                     )
                 )
-                .padding(16.dp)
+                .padding(
+                    top = statusBarHeight + 8.dp,
+                    start = 16.dp,
+                    end = 16.dp,
+                    bottom = 16.dp
+                )
         ) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            // Header content: Back button, Logo, Title
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // First row: Back button, Logo, Title
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                IconButton(
+                    onClick = onBackClick,
+                    modifier = Modifier
+                        .background(
+                            JivaColors.White.copy(alpha = 0.2f),
+                            RoundedCornerShape(8.dp)
+                        )
                 ) {
-                    IconButton(
-                        onClick = onBackClick,
-                        modifier = Modifier
-                            .background(
-                                JivaColors.White.copy(alpha = 0.2f),
-                                RoundedCornerShape(8.dp)
-                            )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back",
-                            tint = JivaColors.White
-                        )
-                    }
-
-                    // App Logo
-                    Image(
-                        painter = painterResource(id = R.drawable.logo),
-                        contentDescription = "JIVA Logo",
-                        modifier = Modifier.size(32.dp)
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        tint = JivaColors.White
                     )
-
-                    Column(
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            text = "Day End Report",
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.SansSerif,
-                            color = JivaColors.White
-                        )
-                        Text(
-                            text = "Daily business summary - $currentDate",
-                            fontSize = 13.sp,
-                            fontFamily = FontFamily.SansSerif,
-                            color = JivaColors.White.copy(alpha = 0.8f)
-                        )
-                    }
                 }
 
-                // Second row: Responsive WhatsApp button
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                // App Logo
+                Image(
+                    painter = painterResource(id = R.drawable.logo),
+                    contentDescription = "JIVA Logo",
+                    modifier = Modifier.size(32.dp)
+                )
+
+                Column(
+                    modifier = Modifier.weight(1f)
                 ) {
-                    ResponsiveWhatsAppButton(
-                        onClick = {
-                            // TODO: Send WhatsApp message to self
-                            // For now, this would generate a dummy message template
-                            val whatsappMessage = generateDayEndWhatsAppMessage(dayEndData, netProfit)
-                            // In real implementation, this would open WhatsApp with the message
-                            // or send via WhatsApp Business API
-                        }
+                    Text(
+                        text = "Day End Report",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.SansSerif,
+                        color = JivaColors.White
+                    )
+                    Text(
+                        text = "Daily business summary - $currentDate",
+                        fontSize = 13.sp,
+                        fontFamily = FontFamily.SansSerif,
+                        color = JivaColors.White.copy(alpha = 0.8f)
                     )
                 }
             }
@@ -320,6 +318,63 @@ fun DayEndReportScreenImpl(onBackClick: () -> Unit = {}) {
                                 ChartData("Cash In Hand", dayEndData.cashInHand, JivaColors.Purple)
                             )
                         )
+                    }
+                }
+            }
+
+            // WhatsApp Share Button
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Share Report",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = JivaColors.DeepBlue
+                        )
+
+                        Button(
+                            onClick = {
+                                // TODO: Send WhatsApp message to self
+                                // For now, this would generate a dummy message template
+                                val whatsappMessage = generateDayEndWhatsAppMessage(dayEndData, netProfit)
+                                // In real implementation, this would open WhatsApp with the message
+                                // or send via WhatsApp Business API
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF25D366) // WhatsApp green
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "Share on WhatsApp",
+                                    tint = JivaColors.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Text(
+                                    text = "Share Day End Report on WhatsApp",
+                                    color = JivaColors.White,
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 16.sp
+                                )
+                            }
+                        }
                     }
                 }
             }

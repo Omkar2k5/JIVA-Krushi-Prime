@@ -347,21 +347,21 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                             }
 
                             Button(
-                                onClick = { /* TODO: Print report */ },
+                                onClick = { /* TODO: Share report */ },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = JivaColors.Purple
+                                    containerColor = Color(0xFF25D366) // WhatsApp green
                                 ),
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Share,
-                                    contentDescription = "Print",
+                                    contentDescription = "Share",
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "PRINT",
+                                    text = "SHARE",
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
@@ -407,75 +407,6 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                                 fontWeight = FontWeight.Bold,
                                 color = JivaColors.White
                             )
-                        }
-                    }
-                }
-            }
-
-            // Action Buttons
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        // Print Button
-                        Button(
-                            onClick = { /* TODO: Implement print functionality */ },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = JivaColors.DeepBlue
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = "Print",
-                                    tint = JivaColors.White
-                                )
-                                Text(
-                                    text = "Print Report",
-                                    color = JivaColors.White,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-
-                        // WhatsApp Button
-                        Button(
-                            onClick = { /* TODO: Implement WhatsApp share */ },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF25D366) // WhatsApp green
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Share,
-                                    contentDescription = "Share on WhatsApp",
-                                    tint = JivaColors.White
-                                )
-                                Text(
-                                    text = "WhatsApp",
-                                    color = JivaColors.White,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
                         }
                     }
                 }
@@ -652,13 +583,12 @@ private fun StockTotalRow(
         StockCell("${totalInQty.toInt()}", modifier = Modifier.weight(0.8f), color = JivaColors.DeepBlue)
         StockCell("${totalOutQty.toInt()}", modifier = Modifier.weight(0.8f), color = JivaColors.DeepBlue)
         StockCell("${totalClosingStock.toInt()}", modifier = Modifier.weight(0.8f), color = JivaColors.DeepBlue)
-        Spacer(modifier = Modifier.weight(0.8f)) // Avg Rate column
+        StockCell("-", modifier = Modifier.weight(0.8f), color = JivaColors.DeepBlue) // Avg Rate column
         StockCell(
             text = "₹${String.format("%.2f", totalValuation)}",
             modifier = Modifier.weight(1f),
             color = JivaColors.Green
         )
-        Spacer(modifier = Modifier.weight(2.2f)) // Type, Company, CGST, SGST columns
     }
 }
 

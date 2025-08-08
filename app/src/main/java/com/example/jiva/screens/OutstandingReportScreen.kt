@@ -408,62 +408,31 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                     colors = CardDefaults.cardColors(containerColor = JivaColors.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
-                    Row(
+                    // Single Share Button
+                    Button(
+                        onClick = { /* TODO: Implement share functionality */ },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF25D366) // WhatsApp green
+                        ),
+                        shape = RoundedCornerShape(8.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            .padding(16.dp)
                     ) {
-                        // Print Button
-                        Button(
-                            onClick = { /* TODO: Implement print functionality */ },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = JivaColors.DeepBlue
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = "Print",
-                                    tint = JivaColors.White
-                                )
-                                Text(
-                                    text = "Print Report",
-                                    color = JivaColors.White,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-
-                        // WhatsApp Button
-                        Button(
-                            onClick = { /* TODO: Implement WhatsApp share */ },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF25D366) // WhatsApp green
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Share,
-                                    contentDescription = "Share on WhatsApp",
-                                    tint = JivaColors.White
-                                )
-                                Text(
-                                    text = "WhatsApp",
-                                    color = JivaColors.White,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Share",
+                                tint = JivaColors.White
+                            )
+                            Text(
+                                text = "SHARE REPORT",
+                                color = JivaColors.White,
+                                fontWeight = FontWeight.Medium
+                            )
                         }
                     }
                 }
