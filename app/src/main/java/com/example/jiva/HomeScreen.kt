@@ -149,6 +149,13 @@ fun HomeScreen(
                 icon = Icons.Default.Star,
                 color = JivaColors.DeepBlue,
                 description = "Item pricing and rate management"
+            ),
+            MenuItem(
+                id = "expiry_report",
+                title = "Expiry Report",
+                icon = Icons.Default.Warning,
+                color = JivaColors.Orange,
+                description = "Items nearing expiration date"
             )
         )
     }

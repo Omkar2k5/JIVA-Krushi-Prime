@@ -139,6 +139,12 @@ fun JivaApp() {
                 onBackClick = { navController.popBackStack() }
             )
         }
+
+        composable("expiry_report") {
+            ExpiryReportScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
     }
 }
 
