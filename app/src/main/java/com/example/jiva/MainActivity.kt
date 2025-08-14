@@ -133,6 +133,12 @@ fun JivaApp() {
                 onBackClick = { navController.popBackStack() }
             )
         }
+
+        composable("price_screen") {
+            PriceScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
     }
 }
 

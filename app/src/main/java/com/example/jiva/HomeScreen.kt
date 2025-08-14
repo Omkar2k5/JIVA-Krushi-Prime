@@ -142,6 +142,13 @@ fun HomeScreen(
                 icon = Icons.Default.Send,
                 color = JivaColors.Red,
                 description = "Send bulk marketing messages"
+            ),
+            MenuItem(
+                id = "price_screen",
+                title = "Price Screen",
+                icon = Icons.Default.Star,
+                color = JivaColors.DeepBlue,
+                description = "Item pricing and rate management"
             )
         )
     }
