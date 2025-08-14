@@ -29,6 +29,9 @@ import androidx.compose.ui.unit.sp
 import com.example.jiva.JivaColors
 import com.example.jiva.R
 import com.example.jiva.components.ResponsiveReportHeader
+import com.example.jiva.utils.PDFGenerator
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -50,6 +53,8 @@ data class LedgerEntry(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     // State management
     var fromDate by remember { mutableStateOf("01/04/2025") }
     var toDate by remember { mutableStateOf("31/03/2026") }
@@ -360,7 +365,37 @@ fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
                             }
 
                             Button(
-                                onClick = { /* TODO: Share report */ },
+                                onClick = {
+                                    scope.launch {
+                                        val columns = listOf(
+                                            PDFGenerator.TableColumn("Date", 100f) { (it as LedgerEntry).entryDate },
+                                            PDFGenerator.TableColumn("Type", 80f) { (it as LedgerEntry).entryType },
+                                            PDFGenerator.TableColumn("No", 70f) { (it as LedgerEntry).entryNo },
+                                            PDFGenerator.TableColumn("Particular", 180f) { (it as LedgerEntry).particular },
+                                            PDFGenerator.TableColumn("DR", 100f) { "₹${String.format("%.2f", (it as LedgerEntry).dr)}" },
+                                            PDFGenerator.TableColumn("CR", 100f) { "₹${String.format("%.2f", (it as LedgerEntry).cr)}" }
+                                        )
+
+                                        val totalRow = mapOf(
+                                            "Date" to "TOTAL",
+                                            "Type" to "",
+                                            "No" to "",
+                                            "Particular" to "",
+                                            "DR" to "₹${String.format("%.2f", totalDr)}",
+                                            "CR" to "₹${String.format("%.2f", totalCr)}"
+                                        )
+
+                                        val config = PDFGenerator.PDFConfig(
+                                            title = "Ledger Report",
+                                            fileName = "Ledger_Report",
+                                            columns = columns,
+                                            data = filteredEntries,
+                                            totalRow = totalRow
+                                        )
+
+                                        PDFGenerator.generateAndSharePDF(context, config)
+                                    }
+                                },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color(0xFF25D366) // WhatsApp green
                                 ),

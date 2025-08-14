@@ -28,6 +28,9 @@ import androidx.compose.ui.unit.sp
 import com.example.jiva.JivaColors
 import com.example.jiva.R
 import com.example.jiva.components.ResponsiveReportHeader
+import com.example.jiva.utils.PDFGenerator
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 
 // Data model for Sales/Purchase Report entries
 data class SalesReportEntry(
@@ -49,6 +52,8 @@ data class SalesReportEntry(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SalesReportScreenImpl(onBackClick: () -> Unit = {}) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     // State management for input fields
     var startDate by remember { mutableStateOf("01/04/2025") }
     var endDate by remember { mutableStateOf("31/03/2026") }
@@ -489,7 +494,39 @@ fun SalesReportScreenImpl(onBackClick: () -> Unit = {}) {
                             }
 
                             Button(
-                                onClick = { /* TODO: Share report */ },
+                                onClick = {
+                                    scope.launch {
+                                        val columns = listOf(
+                                            PDFGenerator.TableColumn("Date", 80f) { (it as SalesReportEntry).trDate },
+                                            PDFGenerator.TableColumn("Party", 120f) { (it as SalesReportEntry).partyName },
+                                            PDFGenerator.TableColumn("GSTIN", 100f) { (it as SalesReportEntry).gstin },
+                                            PDFGenerator.TableColumn("Type", 80f) { (it as SalesReportEntry).entryType },
+                                            PDFGenerator.TableColumn("Item", 150f) { (it as SalesReportEntry).itemName },
+                                            PDFGenerator.TableColumn("Qty", 60f) { "${(it as SalesReportEntry).qty.toInt()}" },
+                                            PDFGenerator.TableColumn("Amount", 100f) { "₹${String.format("%.2f", (it as SalesReportEntry).amount)}" }
+                                        )
+
+                                        val totalRow = mapOf(
+                                            "Date" to "TOTAL",
+                                            "Party" to "",
+                                            "GSTIN" to "",
+                                            "Type" to "",
+                                            "Item" to "",
+                                            "Qty" to "${totalQty.toInt()}",
+                                            "Amount" to "₹${String.format("%.2f", totalAmount)}"
+                                        )
+
+                                        val config = PDFGenerator.PDFConfig(
+                                            title = "Sales Report",
+                                            fileName = "Sales_Report",
+                                            columns = columns,
+                                            data = filteredEntries,
+                                            totalRow = totalRow
+                                        )
+
+                                        PDFGenerator.generateAndSharePDF(context, config)
+                                    }
+                                },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color(0xFF25D366) // WhatsApp green
                                 ),

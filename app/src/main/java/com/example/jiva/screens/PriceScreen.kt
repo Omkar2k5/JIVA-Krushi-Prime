@@ -18,8 +18,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import com.example.jiva.components.ResponsiveReportHeader
 import com.example.jiva.JivaColors
+import com.example.jiva.utils.PDFGenerator
+import kotlinx.coroutines.launch
 
 data class PriceEntry(
     val itemId: String,
@@ -38,6 +41,8 @@ fun PriceScreen(onBackClick: () -> Unit = {}) {
 
 @Composable
 private fun PriceScreenImpl(onBackClick: () -> Unit = {}) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     // Filter states
     var itemName by remember { mutableStateOf("") }
     var itemId by remember { mutableStateOf("") }
@@ -179,7 +184,26 @@ private fun PriceScreenImpl(onBackClick: () -> Unit = {}) {
                             }
 
                             Button(
-                                onClick = { /* TODO: Share price list */ },
+                                onClick = {
+                                    scope.launch {
+                                        val columns = listOf(
+                                            PDFGenerator.TableColumn("Item ID", 80f) { (it as PriceEntry).itemId },
+                                            PDFGenerator.TableColumn("Item Name", 180f) { (it as PriceEntry).itemName },
+                                            PDFGenerator.TableColumn("MRP", 100f) { "₹${String.format("%.2f", (it as PriceEntry).mrp)}" },
+                                            PDFGenerator.TableColumn("Credit Rate", 120f) { "₹${String.format("%.2f", (it as PriceEntry).creditSaleRate)}" },
+                                            PDFGenerator.TableColumn("Cash Rate", 120f) { "₹${String.format("%.2f", (it as PriceEntry).cashSaleRate)}" }
+                                        )
+
+                                        val config = PDFGenerator.PDFConfig(
+                                            title = "Price List",
+                                            fileName = "Price_List",
+                                            columns = columns,
+                                            data = filteredEntries
+                                        )
+
+                                        PDFGenerator.generateAndSharePDF(context, config)
+                                    }
+                                },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color(0xFF25D366) // WhatsApp green
                                 ),

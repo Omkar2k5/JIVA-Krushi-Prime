@@ -28,6 +28,9 @@ import androidx.compose.ui.unit.sp
 import com.example.jiva.JivaColors
 import com.example.jiva.R
 import com.example.jiva.components.ResponsiveReportHeader
+import com.example.jiva.utils.PDFGenerator
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 
 // Data model for Stock Report entries
 data class StockEntry(
@@ -48,6 +51,8 @@ data class StockEntry(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     // State management for input fields
     var itemCode by remember { mutableStateOf("") }
     var brandName by remember { mutableStateOf("") }
@@ -347,7 +352,39 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                             }
 
                             Button(
-                                onClick = { /* TODO: Share report */ },
+                                onClick = {
+                                    scope.launch {
+                                        val columns = listOf(
+                                            PDFGenerator.TableColumn("Item ID", 80f) { (it as StockEntry).itemId },
+                                            PDFGenerator.TableColumn("Item Name", 150f) { (it as StockEntry).itemName },
+                                            PDFGenerator.TableColumn("Opening", 80f) { "${(it as StockEntry).openingStock.toInt()}" },
+                                            PDFGenerator.TableColumn("In Qty", 80f) { "${(it as StockEntry).inQty.toInt()}" },
+                                            PDFGenerator.TableColumn("Out Qty", 80f) { "${(it as StockEntry).outQty.toInt()}" },
+                                            PDFGenerator.TableColumn("Closing", 80f) { "${(it as StockEntry).closingStock.toInt()}" },
+                                            PDFGenerator.TableColumn("Valuation", 100f) { "₹${String.format("%.2f", (it as StockEntry).valuation)}" }
+                                        )
+
+                                        val totalRow = mapOf(
+                                            "Item ID" to "TOTAL",
+                                            "Item Name" to "",
+                                            "Opening" to "${totalOpeningStock.toInt()}",
+                                            "In Qty" to "${totalInQty.toInt()}",
+                                            "Out Qty" to "${totalOutQty.toInt()}",
+                                            "Closing" to "${totalClosingStock.toInt()}",
+                                            "Valuation" to "₹${String.format("%.2f", totalValuation)}"
+                                        )
+
+                                        val config = PDFGenerator.PDFConfig(
+                                            title = "Stock Report",
+                                            fileName = "Stock_Report",
+                                            columns = columns,
+                                            data = filteredEntries,
+                                            totalRow = totalRow
+                                        )
+
+                                        PDFGenerator.generateAndSharePDF(context, config)
+                                    }
+                                },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color(0xFF25D366) // WhatsApp green
                                 ),

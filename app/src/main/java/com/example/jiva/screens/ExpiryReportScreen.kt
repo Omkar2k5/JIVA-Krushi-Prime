@@ -18,8 +18,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import com.example.jiva.components.ResponsiveReportHeader
 import com.example.jiva.JivaColors
+import com.example.jiva.utils.PDFGenerator
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -41,6 +44,8 @@ fun ExpiryReportScreen(onBackClick: () -> Unit = {}) {
 
 @Composable
 private fun ExpiryReportScreenImpl(onBackClick: () -> Unit = {}) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     // Filter states
     var showOnlyExpiring by remember { mutableStateOf(true) } // Show only items expiring within 90 days
     var selectedDays by remember { mutableStateOf("90") } // Days filter
@@ -225,7 +230,35 @@ private fun ExpiryReportScreenImpl(onBackClick: () -> Unit = {}) {
                             }
 
                             Button(
-                                onClick = { /* TODO: Share expiry report */ },
+                                onClick = {
+                                    scope.launch {
+                                        val columns = listOf(
+                                            PDFGenerator.TableColumn("Item ID", 80f) { (it as ExpiryEntry).itemId },
+                                            PDFGenerator.TableColumn("Item Name", 180f) { (it as ExpiryEntry).itemName },
+                                            PDFGenerator.TableColumn("Type", 120f) { (it as ExpiryEntry).itemType },
+                                            PDFGenerator.TableColumn("Batch", 120f) { (it as ExpiryEntry).batchNumber },
+                                            PDFGenerator.TableColumn("Expiry Date", 100f) { (it as ExpiryEntry).expiryDate },
+                                            PDFGenerator.TableColumn("Qty", 80f) { "${(it as ExpiryEntry).qty}" },
+                                            PDFGenerator.TableColumn("Days Left", 100f) {
+                                                val entry = it as ExpiryEntry
+                                                when {
+                                                    entry.daysToExpiry < 0 -> "EXPIRED"
+                                                    entry.daysToExpiry == 0L -> "TODAY"
+                                                    else -> "${entry.daysToExpiry} days"
+                                                }
+                                            }
+                                        )
+
+                                        val config = PDFGenerator.PDFConfig(
+                                            title = "Expiry Report",
+                                            fileName = "Expiry_Report",
+                                            columns = columns,
+                                            data = filteredEntries
+                                        )
+
+                                        PDFGenerator.generateAndSharePDF(context, config)
+                                    }
+                                },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color(0xFF25D366) // WhatsApp green
                                 ),
