@@ -2,6 +2,11 @@ package com.example.jiva
 
 import android.app.Application
 import androidx.multidex.MultiDexApplication
+import com.example.jiva.data.database.DummyDataProvider
+import com.example.jiva.data.database.JivaDatabase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import timber.log.Timber
 
 /**
@@ -9,6 +14,12 @@ import timber.log.Timber
  * Optimized for performance and compatibility across Android 7-15
  */
 class JivaApplication : MultiDexApplication() {
+
+    // Database instance accessible throughout the app
+    val database by lazy { JivaDatabase.getDatabase(this) }
+    
+    // Application scope for coroutines
+    private val applicationScope = CoroutineScope(Dispatchers.Default)
 
     override fun onCreate() {
         super.onCreate()
@@ -18,11 +29,29 @@ class JivaApplication : MultiDexApplication() {
 
         // Performance optimizations
         initializePerformanceOptimizations()
+        
+        // Initialize database with dummy data
+        initializeDatabase()
 
         Timber.d("JIVA Application started successfully")
 
         // Log basic device information
         logDeviceInformation()
+    }
+    
+    /**
+     * Initialize the database with dummy data
+     */
+    private fun initializeDatabase() {
+        applicationScope.launch {
+            try {
+                Timber.d("Populating database with dummy data")
+                DummyDataProvider.populateDatabase(database)
+                Timber.d("Database populated successfully")
+            } catch (e: Exception) {
+                Timber.e(e, "Error populating database with dummy data")
+            }
+        }
     }
 
     private fun initializeLogging() {

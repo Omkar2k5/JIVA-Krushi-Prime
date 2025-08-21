@@ -52,6 +52,15 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun JivaApp() {
     val navController = rememberNavController()
+    val context = LocalContext.current
+    
+    // Create database instance
+    val database = (context.applicationContext as JivaApplication).database
+    
+    // Create repository instance
+    val jivaRepository = remember { 
+        com.example.jiva.data.repository.JivaRepositoryImpl(database) 
+    }
 
     NavHost(
         navController = navController,
@@ -93,7 +102,8 @@ fun JivaApp() {
                 },
                 onNavigateToScreen = { screenId ->
                     navController.navigate(screenId)
-                }
+                },
+                jivaRepository = jivaRepository
             )
         }
 

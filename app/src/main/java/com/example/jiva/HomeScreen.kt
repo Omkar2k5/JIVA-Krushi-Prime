@@ -1,5 +1,4 @@
 package com.example.jiva
-
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -42,6 +41,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.jiva.data.repository.DummyAuthRepository
+import com.example.jiva.data.repository.JivaRepository
 import com.example.jiva.data.model.User
 import com.example.jiva.data.model.UserRole
 import com.example.jiva.utils.ScreenUtils
@@ -82,20 +82,47 @@ fun HomeScreen(
     user: User? = null,
     onLogout: () -> Unit = {},
     onNavigateToScreen: (String) -> Unit = {},
-    viewModel: HomeViewModel? = null
+    viewModel: HomeViewModel? = null,
+    jivaRepository: JivaRepository? = null
 ) {
     val context = LocalContext.current
-    val actualViewModel: HomeViewModel = viewModel ?: viewModel { HomeViewModel(DummyAuthRepository()) }
+    val actualViewModel: HomeViewModel = viewModel ?: viewModel { 
+        HomeViewModel(
+            authRepository = DummyAuthRepository(),
+            jivaRepository = jivaRepository
+        ) 
+    }
     val windowSizeClass = calculateWindowSizeClass(context as androidx.activity.ComponentActivity)
     val configuration = LocalConfiguration.current
     val uiState by actualViewModel.uiState.collectAsState()
 
     // Get user from session if not provided
     val currentUser = user ?: uiState.currentUser
-
+    
     // Load user session without toast
     LaunchedEffect(Unit) {
         actualViewModel.loadUserSession()
+    }
+    
+    // Show toast for sync status
+    LaunchedEffect(uiState.isSyncing, uiState.syncSuccess, uiState.errorMessage) {
+        when {
+            uiState.syncSuccess -> {
+                android.widget.Toast.makeText(
+                    context,
+                    "Data synchronized successfully!",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+            uiState.errorMessage != null -> {
+                android.widget.Toast.makeText(
+                    context,
+                    uiState.errorMessage,
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+                actualViewModel.clearError()
+            }
+        }
     }
 
     // Define vibrant menu items with colors
@@ -174,7 +201,8 @@ fun HomeScreen(
                 onLogout = {
                     actualViewModel.logout()
                     onLogout()
-                }
+                },
+                viewModel = actualViewModel
             )
 
             // Main Content - Responsive Grid with Performance Optimizations
@@ -206,12 +234,16 @@ fun HomeScreen(
 @Composable
 private fun ModernHeader(
     currentUser: User?,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    viewModel: HomeViewModel = viewModel()
 ) {
     val context = LocalContext.current
     // Dummy client name - in real app this would come from database
     val clientName = "Tushar Elinje"
     val businessType = "Agricultural Business"
+    
+    // Observe UI state for sync status
+    val uiState by viewModel.uiState.collectAsState()
 
     // Get status bar height
     val view = LocalView.current
@@ -270,24 +302,63 @@ private fun ModernHeader(
                 }
             }
 
-            IconButton(
-                onClick = {
-                    // Clear saved credentials and logout
-                    AuthUtils.logout(context) {
-                        onLogout()
-                    }
-                },
-                modifier = Modifier
-                    .background(
-                        JivaColors.White.copy(alpha = 0.2f),
-                        CircleShape
-                    )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.ExitToApp,
-                    contentDescription = "Logout",
-                    tint = JivaColors.White
-                )
+                // Sync button
+                IconButton(
+                    onClick = { viewModel.syncData() },
+                    enabled = !uiState.isSyncing,
+                    modifier = Modifier
+                        .background(
+                            JivaColors.White.copy(alpha = 0.2f),
+                            CircleShape
+                        )
+                ) {
+                    if (uiState.isSyncing) {
+                        // Show loading indicator when syncing
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else if (uiState.syncSuccess) {
+                        // Show success icon briefly
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = "Sync Successful",
+                            tint = JivaColors.White
+                        )
+                    } else {
+                        // Show refresh icon
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Sync Data",
+                            tint = JivaColors.White
+                        )
+                    }
+                }
+                
+                // Logout button
+                IconButton(
+                    onClick = {
+                        // Clear saved credentials and logout
+                        AuthUtils.logout(context) {
+                            onLogout()
+                        }
+                    },
+                    modifier = Modifier
+                        .background(
+                            JivaColors.White.copy(alpha = 0.2f),
+                            CircleShape
+                        )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ExitToApp,
+                        contentDescription = "Logout",
+                        tint = JivaColors.White
+                    )
+                }
             }
         }
     }

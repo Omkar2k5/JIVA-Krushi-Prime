@@ -25,8 +25,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.jiva.JivaApplication
 import com.example.jiva.JivaColors
 import com.example.jiva.components.ResponsiveReportHeader
+import com.example.jiva.viewmodel.OutstandingReportViewModel
 import android.content.Context
 import android.content.Intent
 import android.graphics.*
@@ -41,8 +44,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
-
-
 
 // Data model for Outstanding Report entries
 data class OutstandingEntry(
@@ -62,6 +63,18 @@ data class OutstandingEntry(
 fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    
+    // Get the application instance to access the repository
+    val application = context.applicationContext as JivaApplication
+    
+    // Create the ViewModel with the repository
+    val viewModel: OutstandingReportViewModel = viewModel(
+        factory = OutstandingReportViewModel.Factory(application.database)
+    )
+    
+    // Observe UI state
+    val uiState by viewModel.uiState.collectAsState()
+    
     // State management
     var outstandingOf by remember { mutableStateOf("Customer") }
     var viewAll by remember { mutableStateOf(false) }
@@ -75,21 +88,8 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
     var selectedEntries by remember { mutableStateOf(setOf<String>()) }
     var selectAll by remember { mutableStateOf(false) }
 
-    // Dummy data with more entries for better search testing
-    val allEntries = remember {
-        listOf(
-            OutstandingEntry("001", "ABC Traders", "9876543210", 5000.0, 2000.0, 1500.0, 5500.0, "North", "123 Main St"),
-            OutstandingEntry("002", "XYZ Suppliers", "9876543211", 3000.0, 1000.0, 500.0, 3500.0, "South", "456 Oak Ave"),
-            OutstandingEntry("003", "PQR Industries", "9876543212", 8000.0, 3000.0, 2000.0, 9000.0, "East", "789 Pine Rd"),
-            OutstandingEntry("004", "LMN Corporation", "9876543213", 2000.0, 500.0, 1000.0, 1500.0, "West", "321 Elm St"),
-            OutstandingEntry("005", "DEF Enterprises", "9876543214", 6000.0, 2500.0, 1000.0, 7500.0, "North", "654 Maple Dr"),
-            OutstandingEntry("006", "GHI Solutions", "9876543215", 4000.0, 1500.0, 2000.0, 3500.0, "South", "987 Cedar Ln"),
-            OutstandingEntry("025", "Aman Shaikh", "9876543216", 11000.0, 400.0, 2400.0, 13000.0, "North", "789 Business St"),
-            OutstandingEntry("007", "Tech Solutions", "9876543217", 7500.0, 1200.0, 800.0, 8300.0, "East", "456 Tech Park"),
-            OutstandingEntry("008", "Medical Supplies", "9876543218", 4500.0, 800.0, 1200.0, 4300.0, "West", "321 Health Ave"),
-            OutstandingEntry("009", "Food Distributors", "9876543219", 6200.0, 1500.0, 900.0, 6700.0, "South", "654 Food St")
-        )
-    }
+    // Get entries from ViewModel
+    val allEntries = uiState.outstandingEntries
 
     // Filtered entries based on search and area
     val filteredEntries = remember(partyNameSearch, selectedArea, allEntries) {

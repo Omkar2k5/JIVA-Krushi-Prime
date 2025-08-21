@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.jiva.data.model.User
 import com.example.jiva.data.repository.AuthRepository
+import com.example.jiva.data.repository.JivaRepository
 import com.example.jiva.utils.CredentialManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,11 +16,14 @@ import timber.log.Timber
 data class HomeUiState(
     val currentUser: User? = null,
     val isLoading: Boolean = false,
+    val isSyncing: Boolean = false,
+    val syncSuccess: Boolean = false,
     val errorMessage: String? = null
 )
 
 class HomeViewModel(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val jivaRepository: JivaRepository? = null
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -73,5 +77,95 @@ class HomeViewModel(
     
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+    
+    /**
+     * Syncs all data from the server
+     * Updates the UI state with sync status
+     */
+    fun syncData() {
+        viewModelScope.launch {
+            try {
+                // Only proceed if repository is available
+                if (jivaRepository == null) {
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = "Repository not available for sync",
+                        isSyncing = false,
+                        syncSuccess = false
+                    )
+                    return@launch
+                }
+                
+                // Set syncing state
+                _uiState.value = _uiState.value.copy(
+                    isSyncing = true,
+                    syncSuccess = false,
+                    errorMessage = null
+                )
+                
+                try {
+                    // Perform sync operation
+                    val result = jivaRepository.syncAllData()
+                    
+                    if (result.isSuccess) {
+                        _uiState.value = _uiState.value.copy(
+                            isSyncing = false,
+                            syncSuccess = true,
+                            errorMessage = null
+                        )
+                        Timber.d("Data sync completed successfully")
+                        
+                        // Reset success state after 3 seconds
+                        kotlinx.coroutines.delay(3000)
+                        _uiState.value = _uiState.value.copy(syncSuccess = false)
+                    } else {
+                        // Even if API call failed, we still loaded dummy data as fallback
+                        // So we'll show a warning but still mark as success
+                        val error = result.exceptionOrNull()?.message ?: "Unknown error during sync"
+                        
+                        if (error.contains("Server not available") || error.contains("using dummy data")) {
+                            // Server not available, but we loaded dummy data
+                            _uiState.value = _uiState.value.copy(
+                                isSyncing = false,
+                                syncSuccess = true,
+                                errorMessage = "Server not available - using local data"
+                            )
+                            Timber.w("Server not available, using dummy data")
+                            
+                            // Reset success state after 3 seconds
+                            kotlinx.coroutines.delay(3000)
+                            _uiState.value = _uiState.value.copy(
+                                syncSuccess = false,
+                                errorMessage = null
+                            )
+                        } else {
+                            // Other error
+                            _uiState.value = _uiState.value.copy(
+                                isSyncing = false,
+                                syncSuccess = false,
+                                errorMessage = "Sync warning: $error"
+                            )
+                            Timber.w(result.exceptionOrNull(), "Data sync had issues")
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Catch any exceptions during the sync operation
+                    Timber.e(e, "Error during data sync operation")
+                    _uiState.value = _uiState.value.copy(
+                        isSyncing = false,
+                        syncSuccess = false,
+                        errorMessage = "Sync operation error: ${e.message ?: "Unknown error"}"
+                    )
+                }
+            } catch (e: Exception) {
+                // Catch any exceptions in the outer block
+                Timber.e(e, "Critical error during data sync")
+                _uiState.value = _uiState.value.copy(
+                    isSyncing = false,
+                    syncSuccess = false,
+                    errorMessage = "Critical sync error: ${e.message ?: "Unknown error"}"
+                )
+            }
+        }
     }
 }
