@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -15,21 +16,30 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.jiva.JivaApplication
 import com.example.jiva.JivaColors
 import com.example.jiva.R
 import com.example.jiva.components.ResponsiveWhatsAppButton
+import com.example.jiva.data.repository.JivaRepositoryImpl
+import com.example.jiva.viewmodel.AccountSummary
+import com.example.jiva.viewmodel.DayEndReportViewModel
+import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.roundToInt
 
 // Data model for Day End Report
 data class DayEndData(
@@ -43,25 +53,52 @@ data class DayEndData(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DayEndReportScreenImpl(onBackClick: () -> Unit = {}) {
-    // Current date
-    val currentDate = remember {
-        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+    // Get the context and database
+    val context = LocalContext.current
+    val database = (context.applicationContext as JivaApplication).database
+
+    // Create repository and view model
+    val jivaRepository = remember { JivaRepositoryImpl(database) }
+    val viewModel: DayEndReportViewModel = viewModel { DayEndReportViewModel(jivaRepository) }
+
+    // Observe UI state
+    val uiState by viewModel.uiState.collectAsState()
+
+    // Currency formatter
+    val currencyFormatter = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
+
+    // Show toast for error messages
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let { error ->
+            android.widget.Toast.makeText(
+                context,
+                error,
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+            viewModel.clearError()
+        }
     }
 
-    // Dummy data for day end report
-    val dayEndData = remember {
-        DayEndData(
-            totalSale = 45750.50,
-            totalPurchase = 28900.75,
-            cashReceived = 32500.00,
-            cashInHand = 18650.25,
-            date = currentDate
-        )
+    // Prepare WhatsApp message
+    val whatsappMessage = remember(uiState) {
+        """
+        *Day End Report - ${uiState.currentDate}*
+        
+        Company: ${uiState.companyCode}
+        Year: ${uiState.yearString}
+        
+        Total Accounts: ${uiState.totalAccounts}
+        Total Balance: ${currencyFormatter.format(uiState.totalBalance)}
+        Accounts Over Credit Limit: ${uiState.accountsOverCreditLimit}
+        Inactive Accounts: ${uiState.inactiveAccounts}
+        
+        Average Balance per Account: ${currencyFormatter.format(uiState.averageBalancePerAccount)}
+        Average Days Since Last Transaction: ${uiState.averageDaysSinceLastTransaction.roundToInt()}
+        Accounts Within Credit Limit: ${uiState.percentAccountsWithinCreditLimit.roundToInt()}%
+        
+        Generated via JIVA App
+        """.trimIndent()
     }
-
-    // Calculate derived values
-    val netProfit = dayEndData.totalSale - dayEndData.totalPurchase
-    val cashFlow = dayEndData.cashReceived - dayEndData.cashInHand
 
     // Get status bar height
     val view = LocalView.current
@@ -72,308 +109,260 @@ fun DayEndReportScreenImpl(onBackClick: () -> Unit = {}) {
             ?.top?.toDp() ?: 24.dp
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(JivaColors.LightGray)
-    ) {
-        // Header with gradient background
+    // Main content with loading state
+    if (uiState.isLoading) {
+        // Loading state
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(JivaColors.DeepBlue, JivaColors.Purple)
-                    )
-                )
-                .padding(
-                    top = statusBarHeight + 8.dp,
-                    start = 16.dp,
-                    end = 16.dp,
-                    bottom = 16.dp
-                )
+                .fillMaxSize()
+                .background(JivaColors.LightGray),
+            contentAlignment = Alignment.Center
         ) {
-            // Header content: Back button, Logo, Title
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                IconButton(
-                    onClick = onBackClick,
-                    modifier = Modifier
-                        .background(
-                            JivaColors.White.copy(alpha = 0.2f),
-                            RoundedCornerShape(8.dp)
-                        )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Back",
-                        tint = JivaColors.White
-                    )
-                }
-
-                // App Logo
-                Image(
-                    painter = painterResource(id = R.drawable.logo),
-                    contentDescription = "JIVA Logo",
-                    modifier = Modifier.size(32.dp)
-                )
-
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        text = "Day End Report",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.SansSerif,
-                        color = JivaColors.White
-                    )
-                    Text(
-                        text = "Daily business summary - $currentDate",
-                        fontSize = 13.sp,
-                        fontFamily = FontFamily.SansSerif,
-                        color = JivaColors.White.copy(alpha = 0.8f)
-                    )
-                }
-            }
+            CircularProgressIndicator(color = JivaColors.DeepBlue)
         }
-
-        // Main content with performance optimizations
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            userScrollEnabled = true
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(JivaColors.LightGray)
         ) {
-            // Key Metrics Cards
-            item {
+            // Header with gradient background
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(JivaColors.DeepBlue, JivaColors.Purple)
+                        )
+                    )
+                    .padding(
+                        top = statusBarHeight + 8.dp,
+                        start = 16.dp,
+                        end = 16.dp,
+                        bottom = 16.dp
+                    )
+            ) {
+                // Header content: Back button, Logo, Title
                 Row(
                     modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Total Sale Card
-                    MetricCardWithDrawable(
-                        title = "Total Sale",
-                        value = "₹${String.format("%.2f", dayEndData.totalSale)}",
-                        iconRes = R.drawable.total_sales,
-                        backgroundColor = JivaColors.Green,
-                        modifier = Modifier.weight(1f)
+                    IconButton(
+                        onClick = onBackClick,
+                        modifier = Modifier
+                            .background(
+                                JivaColors.White.copy(alpha = 0.2f),
+                                RoundedCornerShape(8.dp)
+                            )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            tint = JivaColors.White
+                        )
+                    }
+
+                    // App Logo
+                    Image(
+                        painter = painterResource(id = R.drawable.logo),
+                        contentDescription = "JIVA Logo",
+                        modifier = Modifier.size(32.dp)
                     )
 
-                    // Total Purchase Card
-                    MetricCardWithDrawable(
-                        title = "Total Purchase",
-                        value = "₹${String.format("%.2f", dayEndData.totalPurchase)}",
-                        iconRes = R.drawable.totalpurchase,
-                        backgroundColor = JivaColors.Orange,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Cash Received Card
-                    MetricCardWithDrawable(
-                        title = "Cash Received",
-                        value = "₹${String.format("%.2f", dayEndData.cashReceived)}",
-                        iconRes = R.drawable.cashrecived,
-                        backgroundColor = JivaColors.Teal,
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    // Cash In Hand Card
-                    MetricCardWithDrawable(
-                        title = "Cash In Hand",
-                        value = "₹${String.format("%.2f", dayEndData.cashInHand)}",
-                        iconRes = R.drawable.cashinhand,
-                        backgroundColor = JivaColors.Purple,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-
-            // Summary Analysis Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        modifier = Modifier.weight(1f)
                     ) {
                         Text(
-                            text = "Business Analysis",
-                            fontSize = 18.sp,
+                            text = "Day End Report",
+                            fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
-                            color = JivaColors.DeepBlue
+                            fontFamily = FontFamily.SansSerif,
+                            color = JivaColors.White
                         )
-
-                        // Net Profit/Loss
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Net Profit/Loss:",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = JivaColors.DeepBlue
-                            )
-                            Text(
-                                text = "₹${String.format("%.2f", netProfit)}",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (netProfit >= 0) JivaColors.Green else JivaColors.Red
-                            )
-                        }
-
-                        // Cash Flow
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Cash Flow:",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = JivaColors.DeepBlue
-                            )
-                            Text(
-                                text = "₹${String.format("%.2f", cashFlow)}",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (cashFlow >= 0) JivaColors.Green else JivaColors.Red
-                            )
-                        }
-
-                        HorizontalDivider(
-                            color = JivaColors.LightGray,
-                            thickness = 1.dp
-                        )
-
-                        // Performance Indicators
                         Text(
-                            text = "Performance Indicators",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = JivaColors.DeepBlue
-                        )
-
-                        // Sale vs Purchase Ratio
-                        val saleRatio = (dayEndData.totalSale / (dayEndData.totalSale + dayEndData.totalPurchase)) * 100
-                        PerformanceIndicator(
-                            label = "Sale vs Purchase Ratio",
-                            percentage = saleRatio,
-                            color = JivaColors.Green
-                        )
-
-                        // Cash Efficiency
-                        val cashEfficiency = (dayEndData.cashInHand / dayEndData.cashReceived) * 100
-                        PerformanceIndicator(
-                            label = "Cash Efficiency",
-                            percentage = cashEfficiency,
-                            color = JivaColors.Teal
+                            text = "Company: ${uiState.companyCode} | Year: ${uiState.yearString}",
+                            fontSize = 13.sp,
+                            fontFamily = FontFamily.SansSerif,
+                            color = JivaColors.White.copy(alpha = 0.8f)
                         )
                     }
                 }
             }
 
-            // Visual Chart Card (Simple Bar Chart Representation)
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+            // Main content with performance optimizations
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                userScrollEnabled = true
+            ) {
+                // Summary Cards - First Row
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text(
-                            text = "Financial Overview",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = JivaColors.DeepBlue
+                        // Total Accounts Card
+                        SummaryCard(
+                            title = "Total Accounts",
+                            value = uiState.totalAccounts.toString(),
+                            icon = Icons.Default.Person,
+                            backgroundColor = JivaColors.Green,
+                            modifier = Modifier.weight(1f)
                         )
 
-                        // Simple Bar Chart
-                        SimpleBarChart(
-                            data = listOf(
-                                ChartData("Sale", dayEndData.totalSale, JivaColors.Green),
-                                ChartData("Purchase", dayEndData.totalPurchase, JivaColors.Orange),
-                                ChartData("Cash Received", dayEndData.cashReceived, JivaColors.Teal),
-                                ChartData("Cash In Hand", dayEndData.cashInHand, JivaColors.Purple)
-                            )
+                        // Total Balance Card
+                        SummaryCard(
+                            title = "Total Balance",
+                            value = currencyFormatter.format(uiState.totalBalance),
+                            icon = Icons.Default.AttachMoney,
+                            backgroundColor = JivaColors.Orange,
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
-            }
 
-            // WhatsApp Share Button
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                // Summary Cards - Second Row
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text(
-                            text = "Share Report",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = JivaColors.DeepBlue
+                        // Over Credit Limit Card
+                        SummaryCard(
+                            title = "Over Credit Limit",
+                            value = uiState.accountsOverCreditLimit.toString(),
+                            icon = Icons.Default.Warning,
+                            backgroundColor = JivaColors.Purple,
+                            modifier = Modifier.weight(1f)
                         )
 
-                        Button(
-                            onClick = {
-                                // TODO: Send WhatsApp message to self
-                                // For now, this would generate a dummy message template
-                                val whatsappMessage = generateDayEndWhatsAppMessage(dayEndData, netProfit)
-                                // In real implementation, this would open WhatsApp with the message
-                                // or send via WhatsApp Business API
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF25D366) // WhatsApp green
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
+                        // Inactive Accounts Card
+                        SummaryCard(
+                            title = "Inactive Accounts",
+                            value = uiState.inactiveAccounts.toString(),
+                            icon = Icons.Default.DateRange,
+                            backgroundColor = JivaColors.Teal,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                // Business Analysis Section
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color.White
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Share,
-                                    contentDescription = "Share on WhatsApp",
-                                    tint = JivaColors.White,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Text(
-                                    text = "Share Day End Report on WhatsApp",
-                                    color = JivaColors.White,
-                                    fontWeight = FontWeight.Medium,
-                                    fontSize = 16.sp
-                                )
-                            }
+                            Text(
+                                text = "Business Analysis",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = JivaColors.DeepBlue
+                            )
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // Average Balance per Account
+                            AnalysisProgressBar(
+                                label = "Average Balance per Account",
+                                value = currencyFormatter.format(uiState.averageBalancePerAccount),
+                                progress = 0.7f, // Fixed progress for visual appeal
+                                progressColor = JivaColors.Green
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Average Days Since Last Transaction
+                            AnalysisProgressBar(
+                                label = "Avg. Days Since Last Transaction",
+                                value = "${uiState.averageDaysSinceLastTransaction.roundToInt()} days",
+                                progress = 0.5f, // Fixed progress for visual appeal
+                                progressColor = JivaColors.Orange
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // % Accounts within Credit Limit
+                            AnalysisProgressBar(
+                                label = "Accounts Within Credit Limit",
+                                value = "${uiState.percentAccountsWithinCreditLimit.roundToInt()}%",
+                                progress = uiState.percentAccountsWithinCreditLimit.toFloat() / 100f,
+                                progressColor = JivaColors.Purple
+                            )
+                        }
+                    }
+                }
+
+                // Accounts List Section Header
+                item {
+                    Text(
+                        text = "Accounts List",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = JivaColors.DeepBlue,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+
+                // Accounts List
+                items(uiState.accounts) { account ->
+                    AccountCard(account = account, currencyFormatter = currencyFormatter)
+                }
+
+                // WhatsApp Share Button
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = "Share Report",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = JivaColors.DeepBlue
+                            )
+
+                            ResponsiveWhatsAppButton(
+                                onClick = {
+                                    // Create intent to share via WhatsApp
+                                    val intent = android.content.Intent().apply {
+                                        action = android.content.Intent.ACTION_SEND
+                                        putExtra(android.content.Intent.EXTRA_TEXT, whatsappMessage)
+                                        type = "text/plain"
+                                        setPackage("com.whatsapp")
+                                    }
+                                    
+                                    try {
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        // WhatsApp not installed, show error toast
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "WhatsApp not installed",
+                                            android.widget.Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                            )
                         }
                     }
                 }
@@ -628,4 +617,164 @@ private fun generateDayEndWhatsAppMessage(dayEndData: DayEndData, netProfit: Dou
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true)
 private fun DayEndReportScreenPreview() {
     DayEndReportScreenImpl()
+}
+
+@Composable
+fun SummaryCard(
+    title: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    backgroundColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = backgroundColor
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = value,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                color = Color.White.copy(alpha = 0.8f)
+            )
+        }
+    }
+}
+
+@Composable
+fun AnalysisProgressBar(
+    label: String,
+    value: String,
+    progress: Float,
+    progressColor: Color
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label,
+                fontSize = 14.sp,
+                color = Color.DarkGray
+            )
+
+            Text(
+                text = value,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = JivaColors.DeepBlue
+            )
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        LinearProgressIndicator(
+            progress = { progress },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp)),
+            color = progressColor,
+            trackColor = Color.LightGray
+        )
+    }
+}
+
+@Composable
+fun AccountCard(
+    account: AccountSummary,
+    currencyFormatter: NumberFormat
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Status indicator
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .clip(CircleShape)
+                    .background(if (account.isOverCreditLimit) Color.Red else Color.Green)
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Account details
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = account.accountName,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = JivaColors.DeepBlue,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Text(
+                    text = "Last Transaction: ${account.lastTransactionDate} (${account.daysSinceLastTransaction} days ago)",
+                    fontSize = 12.sp,
+                    color = Color.Gray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Balance
+            Text(
+                text = currencyFormatter.format(account.balance),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (account.isOverCreditLimit) Color.Red else JivaColors.Green
+            )
+        }
+    }
 }

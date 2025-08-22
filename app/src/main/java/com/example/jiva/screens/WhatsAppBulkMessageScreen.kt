@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -25,8 +26,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.jiva.JivaApplication
 import com.example.jiva.JivaColors
 import com.example.jiva.R
+import com.example.jiva.data.repository.JivaRepositoryImpl
+import com.example.jiva.viewmodel.WhatsAppViewModel
 
 // Data model for Customer contact information
 data class CustomerContact(
@@ -43,36 +48,37 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
     var messageText by remember { mutableStateOf("") }
     var selectAll by remember { mutableStateOf(false) }
     
-    // Dummy customer data
-    val customerContacts = remember {
-        mutableStateListOf(
-            CustomerContact("001", "Aman Shaikh", "+91 9876543210"),
-            CustomerContact("002", "ABC Traders", "+91 9876543211"),
-            CustomerContact("003", "XYZ Suppliers", "+91 9876543212"),
-            CustomerContact("004", "PQR Industries", "+91 9876543213"),
-            CustomerContact("005", "LMN Corporation", "+91 9876543214"),
-            CustomerContact("006", "DEF Enterprises", "+91 9876543215"),
-            CustomerContact("007", "GHI Solutions", "+91 9876543216"),
-            CustomerContact("008", "Tech Agro", "+91 9876543217"),
-            CustomerContact("009", "Modern Farms", "+91 9876543218"),
-            CustomerContact("010", "Green Valley", "+91 9876543219"),
-            CustomerContact("011", "Sunrise Agro", "+91 9876543220"),
-            CustomerContact("012", "Golden Harvest", "+91 9876543221"),
-            CustomerContact("013", "Fresh Fields", "+91 9876543222"),
-            CustomerContact("014", "Crop Care Ltd", "+91 9876543223"),
-            CustomerContact("015", "Agri Solutions", "+91 9876543224")
-        )
-    }
-
+    // Get the context and database
+    val context = LocalContext.current
+    val database = (context.applicationContext as JivaApplication).database
+    
+    // Create repository and view model
+    val jivaRepository = remember { JivaRepositoryImpl(database) }
+    val viewModel: WhatsAppViewModel = viewModel { WhatsAppViewModel(jivaRepository) }
+    
+    // Observe UI state
+    val uiState by viewModel.uiState.collectAsState()
+    val customerContacts = uiState.customerContacts
+    
     // Calculate selected count
     val selectedCount = customerContacts.count { it.isSelected }
     val totalCount = customerContacts.size
-
+    
+    // Show toast for error messages
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let { error ->
+            android.widget.Toast.makeText(
+                context,
+                error,
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+            viewModel.clearError()
+        }
+    }
+    
     // Handle select all functionality
     LaunchedEffect(selectAll) {
-        customerContacts.forEachIndexed { index, contact ->
-            customerContacts[index] = contact.copy(isSelected = selectAll)
-        }
+        viewModel.selectAllContacts(selectAll)
     }
 
     Column(
@@ -292,6 +298,49 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
                     }
                 }
             }
+            
+            // Loading indicator
+            if (uiState.isLoading) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = JivaColors.DeepBlue,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Loading customer contacts...",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = JivaColors.DeepBlue
+                            )
+                        }
+                    }
+                }
+            } else if (customerContacts.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No customer contacts found with mobile numbers",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color.Gray
+                        )
+                    }
+                }
+            }
 
             // Customer Table Data Items with keys for performance
             items(
@@ -307,7 +356,7 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
                     CustomerTableRow(
                         contact = contact,
                         onSelectionChanged = { isSelected ->
-                            customerContacts[index] = contact.copy(isSelected = isSelected)
+                            viewModel.updateContactSelection(contact.accountNumber, isSelected)
                             // Update selectAll state based on current selections
                             selectAll = customerContacts.all { it.isSelected }
                         }
@@ -327,8 +376,16 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
                 ) {
                     Button(
                         onClick = { 
-                            // TODO: Send WhatsApp messages to selected customers
+                            // Get selected customers from the ViewModel
                             val selectedCustomers = customerContacts.filter { it.isSelected }
+                            
+                            // Show toast with selected customers count
+                            android.widget.Toast.makeText(
+                                context,
+                                "Sending message to ${selectedCustomers.size} customers",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                            
                             // In real implementation, this would send messages via WhatsApp Business API
                         },
                         enabled = selectedCount > 0 && messageText.isNotBlank(),
