@@ -3,6 +3,8 @@ package com.example.jiva.data.database.entities
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Contextual
+import kotlinx.serialization.Serializable
 import java.math.BigDecimal
 
 /**
@@ -10,6 +12,7 @@ import java.math.BigDecimal
  * Maps to MySQL table: tb_expiry
  */
 @Entity(tableName = "tb_expiry")
+@Serializable
 data class ExpiryEntity(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "SrNo")
@@ -34,6 +37,7 @@ data class ExpiryEntity(
     val expiryDate: String? = null,
     
     @ColumnInfo(name = "Qty")
+    @Contextual
     val qty: BigDecimal = BigDecimal.ZERO,
     
     @ColumnInfo(name = "DaysLeft")

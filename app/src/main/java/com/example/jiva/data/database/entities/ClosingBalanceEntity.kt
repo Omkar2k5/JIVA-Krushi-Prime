@@ -3,12 +3,14 @@ package com.example.jiva.data.database.entities
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 
 /**
  * Room entity for tb_closing_balance table
  * Maps to MySQL table: tb_closing_balance
  */
 @Entity(tableName = "tb_closing_balance")
+@Serializable
 data class ClosingBalanceEntity(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "SrNO")

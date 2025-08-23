@@ -1,0 +1,431 @@
+JIVA APPLICATION - API DATA REQUIREMENTS FOR LOCAL DATABASE SYNC
+================================================================
+
+OVERVIEW:
+This document outlines all the data structures that need to be sent through your second API endpoint 
+to populate the local Room database for all application screens.
+
+API ENDPOINT STRUCTURE:
+1. Login API: POST /api/login (userId, password) -> success/failure message
+2. Data Sync API: GET /api/sync-all-data -> JSON response with all required data
+
+=================================================================
+REQUIRED DATA STRUCTURES FOR LOCAL DATABASE SYNC
+=================================================================
+
+1. USERS TABLE DATA (users)
+---------------------------
+Purpose: User authentication and company management
+Used By: Login screen, user session management
+
+Required Fields:
+- UserID (int, auto-increment primary key)
+- Password (string, encrypted/hashed)
+- MobileNumber (string, 15 chars max)
+- CompanyName (string, 100 chars max)
+- CompanyCode (string, 50 chars max)
+- OwnerName (string, 100 chars max)
+- DateOfRegistration (date, format: YYYY-MM-DD)
+- IsActive (boolean, default: true)
+
+JSON Structure:
+{
+  "users": [
+    {
+      "UserID": 1001,
+      "Password": "hashed_password_here",
+      "MobileNumber": "9876543210",
+      "CompanyName": "ABC Agro Solutions",
+      "CompanyCode": "ABC001",
+      "OwnerName": "John Doe",
+      "DateOfRegistration": "2024-01-15",
+      "IsActive": true
+    }
+  ]
+}
+
+2. ACCOUNT MASTER DATA (tb_acmaster)
+------------------------------------
+Purpose: Customer/Party master data for all business transactions
+Used By: Outstanding Report, WhatsApp Marketing, Ledger Report
+
+Required Fields:
+- srno (int, auto-increment primary key)
+- CmpCode (int, company identifier)
+- Ac_ID (int, unique account identifier)
+- Account_Name (string, 100 chars, customer/party name)
+- Under (string, 50 chars, account classification)
+- Area (string, 50 chars, geographical area)
+- Opening_Balance (decimal 15,2, opening balance amount)
+- CRDR (enum: 'CR'/'DR', credit or debit balance)
+- Detailed_Address (string, 255 chars, full address)
+- Phone (string, 15 chars, landline number)
+- Mobile (string, 15 chars, mobile number for WhatsApp)
+- ST_Reg_No (string, 50 chars, registration number)
+- CustomerType (string, 50 chars, customer category)
+- State (string, 50 chars, state name)
+- yearString (string, 10 chars, financial year)
+
+JSON Structure:
+{
+  "accounts": [
+    {
+      "srno": 1,
+      "CmpCode": 1,
+      "Ac_ID": 25,
+      "Account_Name": "Aman Shaikh",
+      "Under": "Sundry Debtors",
+      "Area": "North",
+      "Opening_Balance": "11000.00",
+      "CRDR": "DR",
+      "Detailed_Address": "123 Main Street, Mumbai",
+      "Phone": "022-12345678",
+      "Mobile": "9876543210",
+      "ST_Reg_No": "GST123456789",
+      "CustomerType": "Regular",
+      "State": "Maharashtra",
+      "yearString": "2024-25"
+    }
+  ]
+}
+
+3. CLOSING BALANCE DATA (tb_closing_balance)
+--------------------------------------------
+Purpose: Outstanding balances for Outstanding Report screen
+Used By: Outstanding Report Screen
+
+Required Fields:
+- SrNO (int, auto-increment primary key)
+- CmpCode (int, company identifier)
+- AC_ID (int, account identifier, links to tb_acmaster.Ac_ID)
+- Account_Name (string, 150 chars, customer name)
+- Mobile (string, 15 chars, mobile number)
+- Under (string, 100 chars, account classification)
+- Balance (string, 20 chars, outstanding balance amount)
+- LastDate (string, 20 chars, last transaction date)
+- Days (int, days since last transaction)
+- Credit_Limit_Amount (string, 20 chars, credit limit)
+- Credit_Limit_Days (string, 20 chars, credit period)
+- YearString (string, 9 chars, financial year)
+
+JSON Structure:
+{
+  "closing_balances": [
+    {
+      "SrNO": 1,
+      "CmpCode": 1,
+      "AC_ID": 25,
+      "Account_Name": "Aman Shaikh",
+      "Mobile": "9876543210",
+      "Under": "Sundry Debtors",
+      "Balance": "12000.00",
+      "LastDate": "20-Aug-2025",
+      "Days": 3,
+      "Credit_Limit_Amount": "50000.00",
+      "Credit_Limit_Days": "30",
+      "YearString": "2024-25"
+    }
+  ]
+}
+
+4. STOCK DATA (tb_stock)
+------------------------
+Purpose: Inventory management and stock tracking
+Used By: Stock Report Screen
+
+Required Fields:
+- SrNO (int, auto-increment primary key)
+- CmpCode (int, company identifier)
+- ITEM_ID (int, unique item identifier)
+- Item_Name (string, 150 chars, item name)
+- Opening (decimal 15,3, opening stock quantity)
+- InWard (decimal 15,3, stock received quantity)
+- OutWard (decimal 15,3, stock issued quantity)
+- Closing_Stock (decimal 15,3, current stock quantity)
+- AvgRate (decimal 15,2, average rate per unit)
+- Valuation (decimal 18,2, total stock value)
+- ItemType (string, 50 chars, item category)
+- Company (string, 100 chars, manufacturer/supplier)
+- cgst (decimal 5,2, CGST rate percentage)
+- sgst (decimal 5,2, SGST rate percentage)
+- igst (decimal 5,2, IGST rate percentage)
+- YearString (string, 9 chars, financial year)
+
+JSON Structure:
+{
+  "stocks": [
+    {
+      "SrNO": 1,
+      "CmpCode": 1,
+      "ITEM_ID": 1,
+      "Item_Name": "Rogar 100ml",
+      "Opening": "50.000",
+      "InWard": "20.000",
+      "OutWard": "15.000",
+      "Closing_Stock": "55.000",
+      "AvgRate": "125.50",
+      "Valuation": "6902.50",
+      "ItemType": "General",
+      "Company": "Bayer Corp",
+      "cgst": "9.00",
+      "sgst": "9.00",
+      "igst": "0.00",
+      "YearString": "2024-25"
+    }
+  ]
+}
+
+5. SALE/PURCHASE TRANSACTION DATA (tb_salepurchase)
+---------------------------------------------------
+Purpose: Sales and purchase transactions for reports and day-end calculations
+Used By: Sales Report Screen, Day End Report
+
+Required Fields:
+- SrNo (int, auto-increment primary key)
+- CmpCode (int, company identifier)
+- trDate (date, transaction date, format: YYYY-MM-DD)
+- PartyName (string, 150 chars, customer/supplier name)
+- gstin (string, 16 chars, GST identification number)
+- trType (string, 20 chars, transaction type: Sale/Purchase/Credit Sale/etc.)
+- RefNo (string, 50 chars, reference/invoice number)
+- Item_Name (string, 150 chars, item name)
+- HSN (string, 10 chars, HSN code for GST)
+- Category (string, 50 chars, item category)
+- Qty (decimal 15,3, quantity)
+- Unit (string, 20 chars, unit of measurement)
+- Rate (decimal 15,2, rate per unit)
+- Amount (decimal 18,2, total amount)
+- Discount (decimal 15,2, discount amount)
+- YearString (string, 9 chars, financial year)
+
+JSON Structure:
+{
+  "sale_purchases": [
+    {
+      "SrNo": 1,
+      "CmpCode": 1,
+      "trDate": "2025-08-05",
+      "PartyName": "Aman Shaikh",
+      "gstin": "27ABCDE1234F1Z5",
+      "trType": "Credit Sale",
+      "RefNo": "1",
+      "Item_Name": "Rogar 100ml",
+      "HSN": "3808",
+      "Category": "Fertilizers",
+      "Qty": "12.000",
+      "Unit": "Nos",
+      "Rate": "200.00",
+      "Amount": "2285.71",
+      "Discount": "0.00",
+      "YearString": "2024-25"
+    }
+  ]
+}
+
+6. LEDGER ENTRIES DATA (tb_ledger)
+----------------------------------
+Purpose: Double-entry bookkeeping records for ledger reports
+Used By: Ledger Report Screen, Outstanding calculations
+
+Required Fields:
+- SerialNo (int, auto-increment primary key)
+- CmpCode (int, company identifier)
+- EntryNo (int, entry number)
+- ManualNo (string, 50 chars, manual entry number)
+- SrNO (int, serial number)
+- EntryType (string, 50 chars, type of entry)
+- EntryDate (date, entry date, format: YYYY-MM-DD)
+- RefNo (string, 50 chars, reference number)
+- Ac_ID (int, account identifier, links to tb_acmaster.Ac_ID)
+- DR (decimal 15,2, debit amount)
+- CR (decimal 15,2, credit amount)
+- Narration (text, description/narration)
+- IsClere (boolean, cleared status)
+- TrascType (string, 50 chars, transaction type)
+- GSTRate (decimal 5,2, GST rate)
+- Amt (decimal 15,2, amount)
+- IGST (decimal 15,2, IGST amount)
+- YearString (string, 10 chars, financial year)
+
+JSON Structure:
+{
+  "ledgers": [
+    {
+      "SerialNo": 1,
+      "CmpCode": 1,
+      "EntryNo": 1,
+      "ManualNo": "25",
+      "SrNO": 1,
+      "EntryType": "Credit Sale",
+      "EntryDate": "2025-08-05",
+      "RefNo": "1",
+      "Ac_ID": 25,
+      "DR": "2400.00",
+      "CR": "0.00",
+      "Narration": "Credit Sale No:1 - Aman Shaikh",
+      "IsClere": false,
+      "TrascType": "Sale",
+      "GSTRate": "18.00",
+      "Amt": "2400.00",
+      "IGST": "0.00",
+      "YearString": "2024-25"
+    }
+  ]
+}
+
+7. EXPIRY DATA (tb_expiry)
+--------------------------
+Purpose: Item expiry tracking for expiry reports
+Used By: Expiry Report Screen
+
+Required Fields:
+- SrNo (int, auto-increment primary key)
+- CmpCode (int, company identifier)
+- Item_ID (int, item identifier)
+- Item_Name (string, 200 chars, item name)
+- Item_Type (string, 100 chars, item category)
+- Batch_No (string, 100 chars, batch number)
+- Expiry_Date (string, 25 chars, expiry date in DD/MM/YYYY format)
+- Qty (decimal 18,2, quantity)
+- DaysLeft (int, days remaining to expiry, can be negative for expired items)
+- YearString (string, 10 chars, financial year)
+
+JSON Structure:
+{
+  "expiries": [
+    {
+      "SrNo": 1,
+      "CmpCode": 1,
+      "Item_ID": 1,
+      "Item_Name": "Rice Basmati Premium",
+      "Item_Type": "Food Grain",
+      "Batch_No": "RB2024001",
+      "Expiry_Date": "15/02/2025",
+      "Qty": "50.00",
+      "DaysLeft": -8,
+      "YearString": "2024-25"
+    }
+  ]
+}
+
+8. WHATSAPP TEMPLATES DATA (tb_templates)
+------------------------------------------
+Purpose: WhatsApp message templates for bulk marketing
+Used By: WhatsApp Marketing Screen
+
+Required Fields:
+- SrNo (int, auto-increment primary key)
+- CmpCode (int, company identifier)
+- TempID (string, 50 chars, template identifier)
+- Category (string, 100 chars, template category)
+- Msg (text, message content with placeholders)
+- InstanceID (string, 100 chars, WhatsApp Business API instance ID)
+- AccessToken (string, 255 chars, WhatsApp API access token)
+
+JSON Structure:
+{
+  "templates": [
+    {
+      "SrNo": 1,
+      "CmpCode": 1,
+      "TempID": "TEMP001",
+      "Category": "Promotional",
+      "Msg": "Dear {{customer_name}}, Special offer on {{item_name}} at {{discount}}% off! Valid till {{date}}. Contact us for more details.",
+      "InstanceID": "whatsapp_instance_123",
+      "AccessToken": "your_whatsapp_access_token_here"
+    }
+  ]
+}
+
+9. PRICE SCREEN DATA (Custom API Endpoint)
+-------------------------------------------
+Purpose: Item pricing information for price management
+Used By: Price Screen
+
+Note: This data is not stored in a specific MySQL table but needs to be provided
+through a custom API endpoint /api/priceScreen
+
+Required Fields:
+- itemId (string, item identifier)
+- itemName (string, item name)
+- mrp (decimal, maximum retail price)
+- creditSaleRate (decimal, credit sale rate)
+- cashSaleRate (decimal, cash sale rate)
+- wholesaleRate (decimal, wholesale rate)
+- maxPurchaseRate (decimal, maximum purchase rate)
+
+JSON Structure:
+{
+  "price_data": [
+    {
+      "itemId": "ITM001",
+      "itemName": "Rice Basmati Premium",
+      "mrp": "120.00",
+      "creditSaleRate": "115.00",
+      "cashSaleRate": "110.00",
+      "wholesaleRate": "105.00",
+      "maxPurchaseRate": "95.00"
+    }
+  ]
+}
+
+=================================================================
+COMPLETE API RESPONSE STRUCTURE
+=================================================================
+
+Your second API endpoint should return a single JSON response containing all the above data:
+
+{
+  "status": "success",
+  "message": "Data sync successful",
+  "timestamp": "2025-08-23T10:30:00Z",
+  "data": {
+    "users": [...],
+    "accounts": [...],
+    "closing_balances": [...],
+    "stocks": [...],
+    "sale_purchases": [...],
+    "ledgers": [...],
+    "expiries": [...],
+    "templates": [...],
+    "price_data": [...]
+  }
+}
+
+=================================================================
+IMPORTANT NOTES FOR API IMPLEMENTATION
+=================================================================
+
+1. DATA RELATIONSHIPS:
+   - tb_acmaster.Ac_ID links to tb_closing_balance.AC_ID
+   - tb_acmaster.Ac_ID links to tb_ledger.Ac_ID
+   - tb_stock.ITEM_ID links to tb_expiry.Item_ID
+   - All tables have CmpCode for company-wise data filtering
+
+2. DATE FORMATS:
+   - Database dates: YYYY-MM-DD format
+   - Display dates: DD/MM/YYYY format (for expiry dates)
+   - Timestamps: ISO 8601 format for API responses
+
+3. DECIMAL PRECISION:
+   - Financial amounts: 2 decimal places (15,2)
+   - Quantities: 3 decimal places (15,3)
+   - Percentages: 2 decimal places (5,2)
+
+4. COMPANY FILTERING:
+   - All data should be filtered by CmpCode based on logged-in user
+   - Each user belongs to a specific company (CompanyCode in users table)
+
+5. YEAR STRING:
+   - Financial year format: "2024-25"
+   - Used for filtering data by financial year
+
+6. MOBILE NUMBERS:
+   - Required for WhatsApp marketing functionality
+   - Should include country code for international compatibility
+
+7. BOOLEAN VALUES:
+   - Use true/false in JSON
+   - Database stores as tinyint(1) or boolean
+
+This document provides the complete data structure needed for your local database sync API endpoint.

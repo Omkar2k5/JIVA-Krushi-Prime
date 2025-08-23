@@ -1,0 +1,577 @@
+JIVA Android App — Screen Data Specification
+
+Notes
+- Types: string, int, long, decimal, bool, datetime, date, enum, uuid
+- IDs are uuid unless noted; monetary = decimal(18,2); quantities = decimal(18,4)
+- Timestamps are ISO-8601 UTC; booleans default to false unless stated
+- FK → foreign key relationship reference
+
+================================================================================
+1) Login
+--------------------------------------------------------------------------------
+Data Fields
+- username_or_email (string, required): User credential
+- password (string, required): User credential (never store in plain text)
+- device_id (string, optional): Device identifier for session and security
+- app_version (string, optional): Client app version
+- remember_me (bool, optional): Persist session
+
+Features
+- login_submit: Validate and call /auth/login
+- forgot_password: Link to password reset
+- biometric_login: Optional if device supports biometrics
+- sso_button: Optional (Google/Microsoft/Okta) based on tenant config
+
+================================================================================
+2) Dashboard
+--------------------------------------------------------------------------------
+Data Fields
+- user_id (uuid, required, FK users.id)
+- today_sales_total (decimal)
+- today_orders_count (int)
+- low_stock_count (int)
+- pending_invoices_count (int)
+- pending_purchase_orders_count (int)
+- recent_notifications (array<notification_summary>)
+  - id (uuid)
+  - title (string)
+  - created_at (datetime)
+- top_products_today (array<product_sales>)
+  - product_id (uuid)
+  - sku (string)
+  - name (string)
+  - qty_sold (decimal)
+  - sales_value (decimal)
+
+Features
+- refresh_pull_to_sync
+- navigate_shortcuts: products, customers, sales, inventory, reports
+- filter_store (uuid | ‘all’)
+
+================================================================================
+3) User Profile
+--------------------------------------------------------------------------------
+Data Fields
+- id (uuid)
+- email (string)
+- phone (string)
+- first_name (string)
+- last_name (string)
+- avatar_url (string)
+- role_id (uuid, FK roles.id)
+- role_name (string)
+- permissions (array<string>)
+- default_store_id (uuid, FK stores.id)
+- timezone (string)
+- locale (string)
+- currency_code (string)
+- tax_inclusive_pricing (bool)
+- created_at (datetime)
+- updated_at (datetime)
+
+Features
+- edit_profile
+- change_password
+- sign_out
+
+================================================================================
+4) Customers
+--------------------------------------------------------------------------------
+Data Fields
+- id (uuid)
+- external_code (string)
+- name (string, required)
+- email (string)
+- phone (string)
+- tax_id (string)
+- billing_address_line1 (string)
+- billing_address_line2 (string)
+- billing_city (string)
+- billing_state (string)
+- billing_postcode (string)
+- billing_country (string)
+- shipping_address_line1 (string)
+- shipping_address_line2 (string)
+- shipping_city (string)
+- shipping_state (string)
+- shipping_postcode (string)
+- shipping_country (string)
+- payment_terms_days (int)
+- credit_limit (decimal)
+- balance_outstanding (decimal)
+- notes (string)
+- is_active (bool)
+- created_at (datetime)
+- updated_at (datetime)
+
+Features
+- list_search_sort_pagination
+- add_edit_delete
+- view_customer_sales_history
+
+================================================================================
+5) Suppliers
+--------------------------------------------------------------------------------
+Data Fields
+- id (uuid)
+- external_code (string)
+- name (string, required)
+- email (string)
+- phone (string)
+- tax_id (string)
+- address_line1 (string)
+- address_line2 (string)
+- city (string)
+- state (string)
+- postcode (string)
+- country (string)
+- payment_terms_days (int)
+- notes (string)
+- is_active (bool)
+- created_at (datetime)
+- updated_at (datetime)
+
+Features
+- list_search_sort_pagination
+- add_edit_delete
+- view_supplier_pos_and_grns
+
+================================================================================
+6) Products
+--------------------------------------------------------------------------------
+Data Fields
+- id (uuid)
+- sku (string, unique)
+- barcode (string)
+- name (string, required)
+- description (string)
+- category_id (uuid, FK categories.id)
+- brand (string)
+- uom (string)  # unit of measure
+- cost_price (decimal)
+- sell_price (decimal)
+- tax_rate_id (uuid, FK tax_rates.id)
+- track_inventory (bool)
+- reorder_level (decimal)
+- image_url (string)
+- is_active (bool)
+- created_at (datetime)
+- updated_at (datetime)
+
+Features
+- list_search_filter_by_category
+- scan_barcode
+- add_edit_duplicate
+- price_history_view
+
+================================================================================
+7) Categories
+--------------------------------------------------------------------------------
+Data Fields
+- id (uuid)
+- name (string, required)
+- parent_id (uuid, nullable, FK categories.id)
+- description (string)
+- is_active (bool)
+- created_at (datetime)
+- updated_at (datetime)
+
+Features
+- list_tree_view
+- add_edit_delete
+
+================================================================================
+8) Inventory (Stock by Store)
+--------------------------------------------------------------------------------
+Data Fields
+- id (uuid)
+- product_id (uuid, FK products.id)
+- store_id (uuid, FK stores.id)
+- on_hand_qty (decimal)
+- reserved_qty (decimal)
+- available_qty (decimal)  # derived = on_hand - reserved
+- reorder_level (decimal)
+- last_counted_at (datetime)
+- updated_at (datetime)
+
+Features
+- list_filter_by_store_and_category
+- low_stock_badge
+- stock_detail_drilldown
+
+================================================================================
+9) Stock Movements
+--------------------------------------------------------------------------------
+Data Fields
+- id (uuid)
+- product_id (uuid, FK products.id)
+- store_id (uuid, FK stores.id)
+- doc_type (enum: adjustment_in|adjustment_out|sale|purchase|transfer_in|transfer_out|return_in|return_out)
+- doc_id (uuid)  # FK to source document (invoice, PO, transfer, etc.)
+- quantity_delta (decimal, + for in, - for out)
+- unit_cost (decimal)
+- reason (string)
+- created_by (uuid, FK users.id)
+- created_at (datetime)
+
+Features
+- list_filter_export
+- create_adjustment_in_out (with reason)
+
+================================================================================
+10) Sales Order (Cart/Quote)
+--------------------------------------------------------------------------------
+Data Fields
+Header
+- id (uuid)
+- order_number (string)
+- customer_id (uuid, FK customers.id)
+- store_id (uuid, FK stores.id)
+- status (enum: draft|confirmed|invoiced|cancelled)
+- order_date (date)
+- due_date (date)
+- currency_code (string)
+- subtotal (decimal)
+- discount_total (decimal)
+- tax_total (decimal)
+- grand_total (decimal)
+- notes (string)
+- created_at (datetime)
+- updated_at (datetime)
+
+Lines (array)
+- id (uuid)
+- product_id (uuid)
+- description (string)
+- qty (decimal)
+- unit_price (decimal)
+- line_discount (decimal)
+- tax_rate_id (uuid)
+- line_total (decimal)
+
+Features
+- add_remove_lines
+- price_override_with_permission
+- convert_to_invoice
+- share_quote_pdf
+
+================================================================================
+11) Invoice
+--------------------------------------------------------------------------------
+Data Fields
+Header
+- id (uuid)
+- invoice_number (string)
+- customer_id (uuid)
+- store_id (uuid)
+- status (enum: draft|issued|paid|partially_paid|void)
+- issue_date (date)
+- due_date (date)
+- currency_code (string)
+- subtotal (decimal)
+- discount_total (decimal)
+- tax_total (decimal)
+- grand_total (decimal)
+- amount_paid (decimal)
+- balance_due (decimal)
+- notes (string)
+- created_at (datetime)
+- updated_at (datetime)
+
+Lines (array)
+- id (uuid)
+- product_id (uuid)
+- description (string)
+- qty (decimal)
+- unit_price (decimal)
+- line_discount (decimal)
+- tax_rate_id (uuid)
+- line_total (decimal)
+
+Features
+- record_payment
+- email_invoice
+- print_share_pdf
+- issue_void_with_reason
+
+================================================================================
+12) Payments
+--------------------------------------------------------------------------------
+Data Fields
+- id (uuid)
+- invoice_id (uuid, FK invoices.id)
+- customer_id (uuid, FK customers.id)
+- method (enum: cash|card|bank_transfer|mobile_money|other)
+- reference (string)
+- amount (decimal)
+- paid_at (datetime)
+- received_by (uuid, FK users.id)
+- notes (string)
+- created_at (datetime)
+
+Features
+- add_payment
+- refund_payment_with_permission
+- export_payments
+
+================================================================================
+13) Purchase Orders (PO)
+--------------------------------------------------------------------------------
+Data Fields
+Header
+- id (uuid)
+- po_number (string)
+- supplier_id (uuid)
+- store_id (uuid)
+- status (enum: draft|issued|partially_received|received|cancelled)
+- order_date (date)
+- expected_date (date)
+- currency_code (string)
+- subtotal (decimal)
+- discount_total (decimal)
+- tax_total (decimal)
+- grand_total (decimal)
+- notes (string)
+- created_at (datetime)
+- updated_at (datetime)
+
+Lines (array)
+- id (uuid)
+- product_id (uuid)
+- description (string)
+- ordered_qty (decimal)
+- unit_cost (decimal)
+- tax_rate_id (uuid)
+- line_total (decimal)
+
+Features
+- add_remove_lines
+- send_to_supplier_pdf
+- receive_to_grn
+
+================================================================================
+14) Goods Receipt (GRN)
+--------------------------------------------------------------------------------
+Data Fields
+Header
+- id (uuid)
+- grn_number (string)
+- source_po_id (uuid, nullable)
+- supplier_id (uuid)
+- store_id (uuid)
+- received_at (datetime)
+- received_by (uuid, FK users.id)
+- notes (string)
+- created_at (datetime)
+
+Lines (array)
+- id (uuid)
+- product_id (uuid)
+- received_qty (decimal)
+- unit_cost (decimal)
+- batch_number (string)
+- expiry_date (date, nullable)
+- remarks (string)
+
+Features
+- scan_and_receive
+- partial_receive_against_po
+- auto_create_stock_movements
+
+================================================================================
+15) Transactions Ledger
+--------------------------------------------------------------------------------
+Data Fields
+- id (uuid)
+- doc_type (enum: invoice|payment|po|grn|adjustment|transfer)
+- doc_id (uuid)
+- reference (string)
+- counterparty_name (string)
+- debit (decimal)
+- credit (decimal)
+- balance_running (decimal)
+- created_at (datetime)
+
+Features
+- filter_by_date_store_type
+- export_csv
+
+================================================================================
+16) Reports (Sales Summary)
+--------------------------------------------------------------------------------
+Data Fields
+- date (date)
+- store_id (uuid)
+- store_name (string)
+- orders_count (int)
+- items_sold (decimal)
+- sales_total (decimal)
+- discount_total (decimal)
+- tax_total (decimal)
+- net_sales (decimal)
+
+Features
+- date_range_picker
+- group_by_day_week_month
+- export_pdf_csv
+
+================================================================================
+17) Notifications
+--------------------------------------------------------------------------------
+Data Fields
+- id (uuid)
+- title (string)
+- message (string)
+- type (enum: info|warning|alert)
+- read (bool)
+- created_at (datetime)
+- action_url (string)
+
+Features
+- mark_all_read
+- deep_link_actions
+
+================================================================================
+18) Settings
+--------------------------------------------------------------------------------
+Data Fields
+- organization_id (uuid)
+- organization_name (string)
+- default_currency (string)
+- default_tax_rate_id (uuid)
+- price_includes_tax (bool)
+- allow_negative_stock (bool)
+- enable_barcode_scanning (bool)
+- enable_offline_mode (bool)
+- data_retention_days (int)
+
+Features
+- edit_settings_with_permissions
+- reset_to_defaults
+
+================================================================================
+19) Sync Status
+--------------------------------------------------------------------------------
+Data Fields
+- last_full_sync_at (datetime)
+- last_delta_sync_at (datetime)
+- pending_outbox_count (int)
+- last_error_code (string)
+- last_error_message (string)
+
+Features
+- manual_sync_trigger
+- view_sync_log
+
+================================================================================
+20) Audit Log
+--------------------------------------------------------------------------------
+Data Fields
+- id (uuid)
+- entity_type (string)  # e.g., product, invoice
+- entity_id (uuid)
+- action (enum: create|update|delete|login|permission_change)
+- changed_by (uuid, FK users.id)
+- changes_json (string)
+- created_at (datetime)
+
+Features
+- filter_by_entity_user_date
+- view_change_diff
+
+================================================================================
+21) Stores (Outlets)
+--------------------------------------------------------------------------------
+Data Fields
+- id (uuid)
+- code (string)
+- name (string)
+- address_line1 (string)
+- address_line2 (string)
+- city (string)
+- state (string)
+- postcode (string)
+- country (string)
+- phone (string)
+- is_active (bool)
+
+Features
+- select_default_store
+- filter_by_store_in_lists
+
+================================================================================
+22) Taxes & Tax Rates
+--------------------------------------------------------------------------------
+Data Fields
+- id (uuid)
+- name (string)
+- rate_percent (decimal)
+- inclusive (bool)
+- is_active (bool)
+
+Features
+- assign_to_products
+- override_on_document_with_permission
+
+================================================================================
+23) Roles & Permissions
+--------------------------------------------------------------------------------
+Data Fields
+Role
+- id (uuid)
+- name (string)
+- description (string)
+
+Permission
+- key (string)
+- description (string)
+
+RolePermission
+- role_id (uuid)
+- permission_key (string)
+
+UserRole
+- user_id (uuid)
+- role_id (uuid)
+
+Features
+- view_assigned_permissions
+- gate_actions_client_side
+
+================================================================================
+24) User Data (for /user/data endpoint)
+--------------------------------------------------------------------------------
+Payload Outline (aggregated for signed-in user)
+- user_profile: User Profile (see section 3)
+- roles: array<Role>
+- permissions: array<string>
+- stores: array<Store> (limited to accessible stores)
+- settings: Settings (section 18)
+- tax_rates: array<TaxRate>
+- categories: array<Category>
+- products: array<Product> (active)
+- inventory: array<Inventory> (for accessible stores)
+- customers: array<Customer>
+- suppliers: array<Supplier>
+- price_lists (optional): if feature enabled
+- recent_notifications: array<Notification> (last N)
+- feature_flags: { enable_barcode_scanning: bool, enable_offline_mode: bool, ... }
+
+Notes
+- Consider pagination or delta tokens if payload is large
+- Include server_time and sync_token for offline sync
+- Use ETag/If-None-Match for caching
+
+================================================================================
+API Hints
+--------------------------------------------------------------------------------
+/auth/login (POST)
+- Request: { username_or_email, password, device_id?, app_version? }
+- Response: { access_token, refresh_token, expires_in, user_id }
+
+/user/data (GET)
+- Headers: Authorization: Bearer <token>
+- Query (optional): store_id, since=<timestamp>, page, page_size
+- Response: Envelope with payload outlined in section 24 plus sync metadata
+
+End of file.

@@ -3,6 +3,10 @@ package com.example.jiva.data.database.entities
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Contextual
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
+import com.example.jiva.data.serializers.BigDecimalSerializer
 import java.math.BigDecimal
 
 /**
@@ -10,6 +14,7 @@ import java.math.BigDecimal
  * Maps to MySQL table: tb_acmaster
  */
 @Entity(tableName = "tb_acmaster")
+@Serializable
 data class AccountMasterEntity(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "srno")
@@ -31,6 +36,7 @@ data class AccountMasterEntity(
     val area: String? = null,
     
     @ColumnInfo(name = "Opening_Balance")
+    @Contextual
     val openingBalance: BigDecimal = BigDecimal.ZERO,
     
     @ColumnInfo(name = "CRDR")

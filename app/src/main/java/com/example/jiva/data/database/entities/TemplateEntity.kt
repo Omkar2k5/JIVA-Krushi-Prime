@@ -3,12 +3,14 @@ package com.example.jiva.data.database.entities
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 
 /**
  * Room entity for tb_templates table
  * Maps to MySQL table: tb_templates
  */
 @Entity(tableName = "tb_templates")
+@Serializable
 data class TemplateEntity(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "SrNo")

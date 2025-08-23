@@ -3,6 +3,8 @@ package com.example.jiva.data.database.entities
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Contextual
+import kotlinx.serialization.Serializable
 import java.math.BigDecimal
 import java.util.Date
 
@@ -11,6 +13,7 @@ import java.util.Date
  * Maps to MySQL table: tb_salepurchase
  */
 @Entity(tableName = "tb_salepurchase")
+@Serializable
 data class SalePurchaseEntity(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "SrNo")
@@ -44,18 +47,22 @@ data class SalePurchaseEntity(
     val category: String? = null,
     
     @ColumnInfo(name = "Qty")
+    @Contextual
     val qty: BigDecimal = BigDecimal.ZERO,
     
     @ColumnInfo(name = "Unit")
     val unit: String? = null,
     
     @ColumnInfo(name = "Rate")
+    @Contextual
     val rate: BigDecimal = BigDecimal.ZERO,
     
     @ColumnInfo(name = "Amount")
+    @Contextual
     val amount: BigDecimal = BigDecimal.ZERO,
     
     @ColumnInfo(name = "Discount")
+    @Contextual
     val discount: BigDecimal = BigDecimal.ZERO,
     
     @ColumnInfo(name = "YearString")

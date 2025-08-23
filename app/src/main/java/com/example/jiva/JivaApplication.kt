@@ -4,6 +4,11 @@ import android.app.Application
 import androidx.multidex.MultiDexApplication
 import com.example.jiva.data.database.DummyDataProvider
 import com.example.jiva.data.database.JivaDatabase
+import com.example.jiva.data.network.RemoteDataSource
+import com.example.jiva.data.repository.JivaRepository
+import com.example.jiva.data.repository.JivaRepositoryImpl
+import com.example.jiva.data.sync.DataSyncService
+import com.example.jiva.utils.SyncManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -20,9 +25,29 @@ class JivaApplication : MultiDexApplication() {
     
     // Application scope for coroutines
     private val applicationScope = CoroutineScope(Dispatchers.Default)
+    
+    // Simple dependency container (replace with Hilt later if needed)
+    val remoteDataSource by lazy { RemoteDataSource() }
+    val repository: JivaRepository by lazy { 
+        JivaRepositoryImpl(database, remoteDataSource) 
+    }
+    val dataSyncService by lazy { DataSyncService(repository) }
+    val syncManager by lazy { SyncManager(dataSyncService) }
+    
+    companion object {
+        @Volatile
+        private var instance: JivaApplication? = null
+        
+        fun getInstance(): JivaApplication {
+            return instance ?: throw IllegalStateException("JivaApplication not initialized")
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
+        
+        // Store instance for dependency access
+        instance = this
 
         // Initialize Timber for logging
         initializeLogging()

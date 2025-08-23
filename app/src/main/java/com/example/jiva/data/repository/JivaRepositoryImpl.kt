@@ -211,11 +211,28 @@ class JivaRepositoryImpl(
 
     override suspend fun syncSalePurchases(): Result<Unit> {
         return try {
-            // Temporarily not loading sale/purchase data
-            Timber.d("Sale/Purchase data loading skipped")
-            Result.success(Unit)
+            // Try to get data from API first
+            val apiResult = remoteDataSource.getSalePurchases()
+            
+            if (apiResult.isSuccess) {
+                // API call was successful, save the data to database
+                val salePurchases = apiResult.getOrNull()
+                if (salePurchases != null) {
+                    database.salePurchaseDao().insertSalePurchases(salePurchases)
+                    Timber.d("Successfully loaded ${salePurchases.size} sale/purchase records from API")
+                    Result.success(Unit)
+                } else {
+                    throw IllegalStateException("API returned success but data is null")
+                }
+            } else {
+                // API call failed, fall back to dummy data
+                Timber.w("API call failed, falling back to dummy sale/purchase data: ${apiResult.exceptionOrNull()?.message}")
+                database.salePurchaseDao().insertSalePurchases(DummyDataProvider.getDummySalePurchases())
+                Timber.d("Successfully loaded dummy sale/purchase data as fallback")
+                Result.success(Unit)
+            }
         } catch (e: Exception) {
-            Timber.e(e, "Error loading dummy sale/purchase data")
+            Timber.e(e, "Error syncing sale/purchase data")
             Result.failure(e)
         }
     }
@@ -340,162 +357,140 @@ class JivaRepositoryImpl(
     }
 
     // Price Screen operations
-    override suspend fun getPriceScreenData(): Result<List<Any>> {
-        // Create dummy price data
-        val dummyPriceData = listOf(
-            mapOf(
-                "itemName" to "Rogar 100ml",
-                "mrp" to 220.00,
-                "purchasePrice" to 180.00,
-                "sellingPrice" to 200.00,
-                "margin" to 20.00
-            ),
-            mapOf(
-                "itemName" to "Roundup Herbicide",
-                "mrp" to 500.00,
-                "purchasePrice" to 420.00,
-                "sellingPrice" to 450.00,
-                "margin" to 30.00
-            ),
-            mapOf(
-                "itemName" to "NPK Fertilizer",
-                "mrp" to 95.00,
-                "purchasePrice" to 75.00,
-                "sellingPrice" to 85.75,
-                "margin" to 10.75
-            ),
-            mapOf(
-                "itemName" to "Growth Booster",
-                "mrp" to 300.00,
-                "purchasePrice" to 250.00,
-                "sellingPrice" to 275.00,
-                "margin" to 25.00
-            ),
-            mapOf(
-                "itemName" to "Hybrid Tomato Seeds",
-                "mrp" to 18.00,
-                "purchasePrice" to 12.00,
-                "sellingPrice" to 15.50,
-                "margin" to 3.50
-            )
-        )
-        
-        return Result.success(dummyPriceData)
+    override fun getAllPriceData(): Flow<List<PriceDataEntity>> {
+        return database.priceDataDao().getAllPriceData()
+    }
+    
+    override suspend fun getPriceDataByItemId(itemId: String): PriceDataEntity? {
+        return database.priceDataDao().getPriceDataByItemId(itemId)
+    }
+    
+    override suspend fun searchPriceDataByItemName(searchTerm: String): Flow<List<PriceDataEntity>> {
+        return database.priceDataDao().searchPriceDataByItemName(searchTerm)
+    }
+    
+    override suspend fun syncPriceData(): Result<Unit> {
+        return try {
+            // Try to get data from API first
+            val apiResult = remoteDataSource.getPriceScreenData()
+            
+            if (apiResult.isSuccess) {
+                // API call was successful, save the data to database
+                val priceData = apiResult.getOrNull()
+                if (priceData != null) {
+                    database.priceDataDao().insertAllPriceData(priceData)
+                    Timber.d("Successfully loaded ${priceData.size} price data records from API")
+                    Result.success(Unit)
+                } else {
+                    throw IllegalStateException("API returned success but data is null")
+                }
+            } else {
+                // API call failed, fall back to dummy data
+                Timber.w("API call failed, falling back to dummy price data: ${apiResult.exceptionOrNull()?.message}")
+                database.priceDataDao().insertAllPriceData(DummyDataProvider.getDummyPriceData())
+                Timber.d("Successfully loaded dummy price data as fallback")
+                Result.success(Unit)
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error syncing price data")
+            Result.failure(e)
+        }
     }
 
     // Sync all data
     override suspend fun syncAllData(): Result<Unit> {
         return try {
-            // Try to get data from API first
-            val apiResult = remoteDataSource.getAllData()
+            // Try to get data from API using the new syncAllData endpoint
+            val apiResult = remoteDataSource.syncAllData()
             
             if (apiResult.isSuccess) {
                 // API call was successful, process the data
                 Timber.d("Successfully fetched all data from API")
                 
-                // Process each entity type from the API response
-                val allData = apiResult.getOrNull()
-                if (allData != null) {
+                // Process the structured API response
+                val syncResponse = apiResult.getOrNull()
+                if (syncResponse != null && syncResponse.status == "success") {
+                    val data = syncResponse.data
+                    
                     // Process users
-                    allData["users"]?.let { usersList ->
-                        @Suppress("UNCHECKED_CAST")
-                        val users = usersList as List<UserEntity>
-                        database.userDao().insertUsers(users)
-                        Timber.d("Inserted ${users.size} users from API")
+                    if (data.users.isNotEmpty()) {
+                        database.userDao().insertUsers(data.users)
+                        Timber.d("Inserted ${data.users.size} users from API")
                     }
                     
                     // Process accounts
-                    allData["accounts"]?.let { accountsList ->
-                        @Suppress("UNCHECKED_CAST")
-                        val accounts = accountsList as List<AccountMasterEntity>
-                        database.accountMasterDao().insertAccounts(accounts)
-                        Timber.d("Inserted ${accounts.size} accounts from API")
+                    if (data.accounts.isNotEmpty()) {
+                        database.accountMasterDao().insertAccounts(data.accounts)
+                        Timber.d("Inserted ${data.accounts.size} accounts from API")
                     }
                     
                     // Process closing balances
-                    allData["closingBalances"]?.let { balancesList ->
-                        @Suppress("UNCHECKED_CAST")
-                        val balances = balancesList as List<ClosingBalanceEntity>
-                        database.closingBalanceDao().insertClosingBalances(balances)
-                        Timber.d("Inserted ${balances.size} closing balances from API")
+                    if (data.closing_balances.isNotEmpty()) {
+                        database.closingBalanceDao().insertClosingBalances(data.closing_balances)
+                        Timber.d("Inserted ${data.closing_balances.size} closing balances from API")
+                    }
+                    
+                    // Process stocks
+                    if (data.stocks.isNotEmpty()) {
+                        database.stockDao().insertStocks(data.stocks)
+                        Timber.d("Inserted ${data.stocks.size} stocks from API")
+                    }
+                    
+                    // Process sale/purchase data
+                    if (data.sale_purchases.isNotEmpty()) {
+                        database.salePurchaseDao().insertSalePurchases(data.sale_purchases)
+                        Timber.d("Inserted ${data.sale_purchases.size} sale/purchase records from API")
                     }
                     
                     // Process ledgers
-                    allData["ledgers"]?.let { ledgersList ->
-                        @Suppress("UNCHECKED_CAST")
-                        val ledgers = ledgersList as List<LedgerEntity>
-                        database.ledgerDao().insertLedgerEntries(ledgers)
-                        Timber.d("Inserted ${ledgers.size} ledger entries from API")
+                    if (data.ledgers.isNotEmpty()) {
+                        database.ledgerDao().insertLedgerEntries(data.ledgers)
+                        Timber.d("Inserted ${data.ledgers.size} ledger entries from API")
                     }
                     
                     // Process expiries
-                    allData["expiries"]?.let { expiriesList ->
-                        @Suppress("UNCHECKED_CAST")
-                        val expiries = expiriesList as List<ExpiryEntity>
-                        database.expiryDao().insertExpiryItems(expiries)
-                        Timber.d("Inserted ${expiries.size} expiry items from API")
+                    if (data.expiries.isNotEmpty()) {
+                        database.expiryDao().insertExpiryItems(data.expiries)
+                        Timber.d("Inserted ${data.expiries.size} expiry items from API")
                     }
                     
                     // Process templates
-                    allData["templates"]?.let { templatesList ->
-                        @Suppress("UNCHECKED_CAST")
-                        val templates = templatesList as List<TemplateEntity>
-                        database.templateDao().insertTemplates(templates)
-                        Timber.d("Inserted ${templates.size} templates from API")
+                    if (data.templates.isNotEmpty()) {
+                        database.templateDao().insertTemplates(data.templates)
+                        Timber.d("Inserted ${data.templates.size} templates from API")
                     }
+                    
+                    // Process price data
+                    if (data.price_data.isNotEmpty()) {
+                        database.priceDataDao().insertAllPriceData(data.price_data)
+                        Timber.d("Inserted ${data.price_data.size} price data records from API")
+                    }
+                    
+                    Timber.d("Successfully synced all data from server API")
+                    Result.success(Unit)
+                } else {
+                    throw IllegalStateException("API returned success but invalid response structure")
                 }
-                
-                Result.success(Unit)
             } else {
                 // API call failed, fall back to dummy data
                 Timber.w("API call failed, falling back to dummy data: ${apiResult.exceptionOrNull()?.message}")
                 
                 try {
-                    // Use dummy data as fallback - catch exceptions for each entity type
-                    try {
-                        syncUsers()
-                    } catch (e: Exception) {
-                        Timber.e(e, "Error syncing users with dummy data")
-                    }
-                    
-                    try {
-                        syncAccounts()
-                    } catch (e: Exception) {
-                        Timber.e(e, "Error syncing accounts with dummy data")
-                    }
-                    
-                    try {
-                        syncClosingBalances()
-                    } catch (e: Exception) {
-                        Timber.e(e, "Error syncing closing balances with dummy data")
-                    }
-                    
-                    try {
-                        syncLedgers()
-                    } catch (e: Exception) {
-                        Timber.e(e, "Error syncing ledgers with dummy data")
-                    }
-                    
-                    try {
-                        syncExpiries()
-                    } catch (e: Exception) {
-                        Timber.e(e, "Error syncing expiries with dummy data")
-                    }
-                    
-                    try {
-                        syncTemplates()
-                    } catch (e: Exception) {
-                        Timber.e(e, "Error syncing templates with dummy data")
-                    }
-                    
-                    // Note: Stock and SalePurchase entities are not being synced in this version
+                    // Use dummy data as fallback - sync each entity type
+                    syncUsers()
+                    syncAccounts() 
+                    syncClosingBalances()
+                    syncStocks()
+                    syncSalePurchases()
+                    syncLedgers()
+                    syncExpiries()
+                    syncTemplates()
+                    syncPriceData()
                     
                     Timber.d("Successfully loaded all dummy data as fallback")
-                    // Return success even though we used fallback data
                     Result.success(Unit)
                 } catch (e: Exception) {
                     Timber.e(e, "Error loading fallback dummy data")
-                    // Return the original API error, not the fallback error
                     Result.failure(apiResult.exceptionOrNull() ?: e)
                 }
             }

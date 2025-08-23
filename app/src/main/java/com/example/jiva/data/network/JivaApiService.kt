@@ -1,6 +1,7 @@
 package com.example.jiva.data.network
 
 import com.example.jiva.data.database.entities.*
+import com.example.jiva.data.api.models.SyncDataResponse
 import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.Query

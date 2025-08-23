@@ -3,6 +3,7 @@ package com.example.jiva.data.database.entities
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 import java.math.BigDecimal
 
 /**
@@ -10,6 +11,7 @@ import java.math.BigDecimal
  * Maps to MySQL table: tb_stock
  */
 @Entity(tableName = "tb_stock")
+@Serializable
 data class StockEntity(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "SrNO")
@@ -25,21 +27,27 @@ data class StockEntity(
     val itemName: String,
     
     @ColumnInfo(name = "Opening")
+    @Contextual
     val opening: BigDecimal = BigDecimal.ZERO,
     
     @ColumnInfo(name = "InWard")
+    @Contextual
     val inWard: BigDecimal = BigDecimal.ZERO,
     
     @ColumnInfo(name = "OutWard")
+    @Contextual
     val outWard: BigDecimal = BigDecimal.ZERO,
     
     @ColumnInfo(name = "Closing_Stock")
+    @Contextual
     val closingStock: BigDecimal = BigDecimal.ZERO,
     
     @ColumnInfo(name = "AvgRate")
+    @Contextual
     val avgRate: BigDecimal = BigDecimal.ZERO,
     
     @ColumnInfo(name = "Valuation")
+    @Contextual
     val valuation: BigDecimal = BigDecimal.ZERO,
     
     @ColumnInfo(name = "ItemType")
@@ -49,12 +57,15 @@ data class StockEntity(
     val company: String? = null,
     
     @ColumnInfo(name = "cgst")
+    @Contextual
     val cgst: BigDecimal = BigDecimal.ZERO,
     
     @ColumnInfo(name = "sgst")
+    @Contextual
     val sgst: BigDecimal = BigDecimal.ZERO,
     
     @ColumnInfo(name = "igst")
+    @Contextual
     val igst: BigDecimal = BigDecimal.ZERO,
     
     @ColumnInfo(name = "YearString")

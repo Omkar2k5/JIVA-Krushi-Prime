@@ -64,8 +64,11 @@ interface JivaRepository {
     suspend fun getTemplatesByCategory(category: String): Flow<List<TemplateEntity>>
     suspend fun syncTemplates(): Result<Unit>
     
-    // Price Screen operations (will need additional API endpoint)
-    suspend fun getPriceScreenData(): Result<List<Any>> // Define specific price data model
+    // Price Screen operations
+    fun getAllPriceData(): Flow<List<PriceDataEntity>>
+    suspend fun getPriceDataByItemId(itemId: String): PriceDataEntity?
+    suspend fun searchPriceDataByItemName(searchTerm: String): Flow<List<PriceDataEntity>>
+    suspend fun syncPriceData(): Result<Unit>
     
     // Sync all data from server
     suspend fun syncAllData(): Result<Unit>

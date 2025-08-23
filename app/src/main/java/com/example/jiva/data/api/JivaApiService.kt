@@ -1,6 +1,7 @@
 package com.example.jiva.data.api
 
 import com.example.jiva.data.database.entities.*
+import com.example.jiva.data.api.models.SyncDataResponse
 import retrofit2.http.GET
 import retrofit2.http.Query
 
@@ -9,6 +10,14 @@ import retrofit2.http.Query
  * Maps to your custom server API endpoints
  */
 interface JivaApiService {
+    
+    /**
+     * GET /api/sync-all-data
+     * Fetch all data from server in a single request for local database sync
+     * This is the main endpoint for syncing all data according to API_DATA_REQUIREMENTS.txt
+     */
+    @GET("api/sync-all-data")
+    suspend fun syncAllData(): SyncDataResponse
     
     /**
      * GET /api/users
@@ -68,10 +77,10 @@ interface JivaApiService {
     
     /**
      * GET /api/priceScreen
-     * Fetch price screen data (you may need to define specific data model)
+     * Fetch price screen data for price management functionality
      */
     @GET("api/priceScreen")
-    suspend fun getPriceScreenData(): List<Any> // Replace with specific price data model
+    suspend fun getPriceScreenData(): List<PriceDataEntity>
     
     // Additional filtered endpoints for better performance
     

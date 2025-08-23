@@ -320,6 +320,41 @@ object DummyDataProvider {
         )
     }
     
+    fun getDummyPriceData(): List<PriceDataEntity> {
+        return listOf(
+            PriceDataEntity(
+                itemId = "ITM001", itemName = "Rogar 100ml",
+                mrp = BigDecimal("220.00"), creditSaleRate = BigDecimal("200.00"),
+                cashSaleRate = BigDecimal("195.00"), wholesaleRate = BigDecimal("180.00"),
+                maxPurchaseRate = BigDecimal("150.00")
+            ),
+            PriceDataEntity(
+                itemId = "ITM002", itemName = "NPK Fertilizer",
+                mrp = BigDecimal("120.00"), creditSaleRate = BigDecimal("95.00"),
+                cashSaleRate = BigDecimal("90.00"), wholesaleRate = BigDecimal("85.00"),
+                maxPurchaseRate = BigDecimal("75.00")
+            ),
+            PriceDataEntity(
+                itemId = "ITM003", itemName = "Hybrid Tomato Seeds",
+                mrp = BigDecimal("18.00"), creditSaleRate = BigDecimal("15.50"),
+                cashSaleRate = BigDecimal("15.00"), wholesaleRate = BigDecimal("14.00"),
+                maxPurchaseRate = BigDecimal("12.00")
+            ),
+            PriceDataEntity(
+                itemId = "ITM004", itemName = "Growth Booster",
+                mrp = BigDecimal("300.00"), creditSaleRate = BigDecimal("275.00"),
+                cashSaleRate = BigDecimal("270.00"), wholesaleRate = BigDecimal("250.00"),
+                maxPurchaseRate = BigDecimal("220.00")
+            ),
+            PriceDataEntity(
+                itemId = "ITM005", itemName = "Roundup Herbicide",
+                mrp = BigDecimal("500.00"), creditSaleRate = BigDecimal("450.00"),
+                cashSaleRate = BigDecimal("440.00"), wholesaleRate = BigDecimal("420.00"),
+                maxPurchaseRate = BigDecimal("380.00")
+            )
+        )
+    }
+    
     /**
      * Populates the database with dummy data for all entities
      * @param database The Room database instance
@@ -328,15 +363,15 @@ object DummyDataProvider {
         // Clear existing data
         database.clearAllTables()
         
-        // Insert dummy data
+        // Insert dummy data for all entities
         database.userDao().insertUsers(getDummyUsers())
         database.accountMasterDao().insertAccounts(getDummyAccounts())
         database.closingBalanceDao().insertClosingBalances(getDummyClosingBalances())
+        database.stockDao().insertStocks(getDummyStocks())
+        database.salePurchaseDao().insertSalePurchases(getDummySalePurchases())
         database.ledgerDao().insertLedgerEntries(getDummyLedgers())
         database.expiryDao().insertExpiryItems(getDummyExpiries())
         database.templateDao().insertTemplates(getDummyTemplates())
-        
-        // Note: Stock and SalePurchase entities are not being inserted in this version
-        // as they need additional implementation
+        database.priceDataDao().insertAllPriceData(getDummyPriceData())
     }
 }

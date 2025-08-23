@@ -3,6 +3,8 @@ package com.example.jiva.data.database.entities
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Contextual
+import kotlinx.serialization.Serializable
 import java.math.BigDecimal
 import java.util.Date
 
@@ -11,6 +13,7 @@ import java.util.Date
  * Maps to MySQL table: tb_ledger
  */
 @Entity(tableName = "tb_ledger")
+@Serializable
 data class LedgerEntity(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "SerialNo")
@@ -32,6 +35,7 @@ data class LedgerEntity(
     val entryType: String? = null,
     
     @ColumnInfo(name = "EntryDate")
+    @Contextual
     val entryDate: Date? = null,
     
     @ColumnInfo(name = "RefNo")
@@ -41,9 +45,11 @@ data class LedgerEntity(
     val acId: Int? = null,
     
     @ColumnInfo(name = "DR")
+    @Contextual
     val dr: BigDecimal = BigDecimal.ZERO,
     
     @ColumnInfo(name = "CR")
+    @Contextual
     val cr: BigDecimal = BigDecimal.ZERO,
     
     @ColumnInfo(name = "Narration")
@@ -56,12 +62,15 @@ data class LedgerEntity(
     val trascType: String? = null,
     
     @ColumnInfo(name = "GSTRate")
+    @Contextual
     val gstRate: BigDecimal = BigDecimal.ZERO,
     
     @ColumnInfo(name = "Amt")
+    @Contextual
     val amt: BigDecimal = BigDecimal.ZERO,
     
     @ColumnInfo(name = "IGST")
+    @Contextual
     val igst: BigDecimal = BigDecimal.ZERO,
     
     @ColumnInfo(name = "YearString")
