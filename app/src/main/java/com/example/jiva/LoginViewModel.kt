@@ -124,6 +124,13 @@ class LoginViewModel(
                                 attemptCount = 0
                             )
 
+                            // Store userID globally for later API calls
+                            response.user?.let { u ->
+                                context?.let { ctx ->
+                                    com.example.jiva.utils.UserEnv.setUserId(ctx, u.id.toString())
+                                }
+                            }
+
                             // Save credentials if remember me or auto-login is enabled
                             viewModelScope.launch {
                                 saveCredentialsIfNeeded()
@@ -245,6 +252,14 @@ class LoginViewModel(
                                 user = response.user,
                                 errorMessage = null
                             )
+
+                            // Store userID globally for later API calls
+                            response.user?.let { u ->
+                                context?.let { ctx ->
+                                    com.example.jiva.utils.UserEnv.setUserId(ctx, u.id.toString())
+                                }
+                            }
+
                             Timber.d("Auto-login successful for user: ${response.user.username}")
                         } else {
                             // Auto-login failed, clear credentials and show login form

@@ -19,6 +19,8 @@ object AuthUtils {
             try {
                 val fileCredentialManager = FileCredentialManager.getInstance(context)
                 val success = fileCredentialManager.clearCredentials()
+                // Also clear environment user id
+                UserEnv.clearUserId(context)
                 if (success) {
                     Timber.d("Logout: Credentials file cleared successfully")
                 } else {
