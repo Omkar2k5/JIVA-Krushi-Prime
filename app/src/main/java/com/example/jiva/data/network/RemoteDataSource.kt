@@ -18,16 +18,11 @@ class RemoteDataSource {
      */
     private suspend fun <T> safeApiCall(apiCall: suspend () -> T): Result<T> {
         return try {
-            // Simulate API call failure for development. Comment this return to enable real calls.
-            Timber.d("Simulating API call failure for development")
-            return Result.failure(IOException("Server not available - using dummy data"))
-            
-            // For real API calls, use:
-            // val body = apiCall()
-            // Result.success(body)
+            val body = apiCall()
+            Result.success(body)
         } catch (e: Exception) {
             Timber.e(e, "Exception during API call: ${e.message}")
-            Result.failure(IOException("Server not available - using dummy data", e))
+            Result.failure(e)
         }
     }
     
@@ -35,7 +30,7 @@ class RemoteDataSource {
      * Get all users from API
      */
     suspend fun getUsers(): Result<List<UserEntity>> {
-        return safeApiCall { apiService.getUsers() }
+        return  safeApiCall { apiService.getUsers() }
     }
     
     /**

@@ -1,16 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Default configuration for production -->
-    <base-config cleartextTrafficPermitted="false">
+    <!-- Default configuration for development (enable cleartext) -->
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system"/>
         </trust-anchors>
     </base-config>
     
-    <!-- For development/testing with localhost -->
+    <!-- Allow cleartext HTTP for specific API host -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">localhost</domain>
         <domain includeSubdomains="true">10.0.2.2</domain>
         <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="false">202.21.32.47</domain>
     </domain-config>
 </network-security-config>

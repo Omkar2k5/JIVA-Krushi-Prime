@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.jiva.data.repository.DummyAuthRepository
+import com.example.jiva.data.repository.ApiAuthRepository
 import com.example.jiva.data.model.LoginRequest
 import com.example.jiva.screens.*
 import com.example.jiva.ui.theme.MyApplicationTheme
@@ -182,7 +182,7 @@ fun SplashScreen(
                     val credentials = fileCredentialManager.loadCredentials()
                     if (credentials != null) {
                         // Perform auto-login
-                        val authRepository = DummyAuthRepository()
+                        val authRepository = ApiAuthRepository(com.example.jiva.data.network.RetrofitClient.jivaApiService)
                         val loginRequest = LoginRequest(
                             username = credentials.username,
                             password = credentials.password

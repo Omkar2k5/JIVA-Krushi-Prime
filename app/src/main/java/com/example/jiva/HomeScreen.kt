@@ -40,7 +40,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.jiva.data.repository.DummyAuthRepository
+import com.example.jiva.data.repository.ApiAuthRepository
 import com.example.jiva.data.repository.JivaRepository
 import com.example.jiva.data.model.User
 import com.example.jiva.data.model.UserRole
@@ -88,7 +88,7 @@ fun HomeScreen(
     val context = LocalContext.current
     val actualViewModel: HomeViewModel = viewModel ?: viewModel { 
         HomeViewModel(
-            authRepository = DummyAuthRepository(),
+            authRepository = ApiAuthRepository(com.example.jiva.data.network.RetrofitClient.jivaApiService),
             jivaRepository = jivaRepository
         ) 
     }

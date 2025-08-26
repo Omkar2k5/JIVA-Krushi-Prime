@@ -13,8 +13,8 @@ import java.util.concurrent.TimeUnit
  */
 object RetrofitClient {
     
-    // Base URL for the API - should be configured in BuildConfig
-    private const val BASE_URL = "https://api.jivabusiness.com/" // Replace with actual API URL
+    // Base URL for the API
+    private const val BASE_URL = "http://202.21.32.47:8081/"
     
     // Create OkHttpClient with logging and timeouts
     private val okHttpClient = OkHttpClient.Builder()

@@ -134,7 +134,8 @@ class LoginViewModel(
                     },
                     onFailure = { exception ->
                         Timber.e(exception, "Login error")
-                        handleLoginFailure("Network error. Please try again.")
+                        val msg = exception.message?.takeIf { it.isNotBlank() } ?: "Network error. Please try again."
+                        handleLoginFailure(msg)
                     }
                 )
             } catch (e: Exception) {

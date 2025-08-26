@@ -32,7 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.jiva.ui.theme.Accessibility
-import com.example.jiva.data.repository.DummyAuthRepository
+
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3WindowSizeClassApi::class)
 @Composable
@@ -41,7 +41,11 @@ fun LoginScreen(
     viewModel: LoginViewModel? = null
 ) {
     val context = LocalContext.current
-    val actualViewModel: LoginViewModel = viewModel ?: viewModel { LoginViewModel(DummyAuthRepository(), context) }
+    val actualViewModel: LoginViewModel = viewModel ?: run {
+        val api = com.example.jiva.data.network.RetrofitClient.jivaApiService
+        val repo = com.example.jiva.data.repository.ApiAuthRepository(api)
+        viewModel { LoginViewModel(repo, context) }
+    }
     val uiState by actualViewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
 
@@ -393,34 +397,7 @@ private fun LoginContent(
             }
         }
 
-        // Demo credentials hint
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Demo Accounts",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "demo / testing\nadmin / admin123\ntest / test123",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
+
 
         // Attempt counter for debugging
         if (uiState.attemptCount > 0) {

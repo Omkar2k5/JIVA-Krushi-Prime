@@ -2,8 +2,13 @@ package com.example.jiva.data.api
 
 import com.example.jiva.data.database.entities.*
 import com.example.jiva.data.api.models.SyncDataResponse
+import com.example.jiva.data.api.models.ApiLoginRequest
+import com.example.jiva.data.api.models.ApiLoginResponse
+import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.POST
 import retrofit2.http.Query
+import retrofit2.http.Headers
 
 /**
  * Retrofit API service interface for JIVA server endpoints
@@ -11,6 +16,14 @@ import retrofit2.http.Query
  */
 interface JivaApiService {
     
+    /**
+     * POST /api/JivaBusiness/Login
+     * Login with mobile number and password
+     */
+    @Headers("Content-Type: application/json")
+    @POST("api/JivaBusiness/Login")
+    suspend fun login(@Body request: ApiLoginRequest): ApiLoginResponse
+
     /**
      * GET /api/sync-all-data
      * Fetch all data from server in a single request for local database sync
