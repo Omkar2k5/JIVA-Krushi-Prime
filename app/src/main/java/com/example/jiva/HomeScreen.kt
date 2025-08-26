@@ -62,6 +62,7 @@ object JivaColors {
     val Teal = Color(0xFF14B8A6)
     val White = Color(0xFFFFFFFF)
     val LightGray = Color(0xFFF8FAFC)
+    val DarkGray = Color(0xFF6B7280)
     val CardBackground = Color(0xFFFFFFFF)
 }
 
@@ -86,11 +87,12 @@ fun HomeScreen(
     jivaRepository: JivaRepository? = null
 ) {
     val context = LocalContext.current
-    val actualViewModel: HomeViewModel = viewModel ?: viewModel { 
+    val actualViewModel: HomeViewModel = viewModel ?: viewModel {
         HomeViewModel(
+            application = context.applicationContext as JivaApplication,
             authRepository = ApiAuthRepository(com.example.jiva.data.network.RetrofitClient.jivaApiService),
             jivaRepository = jivaRepository
-        ) 
+        )
     }
     val windowSizeClass = calculateWindowSizeClass(context as androidx.activity.ComponentActivity)
     val configuration = LocalConfiguration.current
@@ -235,7 +237,7 @@ fun HomeScreen(
 private fun ModernHeader(
     currentUser: User?,
     onLogout: () -> Unit,
-    viewModel: HomeViewModel = viewModel()
+    viewModel: HomeViewModel
 ) {
     val context = LocalContext.current
     val companyName = com.example.jiva.utils.UserEnv.getCompanyName(context) ?: ""

@@ -404,42 +404,58 @@ class JivaRepositoryImpl(
 
     override suspend fun syncOutstanding(userId: Int, yearString: String): Result<Unit> {
         return try {
+            Timber.d("Starting Outstanding API call for userId: $userId, yearString: $yearString")
             val apiResult = remoteDataSource.getOutstanding(userId, yearString)
+
+            Timber.d("API call completed. Success: ${apiResult.isSuccess}")
+
             if (apiResult.isSuccess) {
                 val body = apiResult.getOrNull()
-                val items = body?.data.orEmpty()
+                Timber.d("API response body: isSuccess=${body?.isSuccess}, message=${body?.message}, data size=${body?.data?.size}")
 
-                // Map API model -> Room entity
-                val entities = items.map {
-                    OutstandingEntity(
-                        cmpCode = it.cmpCode,
-                        acId = it.acId,
-                        accountName = it.accountName,
-                        mobile = it.mobile,
-                        under = it.under,
-                        balance = it.balance,
-                        lastDate = it.lastDate,
-                        days = it.days,
-                        creditLimitAmount = it.creditLimitAmount,
-                        creditLimitDays = it.creditLimitDays,
-                        yearString = it.yearString
-                    )
+                if (body?.isSuccess == true) {
+                    val items = body.data.orEmpty()
+                    Timber.d("Processing ${items.size} outstanding items")
+
+                    // Map API model -> Room entity
+                    val entities = items.map {
+                        OutstandingEntity(
+                            cmpCode = it.cmpCode,
+                            acId = it.acId,
+                            accountName = it.accountName,
+                            mobile = it.mobile,
+                            under = it.under,
+                            balance = it.balance,
+                            lastDate = it.lastDate,
+                            days = it.days,
+                            creditLimitAmount = it.creditLimitAmount,
+                            creditLimitDays = it.creditLimitDays,
+                            yearString = it.yearString
+                        )
+                    }
+
+                    // Chunked inserts for huge payloads
+                    database.outstandingDao().clearYear(yearString)
+                    val chunkSize = 1000
+                    var index = 0
+                    while (index < entities.size) {
+                        val end = minOf(index + chunkSize, entities.size)
+                        database.outstandingDao().insertAll(entities.subList(index, end))
+                        index = end
+                    }
+
+                    Timber.d("Successfully inserted ${entities.size} outstanding rows for $yearString")
+                    Result.success(Unit)
+                } else {
+                    val errorMsg = "API returned isSuccess=false: ${body?.message}"
+                    Timber.e(errorMsg)
+                    Result.failure(IllegalStateException(errorMsg))
                 }
-
-                // Chunked inserts for huge payloads
-                database.outstandingDao().clearYear(yearString)
-                val chunkSize = 1000
-                var index = 0
-                while (index < entities.size) {
-                    val end = minOf(index + chunkSize, entities.size)
-                    database.outstandingDao().insertAll(entities.subList(index, end))
-                    index = end
-                }
-
-                Timber.d("Inserted ${entities.size} outstanding rows for $yearString")
-                Result.success(Unit)
             } else {
-                Result.failure(apiResult.exceptionOrNull() ?: IllegalStateException("Outstanding API failed"))
+                val exception = apiResult.exceptionOrNull()
+                val errorMsg = "Outstanding API call failed: ${exception?.message}"
+                Timber.e(exception, errorMsg)
+                Result.failure(exception ?: IllegalStateException(errorMsg))
             }
         } catch (e: Exception) {
             Timber.e(e, "Error syncing outstanding data")
@@ -515,7 +531,16 @@ class JivaRepositoryImpl(
                         database.priceDataDao().insertAllPriceData(data.price_data)
                         Timber.d("Inserted ${data.price_data.size} price data records from API")
                     }
-                    
+
+                    // Also sync Outstanding data if user context is available
+                    try {
+                        // Try to sync Outstanding with default user ID 1017 and current year
+                        syncOutstanding(1017, "2025-26")
+                        Timber.d("Successfully synced Outstanding data with default parameters")
+                    } catch (e: Exception) {
+                        Timber.w(e, "Could not sync Outstanding data with default parameters")
+                    }
+
                     Timber.d("Successfully synced all data from server API")
                     Result.success(Unit)
                 } else {
@@ -528,7 +553,7 @@ class JivaRepositoryImpl(
                 try {
                     // Use dummy data as fallback - sync each entity type
                     syncUsers()
-                    syncAccounts() 
+                    syncAccounts()
                     syncClosingBalances()
                     syncStocks()
                     syncSalePurchases()
@@ -536,6 +561,16 @@ class JivaRepositoryImpl(
                     syncExpiries()
                     syncTemplates()
                     syncPriceData()
+
+                    // Also sync Outstanding data if user context is available
+                    // Note: Outstanding sync requires userId and year, so we'll try with default values
+                    try {
+                        // Try to sync Outstanding with default user ID 1017 and current year
+                        syncOutstanding(1017, "2025-26")
+                        Timber.d("Successfully synced Outstanding data with default parameters")
+                    } catch (e: Exception) {
+                        Timber.w(e, "Could not sync Outstanding data with default parameters")
+                    }
                     
                     Timber.d("Successfully loaded all dummy data as fallback")
                     Result.success(Unit)

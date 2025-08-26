@@ -1,6 +1,8 @@
 package com.example.jiva
 
+import android.app.Application
 import android.content.Context
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.jiva.data.model.User
@@ -22,9 +24,10 @@ data class HomeUiState(
 )
 
 class HomeViewModel(
+    application: Application,
     private val authRepository: AuthRepository,
     private val jivaRepository: JivaRepository? = null
-) : ViewModel() {
+) : AndroidViewModel(application) {
     
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -106,7 +109,27 @@ class HomeViewModel(
                 try {
                     // Perform sync operation
                     val result = jivaRepository.syncAllData()
-                    
+
+                    // Also sync Outstanding data with user context if available
+                    try {
+                        val context = getApplication<JivaApplication>().applicationContext
+                        val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
+                        val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
+
+                        if (userId != null) {
+                            val outstandingResult = jivaRepository.syncOutstanding(userId, year)
+                            if (outstandingResult.isSuccess) {
+                                Timber.d("Successfully synced Outstanding data for user $userId, year $year")
+                            } else {
+                                Timber.w("Failed to sync Outstanding data: ${outstandingResult.exceptionOrNull()?.message}")
+                            }
+                        } else {
+                            Timber.w("No user ID available for Outstanding sync")
+                        }
+                    } catch (e: Exception) {
+                        Timber.w(e, "Error during Outstanding sync in main refresh")
+                    }
+
                     if (result.isSuccess) {
                         _uiState.value = _uiState.value.copy(
                             isSyncing = false,

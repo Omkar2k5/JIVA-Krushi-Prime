@@ -91,8 +91,18 @@ class RemoteDataSource {
     
     /** Outstanding API */
     suspend fun getOutstanding(userId: Int, yearString: String): Result<com.example.jiva.data.api.models.OutstandingResponse> {
-        return safeApiCall {
-            apiService.getOutstanding(com.example.jiva.data.api.models.OutstandingRequest(userID = userId, yearString = yearString))
+        return try {
+            Timber.d("Making Outstanding API call with userId: $userId, yearString: $yearString")
+            val request = com.example.jiva.data.api.models.OutstandingRequest(userID = userId, yearString = yearString)
+            Timber.d("Request body: $request")
+
+            val response = apiService.getOutstanding(request)
+            Timber.d("API response received: isSuccess=${response.isSuccess}, message=${response.message}, data size=${response.data?.size}")
+
+            Result.success(response)
+        } catch (e: Exception) {
+            Timber.e(e, "Outstanding API call failed: ${e.message}")
+            Result.failure(e)
         }
     }
     

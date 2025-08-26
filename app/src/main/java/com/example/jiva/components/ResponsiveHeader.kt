@@ -34,7 +34,8 @@ import com.example.jiva.utils.ScreenUtils
 fun ResponsiveReportHeader(
     title: String,
     subtitle: String,
-    onBackClick: () -> Unit = {}
+    onBackClick: () -> Unit = {},
+    actions: @Composable RowScope.() -> Unit = {}
 ) {
     val isCompactScreen = ScreenUtils.isCompactScreen()
     val screenSize = ScreenUtils.getScreenSize()
@@ -69,14 +70,16 @@ fun ResponsiveReportHeader(
             CompactHeaderLayout(
                 title = title,
                 subtitle = subtitle,
-                onBackClick = onBackClick
+                onBackClick = onBackClick,
+                actions = actions
             )
         } else {
             // Standard layout for larger screens
             StandardHeaderLayout(
                 title = title,
                 subtitle = subtitle,
-                onBackClick = onBackClick
+                onBackClick = onBackClick,
+                actions = actions
             )
         }
     }
@@ -86,7 +89,8 @@ fun ResponsiveReportHeader(
 private fun CompactHeaderLayout(
     title: String,
     subtitle: String,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    actions: @Composable RowScope.() -> Unit = {}
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -139,6 +143,12 @@ private fun CompactHeaderLayout(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+
+            // Actions
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                content = actions
+            )
         }
     }
 }
@@ -147,7 +157,8 @@ private fun CompactHeaderLayout(
 private fun StandardHeaderLayout(
     title: String,
     subtitle: String,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    actions: @Composable RowScope.() -> Unit = {}
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -196,6 +207,12 @@ private fun StandardHeaderLayout(
                 )
             }
         }
+
+        // Actions
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            content = actions
+        )
     }
 }
 

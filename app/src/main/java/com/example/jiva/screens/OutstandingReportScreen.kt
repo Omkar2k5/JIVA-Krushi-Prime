@@ -80,29 +80,34 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
     var viewAll by remember { mutableStateOf(false) }
     var interestRate by remember { mutableStateOf("0.06") }
     var partyNameSearch by remember { mutableStateOf("") }
-    var selectedArea by remember { mutableStateOf("All") }
+    var mobileNumberSearch by remember { mutableStateOf("") }
     var isOutstandingDropdownExpanded by remember { mutableStateOf(false) }
-    var isAreaDropdownExpanded by remember { mutableStateOf(false) }
 
-    // Selection state for checkboxes
-    var selectedEntries by remember { mutableStateOf(setOf<String>()) }
-    var selectAll by remember { mutableStateOf(false) }
+
 
     // Sync + observe Outstanding table
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
     val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
-    LaunchedEffect(userId, year) {
-        if (userId != null) {
-            viewModel.syncOutstanding(userId, year)
+    // Initialize test environment if needed (only for debugging)
+    LaunchedEffect(Unit) {
+        if (userId == null) {
+            com.example.jiva.utils.OutstandingDebugHelper.initializeTestEnvironment(context)
         }
     }
 
+    // Re-read userId after potential initialization
+    val finalUserId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
+
+    // Note: Removed automatic API call on screen load for better performance
+    // Data will be loaded from Room DB only, API calls only on manual refresh
+
+    // Optimized data loading - only from Room DB for better performance
     val outstandingEntities by viewModel.observeOutstanding(year).collectAsState(initial = emptyList())
 
-    // Prefer Outstanding DB data when available; fall back to legacy combined data
-    val allEntries = remember(outstandingEntities, uiState.outstandingEntries) {
-        if (outstandingEntities.isNotEmpty()) {
+    // Use only Outstanding DB data for better performance and stability
+    val allEntries = remember(outstandingEntities) {
+        try {
             outstandingEntities.map {
                 OutstandingEntry(
                     acId = it.acId,
@@ -116,60 +121,88 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                     creditLimitDays = it.creditLimitDays
                 )
             }
-        } else {
-            // Map legacy model to new presentation with minimal info
-            uiState.outstandingEntries.map {
-                OutstandingEntry(
-                    acId = it.acId,
-                    accountName = it.accountName,
-                    mobile = it.mobile,
-                    under = "",
-                    balance = it.balance,
-                    lastDate = "",
-                    days = "",
-                    creditLimitAmount = "",
-                    creditLimitDays = ""
-                )
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error mapping outstanding entities")
+            emptyList()
+        }
+    }
+
+    // Optimized filtering with error handling
+    val filteredEntries = remember(partyNameSearch, mobileNumberSearch, allEntries) {
+        try {
+            if (allEntries.isEmpty()) {
+                emptyList()
+            } else {
+                allEntries.filter { entry ->
+                    try {
+                        val nameMatch = if (partyNameSearch.isBlank()) true else
+                            entry.accountName.contains(partyNameSearch, ignoreCase = true)
+                        val mobileMatch = if (mobileNumberSearch.isBlank()) true else
+                            entry.mobile.contains(mobileNumberSearch, ignoreCase = true)
+                        nameMatch && mobileMatch
+                    } catch (e: Exception) {
+                        timber.log.Timber.e(e, "Error filtering entry: ${entry.acId}")
+                        false
+                    }
+                }
             }
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error during filtering")
+            emptyList()
         }
     }
 
-    // Filtered entries based on account name or mobile only
-    val filteredEntries = remember(partyNameSearch, allEntries) {
-        allEntries.filter { entry ->
-            if (partyNameSearch.isBlank()) true else
-                entry.accountName.contains(partyNameSearch, ignoreCase = true) ||
-                entry.mobile.contains(partyNameSearch, ignoreCase = true)
+
+
+    // Calculate total for PDF generation only
+    val totalBalance = remember(filteredEntries) {
+        try {
+            filteredEntries.sumOf { it.balance.toDoubleOrNull() ?: 0.0 }
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error calculating total balance")
+            0.0
         }
     }
-
-    // Handle select all functionality
-    LaunchedEffect(selectAll, filteredEntries) {
-        if (selectAll) {
-            selectedEntries = filteredEntries.map { it.acId }.toSet()
-        } else {
-            selectedEntries = emptySet()
-        }
-    }
-
-    // Update selectAll state based on individual selections
-    LaunchedEffect(selectedEntries, filteredEntries) {
-        selectAll = filteredEntries.isNotEmpty() && selectedEntries.containsAll(filteredEntries.map { it.acId })
-    }
-
-    // Calculate totals (balance stored as String; parse to Double safely)
-    val totalBalance = filteredEntries.sumOf { it.balance.toDoubleOrNull() ?: 0.0 }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(JivaColors.LightGray)
     ) {
-        // Responsive Header
+        // Responsive Header with Refresh Button
         ResponsiveReportHeader(
             title = "Outstanding Report",
             subtitle = "Manage outstanding payments and dues",
-            onBackClick = onBackClick
+            onBackClick = onBackClick,
+            actions = {
+                IconButton(
+                    onClick = {
+                        if (finalUserId != null) {
+                            viewModel.syncOutstanding(finalUserId, year)
+                        }
+                    },
+                    enabled = finalUserId != null && !uiState.isLoading,
+                    modifier = Modifier
+                        .background(
+                            JivaColors.White.copy(alpha = 0.2f),
+                            RoundedCornerShape(8.dp)
+                        )
+                ) {
+                    if (uiState.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = JivaColors.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh Outstanding Data",
+                            tint = JivaColors.White
+                        )
+                    }
+                }
+            }
         )
 
         // Main content with performance optimizations
@@ -227,113 +260,82 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                 )
                             }
 
-                            // Area dropdown
+                            // Mobile Number search
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Area",
+                                    text = "Mobile Number",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = JivaColors.DeepBlue,
                                     modifier = Modifier.padding(bottom = 4.dp)
                                 )
-                                ExposedDropdownMenuBox(
-                                    expanded = isAreaDropdownExpanded,
-                                    onExpandedChange = { isAreaDropdownExpanded = it }
-                                ) {
-                                    OutlinedTextField(
-                                        value = selectedArea,
-                                        onValueChange = {},
-                                        readOnly = true,
-                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isAreaDropdownExpanded) },
-                                        modifier = Modifier
-                                            .menuAnchor()
-                                            .fillMaxWidth(),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    ExposedDropdownMenu(
-                                        expanded = isAreaDropdownExpanded,
-                                        onDismissRequest = { isAreaDropdownExpanded = false }
-                                    ) {
-                                        listOf("All", "North", "South", "East", "West").forEach { area ->
-                                            DropdownMenuItem(
-                                                text = { Text(area) },
-                                                onClick = {
-                                                    selectedArea = area
-                                                    isAreaDropdownExpanded = false
-                                                }
+                                OutlinedTextField(
+                                    value = mobileNumberSearch,
+                                    onValueChange = { mobileNumberSearch = it },
+                                    placeholder = { Text("Search by mobile...") },
+                                    trailingIcon = {
+                                        IconButton(onClick = { mobileNumberSearch = "" }) {
+                                            Icon(
+                                                imageVector = if (mobileNumberSearch.isNotEmpty()) Icons.Default.Clear else Icons.Default.Phone,
+                                                contentDescription = if (mobileNumberSearch.isNotEmpty()) "Clear" else "Mobile"
                                             )
                                         }
-                                    }
-                                }
+                                    },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
                             }
                         }
 
-                        // Selection info and action buttons
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        // Filter Actions
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            // Selection summary
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Selected: ${selectedEntries.size} of ${filteredEntries.size} entries",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue
-                                )
-
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Checkbox(
-                                        checked = selectAll,
-                                        onCheckedChange = { selectAll = it },
-                                        colors = CheckboxDefaults.colors(checkedColor = JivaColors.Purple)
-                                    )
-                                    Text(
-                                        text = "Select All",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = JivaColors.DeepBlue
-                                    )
-                                }
-                            }
-
-                            // Action button
-                            Button(
+                            // Clear Filters Button
+                            OutlinedButton(
                                 onClick = {
-                                    if (selectedEntries.isNotEmpty()) {
-                                        // TODO: Send WhatsApp to selected entries
-                                        val selectedData = filteredEntries.filter { it.acId in selectedEntries }
-                                        // Handle WhatsApp sending logic here
-                                    }
+                                    partyNameSearch = ""
+                                    mobileNumberSearch = ""
                                 },
-                                enabled = selectedEntries.isNotEmpty(),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = JivaColors.Green,
-                                    disabledContainerColor = JivaColors.Green.copy(alpha = 0.5f)
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Send,
-                                    contentDescription = "WhatsApp",
-                                    modifier = Modifier.size(18.dp)
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = "Clear Filters",
+                                    modifier = Modifier.size(16.dp)
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Send WhatsApp (${selectedEntries.size})",
-                                    fontWeight = FontWeight.SemiBold
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Clear Filters")
+                            }
+
+                            // Apply Filters Button (for future use)
+                            Button(
+                                onClick = {
+                                    // Filters are applied automatically through remember
+                                    // This button can be used for additional filter actions if needed
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = JivaColors.DeepBlue)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Apply Filters",
+                                    modifier = Modifier.size(16.dp)
                                 )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Apply Filters")
                             }
                         }
+
                     }
                 }
             }
+
+
 
             // Action Buttons
             item {
@@ -351,7 +353,7 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF25D366) // WhatsApp green
+                            containerColor = JivaColors.Purple
                         ),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier
@@ -396,7 +398,7 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
 
-                        // Horizontally scrollable table
+                        // Optimized table with LazyColumn for better performance
                         val tableScrollState = rememberScrollState()
 
                         Column(
@@ -407,25 +409,46 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                             // Table Header
                             OutstandingTableHeader()
 
-                            // Table Rows
-                            filteredEntries.forEach { entry ->
-                                OutstandingTableRow(
-                                    entry = entry,
-                                    isSelected = selectedEntries.contains(entry.acId),
-                                    onSelectionChange = { isSelected ->
-                                        selectedEntries = if (isSelected) {
-                                            selectedEntries + entry.acId
-                                        } else {
-                                            selectedEntries - entry.acId
-                                        }
-                                    }
-                                )
-                            }
+                            // Optimized table rows
+                            if (filteredEntries.isNotEmpty()) {
+                                filteredEntries.take(100).forEach { entry -> // Limit to 100 entries for performance
+                                    OutstandingTableRow(entry = entry)
+                                }
 
-                            // Total Row
-                            OutstandingTotalRow(
-                                totalBalance = totalBalance
-                            )
+                                // Show message if there are more entries
+                                if (filteredEntries.size > 100) {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(8.dp),
+                                        colors = CardDefaults.cardColors(containerColor = JivaColors.LightGray)
+                                    ) {
+                                        Text(
+                                            text = "Showing first 100 of ${filteredEntries.size} entries. Use filters to narrow down results.",
+                                            modifier = Modifier.padding(16.dp),
+                                            fontSize = 14.sp,
+                                            color = JivaColors.DeepBlue,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+                            } else {
+                                // Empty state
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(8.dp),
+                                    colors = CardDefaults.cardColors(containerColor = JivaColors.LightGray)
+                                ) {
+                                    Text(
+                                        text = "No outstanding data found. Click refresh to load data from server.",
+                                        modifier = Modifier.padding(16.dp),
+                                        fontSize = 14.sp,
+                                        color = JivaColors.DarkGray,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -446,18 +469,6 @@ private fun OutstandingTableHeader() {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Checkbox column header
-        Box(
-            modifier = Modifier.width(50.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = "Select",
-                tint = JivaColors.DeepBlue,
-                modifier = Modifier.size(16.dp)
-            )
-        }
         OutstandingHeaderCell("AC ID", Modifier.width(80.dp))
         OutstandingHeaderCell("Account Name", Modifier.width(180.dp))
         OutstandingHeaderCell("Mobile", Modifier.width(140.dp))
@@ -486,10 +497,37 @@ private fun OutstandingHeaderCell(text: String, modifier: Modifier = Modifier) {
 
 @Composable
 private fun OutstandingTableRow(
-    entry: OutstandingEntry,
-    isSelected: Boolean,
-    onSelectionChange: (Boolean) -> Unit
+    entry: OutstandingEntry
 ) {
+    // Safe data processing before rendering
+    val safeEntry = remember(entry) {
+        try {
+            entry.copy(
+                acId = entry.acId.takeIf { it.isNotBlank() } ?: "N/A",
+                accountName = entry.accountName.takeIf { it.isNotBlank() } ?: "Unknown",
+                mobile = entry.mobile.takeIf { it.isNotBlank() } ?: "",
+                under = entry.under.takeIf { it.isNotBlank() } ?: "",
+                balance = entry.balance.takeIf { it.isNotBlank() } ?: "0",
+                lastDate = entry.lastDate.takeIf { it.isNotBlank() } ?: "",
+                days = entry.days.takeIf { it.isNotBlank() } ?: "",
+                creditLimitAmount = entry.creditLimitAmount.takeIf { it.isNotBlank() } ?: "",
+                creditLimitDays = entry.creditLimitDays.takeIf { it.isNotBlank() } ?: ""
+            )
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error processing entry: ${entry.acId}")
+            OutstandingEntry("Error", "Error loading data", "", "", "0", "", "", "", "")
+        }
+    }
+
+    // Safe balance parsing
+    val balanceValue = remember(safeEntry.balance) {
+        try {
+            safeEntry.balance.replace(",", "").toDoubleOrNull() ?: 0.0
+        } catch (e: Exception) {
+            0.0
+        }
+    }
+
     Column {
         Row(
             modifier = Modifier
@@ -497,32 +535,20 @@ private fun OutstandingTableRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Checkbox column
-            Box(
-                modifier = Modifier.width(50.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Checkbox(
-                    checked = isSelected,
-                    onCheckedChange = onSelectionChange,
-                    colors = CheckboxDefaults.colors(checkedColor = JivaColors.Purple),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            OutstandingCell(entry.acId, Modifier.width(80.dp))
-            OutstandingCell(entry.accountName, Modifier.width(180.dp))
-            OutstandingCell(entry.mobile, Modifier.width(140.dp))
-            OutstandingCell(entry.under, Modifier.width(160.dp))
-            val balanceValue = entry.balance.replace(",", "").toDoubleOrNull() ?: 0.0
+            OutstandingCell(safeEntry.acId, Modifier.width(80.dp))
+            OutstandingCell(safeEntry.accountName, Modifier.width(180.dp))
+            OutstandingCell(safeEntry.mobile, Modifier.width(140.dp))
+            OutstandingCell(safeEntry.under, Modifier.width(160.dp))
+
             OutstandingCell(
-                text = "₹${entry.balance}",
+                text = "₹${safeEntry.balance}",
                 modifier = Modifier.width(120.dp),
                 color = if (balanceValue >= 0) JivaColors.Green else JivaColors.Red
             )
-            OutstandingCell(entry.lastDate, Modifier.width(140.dp))
-            OutstandingCell(entry.days, Modifier.width(80.dp))
-            OutstandingCell(entry.creditLimitAmount, Modifier.width(140.dp))
-            OutstandingCell(entry.creditLimitDays, Modifier.width(140.dp))
+            OutstandingCell(safeEntry.lastDate, Modifier.width(140.dp))
+            OutstandingCell(safeEntry.days, Modifier.width(80.dp))
+            OutstandingCell(safeEntry.creditLimitAmount, Modifier.width(140.dp))
+            OutstandingCell(safeEntry.creditLimitDays, Modifier.width(140.dp))
         }
 
         HorizontalDivider(
@@ -539,8 +565,18 @@ private fun OutstandingCell(
     modifier: Modifier = Modifier,
     color: Color = Color(0xFF374151)
 ) {
+    // Safe text processing before rendering
+    val safeText = remember(text) {
+        try {
+            text.takeIf { it.isNotBlank() } ?: ""
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error processing text: $text")
+            "Error"
+        }
+    }
+
     Text(
-        text = text,
+        text = safeText,
         fontSize = 11.sp,
         color = color,
         textAlign = TextAlign.Center,
@@ -550,39 +586,7 @@ private fun OutstandingCell(
     )
 }
 
-@Composable
-private fun OutstandingTotalRow(
-    totalBalance: Double
-) {
-    Row(
-        modifier = Modifier
-            .background(
-                JivaColors.DeepBlue.copy(alpha = 0.1f),
-                RoundedCornerShape(8.dp)
-            )
-            .padding(vertical = 12.dp, horizontal = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Empty space for checkbox column
-        Box(modifier = Modifier.width(50.dp))
 
-        Text(
-            text = "TOTAL",
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            color = JivaColors.DeepBlue,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.width(560.dp) // AC ID + Account Name + Mobile + Under columns
-        )
-        OutstandingCell(
-            text = "₹${String.format("%.0f", totalBalance)}",
-            modifier = Modifier.width(120.dp),
-            color = if (totalBalance >= 0) JivaColors.Green else JivaColors.Red
-        )
-        // Skip Last Date, Days, Credit limits in total row
-    }
-}
 
 // PDF Generation Function
 private suspend fun generateAndSharePDF(
@@ -594,9 +598,6 @@ private suspend fun generateAndSharePDF(
         try {
             // Create PDF document
             val pdfDocument = PdfDocument()
-            val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create() // A4 size
-            val page = pdfDocument.startPage(pageInfo)
-            val canvas = page.canvas
 
             // Paint objects for different text styles
             val titlePaint = Paint().apply {
@@ -624,81 +625,100 @@ private suspend fun generateAndSharePDF(
                 strokeWidth = 1f
             }
 
-            // Draw title
-            val currentDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
-            canvas.drawText("Outstanding Report", 297.5f, 50f, titlePaint)
-            canvas.drawText("Generated on: $currentDate", 297.5f, 75f, cellPaint)
-
             // Table dimensions
             val startX = 30f
             val startY = 120f
             val rowHeight = 25f
             val colWidths = floatArrayOf(60f, 140f, 100f, 90f, 100f)
             val totalWidth = colWidths.sum()
-
-            // Draw table headers
             val headers = arrayOf("AC ID", "Account Name", "Mobile", "Balance", "Area")
-            var currentX = startX
-            var currentY = startY
 
-            // Header row background
-            val headerRect = RectF(startX, currentY, startX + totalWidth, currentY + rowHeight)
-            canvas.drawRect(headerRect, Paint().apply { color = android.graphics.Color.LTGRAY; style = Paint.Style.FILL })
+            // Calculate rows per page (leaving space for header, title, and footer)
+            val maxRowsPerPage = 25
+            val totalPages = kotlin.math.ceil(entries.size.toDouble() / maxRowsPerPage).toInt().coerceAtLeast(1)
 
-            // Draw header text and borders
-            for (i in headers.indices) {
-                val rect = RectF(currentX, currentY, currentX + colWidths[i], currentY + rowHeight)
-                canvas.drawRect(rect, borderPaint)
-                canvas.drawText(headers[i], currentX + 5f, currentY + 15f, headerPaint)
-                currentX += colWidths[i]
-            }
+            var entryIndex = 0
 
-            // Draw data rows
-            currentY += rowHeight
-            for (entry in entries.take(25)) { // Limit to 25 entries to fit on page
-                currentX = startX
-                val rowData = arrayOf(
-                    entry.acId,
-                    entry.accountName.take(20), // Truncate long names
-                    entry.mobile,
-                    "₹${entry.balance}",
-                    entry.under.take(12) // Use 'under' as area/category
-                )
+            // Generate pages
+            for (pageNum in 1..totalPages) {
+                val pageInfo = PdfDocument.PageInfo.Builder(595, 842, pageNum).create() // A4 size
+                val page = pdfDocument.startPage(pageInfo)
+                val canvas = page.canvas
 
-                for (i in rowData.indices) {
+                // Draw title and date
+                val currentDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+                canvas.drawText("Outstanding Report", 297.5f, 50f, titlePaint)
+                canvas.drawText("Generated on: $currentDate", 297.5f, 75f, cellPaint)
+                canvas.drawText("Page $pageNum of $totalPages", 297.5f, 95f, cellPaint)
+
+                var currentX = startX
+                var currentY = startY
+
+                // Draw table headers
+                val headerRect = RectF(startX, currentY, startX + totalWidth, currentY + rowHeight)
+                canvas.drawRect(headerRect, Paint().apply { color = android.graphics.Color.LTGRAY; style = Paint.Style.FILL })
+
+                for (i in headers.indices) {
                     val rect = RectF(currentX, currentY, currentX + colWidths[i], currentY + rowHeight)
                     canvas.drawRect(rect, borderPaint)
-                    canvas.drawText(rowData[i], currentX + 5f, currentY + 15f, cellPaint)
+                    canvas.drawText(headers[i], currentX + 5f, currentY + 15f, headerPaint)
                     currentX += colWidths[i]
                 }
+
+                // Draw data rows for this page
                 currentY += rowHeight
+                val endIndex = kotlin.math.min(entryIndex + maxRowsPerPage, entries.size)
+
+                for (i in entryIndex until endIndex) {
+                    val entry = entries[i]
+                    currentX = startX
+                    val rowData = arrayOf(
+                        entry.acId,
+                        entry.accountName.take(20), // Truncate long names
+                        entry.mobile,
+                        "₹${entry.balance}",
+                        entry.under.take(12) // Use 'under' as area/category
+                    )
+
+                    for (j in rowData.indices) {
+                        val rect = RectF(currentX, currentY, currentX + colWidths[j], currentY + rowHeight)
+                        canvas.drawRect(rect, borderPaint)
+                        canvas.drawText(rowData[j], currentX + 5f, currentY + 15f, cellPaint)
+                        currentX += colWidths[j]
+                    }
+                    currentY += rowHeight
+                }
+
+                entryIndex = endIndex
+
+                // Draw totals row only on the last page
+                if (pageNum == totalPages) {
+                    currentX = startX
+                    val totalRect = RectF(startX, currentY, startX + totalWidth, currentY + rowHeight)
+                    canvas.drawRect(totalRect, Paint().apply { color = android.graphics.Color.CYAN; style = Paint.Style.FILL; alpha = 100 })
+
+                    val totalData = arrayOf(
+                        "TOTAL",
+                        "",
+                        "",
+                        "₹${String.format("%.0f", totalBalance)}",
+                        ""
+                    )
+
+                    for (i in totalData.indices) {
+                        val rect = RectF(currentX, currentY, currentX + colWidths[i], currentY + rowHeight)
+                        canvas.drawRect(rect, borderPaint)
+                        canvas.drawText(totalData[i], currentX + 5f, currentY + 15f, headerPaint)
+                        currentX += colWidths[i]
+                    }
+
+                    // Add footer
+                    canvas.drawText("Total Entries: ${entries.size}", startX, currentY + 50f, cellPaint)
+                    canvas.drawText("Generated by JIVA App", startX, currentY + 70f, cellPaint)
+                }
+
+                pdfDocument.finishPage(page)
             }
-
-            // Draw totals row
-            currentX = startX
-            val totalRect = RectF(startX, currentY, startX + totalWidth, currentY + rowHeight)
-            canvas.drawRect(totalRect, Paint().apply { color = android.graphics.Color.CYAN; style = Paint.Style.FILL; alpha = 100 })
-
-            val totalData = arrayOf(
-                "TOTAL",
-                "",
-                "",
-                "₹${String.format("%.0f", totalBalance)}",
-                ""
-            )
-
-            for (i in totalData.indices) {
-                val rect = RectF(currentX, currentY, currentX + colWidths[i], currentY + rowHeight)
-                canvas.drawRect(rect, borderPaint)
-                canvas.drawText(totalData[i], currentX + 5f, currentY + 15f, headerPaint)
-                currentX += colWidths[i]
-            }
-
-            // Add footer
-            canvas.drawText("Total Entries: ${entries.size}", startX, currentY + 50f, cellPaint)
-            canvas.drawText("Generated by JIVA App", startX, currentY + 70f, cellPaint)
-
-            pdfDocument.finishPage(page)
 
             // Save PDF to external storage
             val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)

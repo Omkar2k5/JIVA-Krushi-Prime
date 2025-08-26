@@ -27,10 +27,8 @@ class OutstandingReportViewModel(
     private val _uiState = MutableStateFlow(OutstandingReportUiState())
     val uiState: StateFlow<OutstandingReportUiState> = _uiState.asStateFlow()
     
-    init {
-        loadOutstandingData()
-        syncDataFromServer()
-    }
+    // Removed automatic data loading from init for better performance
+    // Data will be loaded from Room DB only, API calls only on manual refresh
 
     // Observe Outstanding table directly (fast for large datasets)
     fun observeOutstanding(year: String): Flow<List<com.example.jiva.data.database.entities.OutstandingEntity>> {
@@ -41,9 +39,21 @@ class OutstandingReportViewModel(
     fun syncOutstanding(userId: Int, year: String) {
         viewModelScope.launch {
             try {
-                repository.syncOutstanding(userId, year)
+                Timber.d("Starting Outstanding sync for userId: $userId, year: $year")
+                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+
+                val result = repository.syncOutstanding(userId, year)
+                if (result.isSuccess) {
+                    Timber.d("Outstanding sync completed successfully")
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = null)
+                } else {
+                    val errorMsg = result.exceptionOrNull()?.message ?: "Outstanding sync failed"
+                    Timber.e("Outstanding sync failed: $errorMsg")
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = errorMsg)
+                }
             } catch (e: Exception) {
-                Timber.e(e, "Outstanding sync failed")
+                Timber.e(e, "Outstanding sync failed with exception")
+                _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
             }
         }
     }
