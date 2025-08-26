@@ -45,17 +45,17 @@ import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
 
-// Data model for Outstanding Report entries
+// Data model for Outstanding Report entries (all Strings to save space)
 data class OutstandingEntry(
     val acId: String,
     val accountName: String,
     val mobile: String,
-    val opening: Double,
-    val cr: Double,
-    val dr: Double,
-    val closingBalance: Double,
-    val area: String,
-    val address: String
+    val under: String,
+    val balance: String,
+    val lastDate: String,
+    val days: String,
+    val creditLimitAmount: String,
+    val creditLimitDays: String
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -88,22 +88,58 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
     var selectedEntries by remember { mutableStateOf(setOf<String>()) }
     var selectAll by remember { mutableStateOf(false) }
 
-    // Get entries from ViewModel
-    val allEntries = uiState.outstandingEntries
+    // Sync + observe Outstanding table
+    val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
+    val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
-    // Filtered entries based on search and area
-    val filteredEntries = remember(partyNameSearch, selectedArea, allEntries) {
+    LaunchedEffect(userId, year) {
+        if (userId != null) {
+            viewModel.syncOutstanding(userId, year)
+        }
+    }
+
+    val outstandingEntities by viewModel.observeOutstanding(year).collectAsState(initial = emptyList())
+
+    // Prefer Outstanding DB data when available; fall back to legacy combined data
+    val allEntries = remember(outstandingEntities, uiState.outstandingEntries) {
+        if (outstandingEntities.isNotEmpty()) {
+            outstandingEntities.map {
+                OutstandingEntry(
+                    acId = it.acId,
+                    accountName = it.accountName,
+                    mobile = it.mobile,
+                    under = it.under,
+                    balance = it.balance,
+                    lastDate = it.lastDate,
+                    days = it.days,
+                    creditLimitAmount = it.creditLimitAmount,
+                    creditLimitDays = it.creditLimitDays
+                )
+            }
+        } else {
+            // Map legacy model to new presentation with minimal info
+            uiState.outstandingEntries.map {
+                OutstandingEntry(
+                    acId = it.acId,
+                    accountName = it.accountName,
+                    mobile = it.mobile,
+                    under = "",
+                    balance = it.balance,
+                    lastDate = "",
+                    days = "",
+                    creditLimitAmount = "",
+                    creditLimitDays = ""
+                )
+            }
+        }
+    }
+
+    // Filtered entries based on account name or mobile only
+    val filteredEntries = remember(partyNameSearch, allEntries) {
         allEntries.filter { entry ->
-            // Party name search - searches in both account name and account ID
-            val matchesSearch = if (partyNameSearch.isBlank()) true
-                else entry.accountName.contains(partyNameSearch, ignoreCase = true) ||
-                     entry.acId.contains(partyNameSearch, ignoreCase = true)
-
-            // Area filter
-            val matchesArea = if (selectedArea == "All") true
-                else entry.area == selectedArea
-
-            matchesSearch && matchesArea
+            if (partyNameSearch.isBlank()) true else
+                entry.accountName.contains(partyNameSearch, ignoreCase = true) ||
+                entry.mobile.contains(partyNameSearch, ignoreCase = true)
         }
     }
 
@@ -121,11 +157,8 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
         selectAll = filteredEntries.isNotEmpty() && selectedEntries.containsAll(filteredEntries.map { it.acId })
     }
 
-    // Calculate totals
-    val totalBalance = filteredEntries.sumOf { it.closingBalance }
-    val totalOpening = filteredEntries.sumOf { it.opening }
-    val totalCr = filteredEntries.sumOf { it.cr }
-    val totalDr = filteredEntries.sumOf { it.dr }
+    // Calculate totals (balance stored as String; parse to Double safely)
+    val totalBalance = filteredEntries.sumOf { it.balance.toDoubleOrNull() ?: 0.0 }
 
     Column(
         modifier = Modifier
@@ -158,125 +191,9 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                         modifier = Modifier.padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // First row: Outstanding Of dropdown and View All checkbox
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Outstanding Of dropdown
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Outstanding Of",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                                ExposedDropdownMenuBox(
-                                    expanded = isOutstandingDropdownExpanded,
-                                    onExpandedChange = { isOutstandingDropdownExpanded = it }
-                                ) {
-                                    OutlinedTextField(
-                                        value = outstandingOf,
-                                        onValueChange = {},
-                                        readOnly = true,
-                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isOutstandingDropdownExpanded) },
-                                        modifier = Modifier
-                                            .menuAnchor()
-                                            .fillMaxWidth(),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    ExposedDropdownMenu(
-                                        expanded = isOutstandingDropdownExpanded,
-                                        onDismissRequest = { isOutstandingDropdownExpanded = false }
-                                    ) {
-                                        listOf("Customer", "Supplier").forEach { option ->
-                                            DropdownMenuItem(
-                                                text = { Text(option) },
-                                                onClick = {
-                                                    outstandingOf = option
-                                                    isOutstandingDropdownExpanded = false
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
+                        // Simplified controls: only search by Account Name or Mobile
 
-                            // View All checkbox
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(top = 24.dp)
-                            ) {
-                                Checkbox(
-                                    checked = viewAll,
-                                    onCheckedChange = { viewAll = it },
-                                    colors = CheckboxDefaults.colors(checkedColor = JivaColors.Purple)
-                                )
-                                Text(
-                                    text = "View All",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue
-                                )
-                            }
-                        }
-
-                        // Interest Calculation Section
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = JivaColors.LightGray),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Text(
-                                    text = "Interest Calculation",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = JivaColors.DeepBlue
-                                )
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    OutlinedTextField(
-                                        value = interestRate,
-                                        onValueChange = { interestRate = it },
-                                        label = { Text("Interest Rate") },
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                        modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-
-                                    Text(
-                                        text = "/Day",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = JivaColors.DeepBlue
-                                    )
-
-                                    Button(
-                                        onClick = { /* TODO: Calculate interest */ },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = JivaColors.Green
-                                        ),
-                                        shape = RoundedCornerShape(8.dp)
-                                    ) {
-                                        Text(
-                                            text = "Calculate",
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                        // Removed Interest Calculation Section as per new requirements
 
                         // Search and Filter Section
                         Row(
@@ -430,7 +347,7 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                     Button(
                         onClick = {
                             scope.launch {
-                                generateAndSharePDF(context, filteredEntries, totalOpening, totalCr, totalDr, totalBalance)
+                                generateAndSharePDF(context, filteredEntries, totalBalance)
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
@@ -507,9 +424,6 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
 
                             // Total Row
                             OutstandingTotalRow(
-                                totalOpening = totalOpening,
-                                totalCr = totalCr,
-                                totalDr = totalDr,
                                 totalBalance = totalBalance
                             )
                         }
@@ -545,13 +459,14 @@ private fun OutstandingTableHeader() {
             )
         }
         OutstandingHeaderCell("AC ID", Modifier.width(80.dp))
-        OutstandingHeaderCell("Account Name", Modifier.width(150.dp))
-        OutstandingHeaderCell("Mobile", Modifier.width(120.dp))
-        OutstandingHeaderCell("Opening", Modifier.width(100.dp))
-        OutstandingHeaderCell("CR", Modifier.width(100.dp))
-        OutstandingHeaderCell("DR", Modifier.width(100.dp))
-        OutstandingHeaderCell("Closing", Modifier.width(120.dp))
-        OutstandingHeaderCell("Area", Modifier.width(100.dp))
+        OutstandingHeaderCell("Account Name", Modifier.width(180.dp))
+        OutstandingHeaderCell("Mobile", Modifier.width(140.dp))
+        OutstandingHeaderCell("Under", Modifier.width(160.dp))
+        OutstandingHeaderCell("Balance", Modifier.width(120.dp))
+        OutstandingHeaderCell("Last Date", Modifier.width(140.dp))
+        OutstandingHeaderCell("Days", Modifier.width(80.dp))
+        OutstandingHeaderCell("Credit Limit Amt", Modifier.width(140.dp))
+        OutstandingHeaderCell("Credit Limit Days", Modifier.width(140.dp))
     }
 }
 
@@ -595,17 +510,19 @@ private fun OutstandingTableRow(
                 )
             }
             OutstandingCell(entry.acId, Modifier.width(80.dp))
-            OutstandingCell(entry.accountName, Modifier.width(150.dp))
-            OutstandingCell(entry.mobile, Modifier.width(120.dp))
-            OutstandingCell("₹${String.format("%.0f", entry.opening)}", Modifier.width(100.dp))
-            OutstandingCell("₹${String.format("%.0f", entry.cr)}", Modifier.width(100.dp))
-            OutstandingCell("₹${String.format("%.0f", entry.dr)}", Modifier.width(100.dp))
+            OutstandingCell(entry.accountName, Modifier.width(180.dp))
+            OutstandingCell(entry.mobile, Modifier.width(140.dp))
+            OutstandingCell(entry.under, Modifier.width(160.dp))
+            val balanceValue = entry.balance.replace(",", "").toDoubleOrNull() ?: 0.0
             OutstandingCell(
-                text = "₹${String.format("%.0f", entry.closingBalance)}",
+                text = "₹${entry.balance}",
                 modifier = Modifier.width(120.dp),
-                color = if (entry.closingBalance >= 0) JivaColors.Green else JivaColors.Red
+                color = if (balanceValue >= 0) JivaColors.Green else JivaColors.Red
             )
-            OutstandingCell(entry.area, Modifier.width(100.dp))
+            OutstandingCell(entry.lastDate, Modifier.width(140.dp))
+            OutstandingCell(entry.days, Modifier.width(80.dp))
+            OutstandingCell(entry.creditLimitAmount, Modifier.width(140.dp))
+            OutstandingCell(entry.creditLimitDays, Modifier.width(140.dp))
         }
 
         HorizontalDivider(
@@ -635,9 +552,6 @@ private fun OutstandingCell(
 
 @Composable
 private fun OutstandingTotalRow(
-    totalOpening: Double,
-    totalCr: Double,
-    totalDr: Double,
     totalBalance: Double
 ) {
     Row(
@@ -659,17 +573,14 @@ private fun OutstandingTotalRow(
             fontWeight = FontWeight.Bold,
             color = JivaColors.DeepBlue,
             textAlign = TextAlign.Center,
-            modifier = Modifier.width(230.dp) // AC ID + Account Name + Mobile columns
+            modifier = Modifier.width(560.dp) // AC ID + Account Name + Mobile + Under columns
         )
-        OutstandingCell("₹${String.format("%.0f", totalOpening)}", Modifier.width(100.dp), JivaColors.DeepBlue)
-        OutstandingCell("₹${String.format("%.0f", totalCr)}", Modifier.width(100.dp), JivaColors.DeepBlue)
-        OutstandingCell("₹${String.format("%.0f", totalDr)}", Modifier.width(100.dp), JivaColors.DeepBlue)
         OutstandingCell(
             text = "₹${String.format("%.0f", totalBalance)}",
             modifier = Modifier.width(120.dp),
             color = if (totalBalance >= 0) JivaColors.Green else JivaColors.Red
         )
-        OutstandingCell("-", Modifier.width(100.dp), JivaColors.DeepBlue) // Area column
+        // Skip Last Date, Days, Credit limits in total row
     }
 }
 
@@ -677,9 +588,6 @@ private fun OutstandingTotalRow(
 private suspend fun generateAndSharePDF(
     context: Context,
     entries: List<OutstandingEntry>,
-    totalOpening: Double,
-    totalCr: Double,
-    totalDr: Double,
     totalBalance: Double
 ) {
     withContext(Dispatchers.IO) {
@@ -725,11 +633,11 @@ private suspend fun generateAndSharePDF(
             val startX = 30f
             val startY = 120f
             val rowHeight = 25f
-            val colWidths = floatArrayOf(60f, 120f, 80f, 70f, 70f, 70f, 80f, 80f)
+            val colWidths = floatArrayOf(60f, 140f, 100f, 90f, 100f)
             val totalWidth = colWidths.sum()
 
             // Draw table headers
-            val headers = arrayOf("AC ID", "Account Name", "Mobile", "Opening", "CR", "DR", "Balance", "Area")
+            val headers = arrayOf("AC ID", "Account Name", "Mobile", "Balance", "Area")
             var currentX = startX
             var currentY = startY
 
@@ -751,13 +659,10 @@ private suspend fun generateAndSharePDF(
                 currentX = startX
                 val rowData = arrayOf(
                     entry.acId,
-                    entry.accountName.take(15), // Truncate long names
+                    entry.accountName.take(20), // Truncate long names
                     entry.mobile,
-                    "₹${String.format("%.0f", entry.opening)}",
-                    "₹${String.format("%.0f", entry.cr)}",
-                    "₹${String.format("%.0f", entry.dr)}",
-                    "₹${String.format("%.0f", entry.closingBalance)}",
-                    entry.area.take(10) // Truncate long area names
+                    "₹${entry.balance}",
+                    entry.under.take(12) // Use 'under' as area/category
                 )
 
                 for (i in rowData.indices) {
@@ -778,9 +683,6 @@ private suspend fun generateAndSharePDF(
                 "TOTAL",
                 "",
                 "",
-                "₹${String.format("%.0f", totalOpening)}",
-                "₹${String.format("%.0f", totalCr)}",
-                "₹${String.format("%.0f", totalDr)}",
                 "₹${String.format("%.0f", totalBalance)}",
                 ""
             )

@@ -89,6 +89,13 @@ class RemoteDataSource {
         return safeApiCall { apiService.getPriceScreenData() }
     }
     
+    /** Outstanding API */
+    suspend fun getOutstanding(userId: Int, yearString: String): Result<com.example.jiva.data.api.models.OutstandingResponse> {
+        return safeApiCall {
+            apiService.getOutstanding(com.example.jiva.data.api.models.OutstandingRequest(userID = userId, yearString = yearString))
+        }
+    }
+    
     /**
      * Get all data in a single call (for initial sync)
      */

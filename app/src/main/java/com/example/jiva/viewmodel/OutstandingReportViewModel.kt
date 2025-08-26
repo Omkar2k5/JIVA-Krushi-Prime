@@ -31,6 +31,22 @@ class OutstandingReportViewModel(
         loadOutstandingData()
         syncDataFromServer()
     }
+
+    // Observe Outstanding table directly (fast for large datasets)
+    fun observeOutstanding(year: String): Flow<List<com.example.jiva.data.database.entities.OutstandingEntity>> {
+        return repository.getOutstandingFlow(year)
+    }
+
+    // Trigger Outstanding sync with explicit params
+    fun syncOutstanding(userId: Int, year: String) {
+        viewModelScope.launch {
+            try {
+                repository.syncOutstanding(userId, year)
+            } catch (e: Exception) {
+                Timber.e(e, "Outstanding sync failed")
+            }
+        }
+    }
     
     private fun loadOutstandingData() {
         viewModelScope.launch {
@@ -109,12 +125,12 @@ class OutstandingReportViewModel(
             acId = account.acId.toString(),
             accountName = account.accountName,
             mobile = account.mobile ?: "",
-            opening = account.openingBalance.toDouble(),
-            cr = 0.0, // Would need ledger entries to calculate this
-            dr = 0.0, // Would need ledger entries to calculate this
-            closingBalance = closingBalance?.balance?.toDoubleOrNull() ?: account.openingBalance.toDouble(),
-            area = account.area ?: "",
-            address = account.detailedAddress ?: ""
+            under = account.area ?: "",
+            balance = (closingBalance?.balance?.toString() ?: account.openingBalance.toString()),
+            lastDate = "", // Would need transaction data to calculate this
+            days = "", // Would need transaction data to calculate this
+            creditLimitAmount = "", // Would need credit limit data
+            creditLimitDays = "" // Would need credit limit data
         )
     }
     

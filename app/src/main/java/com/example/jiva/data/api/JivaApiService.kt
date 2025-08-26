@@ -6,6 +6,8 @@ import com.example.jiva.data.api.models.ApiLoginRequest
 import com.example.jiva.data.api.models.ApiLoginResponse
 import com.example.jiva.data.api.models.CompanyInfoRequest
 import com.example.jiva.data.api.models.CompanyInfoResponse
+import com.example.jiva.data.api.models.OutstandingRequest
+import com.example.jiva.data.api.models.OutstandingResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -103,6 +105,13 @@ interface JivaApiService {
     @Headers("Content-Type: application/json")
     @POST("api/JivaBusiness/CompanyInfo")
     suspend fun getCompanyInfo(@Body request: CompanyInfoRequest): CompanyInfoResponse
+
+    /**
+     * POST /api/JivaBusiness/OutStanding
+     */
+    @Headers("Content-Type: application/json")
+    @POST("api/JivaBusiness/OutStanding")
+    suspend fun getOutstanding(@Body request: OutstandingRequest): OutstandingResponse
     
     // Additional filtered endpoints for better performance
     

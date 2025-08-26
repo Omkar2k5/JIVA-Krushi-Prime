@@ -307,7 +307,7 @@ private fun LoginContent(
             val end = (start + 1) % 100
             String.format("%d-%02d", start, end)
         }
-        val years = remember { (dynamicYears + listOf("2026-27")).distinct() }
+        val years = remember { (dynamicYears + listOf("2025-26")).distinct() }
         var selectedYear by remember {
             mutableStateOf(com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: years.first())
         }

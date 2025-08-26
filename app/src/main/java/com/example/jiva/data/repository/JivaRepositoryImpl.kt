@@ -397,6 +397,56 @@ class JivaRepositoryImpl(
         }
     }
 
+    // Outstanding operations
+    override fun getOutstandingFlow(year: String): Flow<List<OutstandingEntity>> {
+        return database.outstandingDao().getAll(year)
+    }
+
+    override suspend fun syncOutstanding(userId: Int, yearString: String): Result<Unit> {
+        return try {
+            val apiResult = remoteDataSource.getOutstanding(userId, yearString)
+            if (apiResult.isSuccess) {
+                val body = apiResult.getOrNull()
+                val items = body?.data.orEmpty()
+
+                // Map API model -> Room entity
+                val entities = items.map {
+                    OutstandingEntity(
+                        cmpCode = it.cmpCode,
+                        acId = it.acId,
+                        accountName = it.accountName,
+                        mobile = it.mobile,
+                        under = it.under,
+                        balance = it.balance,
+                        lastDate = it.lastDate,
+                        days = it.days,
+                        creditLimitAmount = it.creditLimitAmount,
+                        creditLimitDays = it.creditLimitDays,
+                        yearString = it.yearString
+                    )
+                }
+
+                // Chunked inserts for huge payloads
+                database.outstandingDao().clearYear(yearString)
+                val chunkSize = 1000
+                var index = 0
+                while (index < entities.size) {
+                    val end = minOf(index + chunkSize, entities.size)
+                    database.outstandingDao().insertAll(entities.subList(index, end))
+                    index = end
+                }
+
+                Timber.d("Inserted ${entities.size} outstanding rows for $yearString")
+                Result.success(Unit)
+            } else {
+                Result.failure(apiResult.exceptionOrNull() ?: IllegalStateException("Outstanding API failed"))
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error syncing outstanding data")
+            Result.failure(e)
+        }
+    }
+
     // Sync all data
     override suspend fun syncAllData(): Result<Unit> {
         return try {

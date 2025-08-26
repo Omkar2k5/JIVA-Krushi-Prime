@@ -25,9 +25,10 @@ import com.example.jiva.data.database.entities.*
         LedgerEntity::class,
         ExpiryEntity::class,
         TemplateEntity::class,
-        PriceDataEntity::class
+        PriceDataEntity::class,
+        OutstandingEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -43,6 +44,7 @@ abstract class JivaDatabase : RoomDatabase() {
     abstract fun expiryDao(): ExpiryDao
     abstract fun templateDao(): TemplateDao
     abstract fun priceDataDao(): PriceDataDao
+    abstract fun outstandingDao(): OutstandingDao
     
     companion object {
         @Volatile
@@ -51,7 +53,6 @@ abstract class JivaDatabase : RoomDatabase() {
         // Migration from version 1 to 2 - adds PriceData table
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                // Create PriceData table
                 database.execSQL("""
                     CREATE TABLE IF NOT EXISTS `PriceData` (
                         `itemId` TEXT PRIMARY KEY NOT NULL,
@@ -65,6 +66,29 @@ abstract class JivaDatabase : RoomDatabase() {
                 """.trimIndent())
             }
         }
+
+        // Migration from version 2 to 3 - adds Outstanding table
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `Outstanding` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `cmpCode` TEXT NOT NULL,
+                        `acId` TEXT NOT NULL,
+                        `accountName` TEXT NOT NULL,
+                        `mobile` TEXT NOT NULL,
+                        `under` TEXT NOT NULL,
+                        `balance` TEXT NOT NULL,
+                        `lastDate` TEXT NOT NULL,
+                        `days` TEXT NOT NULL,
+                        `creditLimitAmount` TEXT NOT NULL,
+                        `creditLimitDays` TEXT NOT NULL,
+                        `yearString` TEXT NOT NULL
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_Outstanding_cmpCode_acId_yearString ON Outstanding(cmpCode, acId, yearString)")
+            }
+        }
         
         fun getDatabase(context: Context): JivaDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -73,8 +97,8 @@ abstract class JivaDatabase : RoomDatabase() {
                     JivaDatabase::class.java,
                     "jiva_database"
                 )
-                .addMigrations(MIGRATION_1_2) // Add migration instead of destructive fallback
-                .fallbackToDestructiveMigration() // Keep as fallback for development
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
                 instance

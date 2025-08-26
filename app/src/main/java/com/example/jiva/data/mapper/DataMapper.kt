@@ -20,12 +20,12 @@ object DataMapper {
             acId = this.acId?.toString() ?: this.srno.toString(),
             accountName = this.accountName,
             mobile = this.mobile ?: "",
-            opening = this.openingBalance.toDouble(),
-            cr = 0.0, // Will be calculated from ledger entries
-            dr = 0.0, // Will be calculated from ledger entries
-            closingBalance = closingBalance?.balance?.toDoubleOrNull() ?: 0.0,
-            area = this.area ?: "",
-            address = this.detailedAddress ?: ""
+            under = this.area ?: "",
+            balance = (closingBalance?.balance ?: this.openingBalance.toString()),
+            lastDate = "",
+            days = "",
+            creditLimitAmount = "",
+            creditLimitDays = ""
         )
     }
     
