@@ -35,16 +35,31 @@ class OutstandingReportViewModel(
         return repository.getOutstandingFlow(year)
     }
 
-    // Trigger Outstanding sync with explicit params
-    fun syncOutstanding(userId: Int, year: String) {
+    // Trigger Outstanding sync with explicit params and local storage
+    fun syncOutstanding(userId: Int, year: String, context: android.content.Context) {
         viewModelScope.launch {
             try {
                 Timber.d("Starting Outstanding sync for userId: $userId, year: $year")
                 _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
+                // First, try to load from local storage
+                val localData = com.example.jiva.utils.LocalDataStorage.loadOutstandingData(context, year)
+                if (localData.isNotEmpty()) {
+                    Timber.d("Loading ${localData.size} entries from local storage")
+                    // Update Room DB with local data
+                    database.outstandingDao().clearYear(year)
+                    database.outstandingDao().insertAll(localData)
+                }
+
+                // Then sync from API and update local storage
                 val result = repository.syncOutstanding(userId, year)
                 if (result.isSuccess) {
                     Timber.d("Outstanding sync completed successfully")
+
+                    // Save updated data to local storage
+                    val updatedData = database.outstandingDao().getAllSync(year)
+                    com.example.jiva.utils.LocalDataStorage.saveOutstandingData(context, updatedData, year)
+
                     _uiState.value = _uiState.value.copy(isLoading = false, error = null)
                 } else {
                     val errorMsg = result.exceptionOrNull()?.message ?: "Outstanding sync failed"
@@ -53,6 +68,32 @@ class OutstandingReportViewModel(
                 }
             } catch (e: Exception) {
                 Timber.e(e, "Outstanding sync failed with exception")
+                _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
+            }
+        }
+    }
+
+    // Load data from local storage on startup
+    fun loadFromLocalStorage(context: android.content.Context, year: String) {
+        viewModelScope.launch {
+            try {
+                Timber.d("Loading Outstanding data from local storage for year: $year")
+                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+
+                val localData = com.example.jiva.utils.LocalDataStorage.loadOutstandingData(context, year)
+                if (localData.isNotEmpty()) {
+                    Timber.d("Found ${localData.size} entries in local storage")
+                    // Update Room DB with local data
+                    database.outstandingDao().clearYear(year)
+                    database.outstandingDao().insertAll(localData)
+
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = null)
+                } else {
+                    Timber.d("No local data found, database will show empty until refresh")
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = null)
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to load from local storage")
                 _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
             }
         }

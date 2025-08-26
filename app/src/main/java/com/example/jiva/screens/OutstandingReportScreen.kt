@@ -1,5 +1,6 @@
 package com.example.jiva.screens
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.horizontalScroll
@@ -14,7 +15,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
@@ -32,6 +38,7 @@ import com.example.jiva.components.ResponsiveReportHeader
 import com.example.jiva.viewmodel.OutstandingReportViewModel
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.graphics.*
 import android.graphics.pdf.PdfDocument
 import android.os.Environment
@@ -83,17 +90,28 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
     var mobileNumberSearch by remember { mutableStateOf("") }
     var isOutstandingDropdownExpanded by remember { mutableStateOf(false) }
 
+    // WhatsApp messaging state
+    var selectedEntries by remember { mutableStateOf(setOf<String>()) }
+    var selectAll by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+
+    // WhatsApp template message
+    val whatsappTemplate = "Hello Kurshi Prime"
+
 
 
     // Sync + observe Outstanding table
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
     val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
-    // Initialize test environment if needed (only for debugging)
+    // Initialize test environment and load local data
     LaunchedEffect(Unit) {
         if (userId == null) {
             com.example.jiva.utils.OutstandingDebugHelper.initializeTestEnvironment(context)
         }
+
+        // Load data from local storage on startup for faster loading
+        viewModel.loadFromLocalStorage(context, year)
     }
 
     // Re-read userId after potential initialization
@@ -152,12 +170,36 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
         }
     }
 
+    // Handle select all functionality
+    LaunchedEffect(selectAll, filteredEntries) {
+        if (selectAll) {
+            selectedEntries = filteredEntries.map { it.acId }.toSet()
+        } else {
+            selectedEntries = emptySet()
+        }
+    }
 
+    // Update selectAll state based on individual selections
+    LaunchedEffect(selectedEntries, filteredEntries) {
+        selectAll = filteredEntries.isNotEmpty() && selectedEntries.containsAll(filteredEntries.map { it.acId })
+    }
 
-    // Calculate total for PDF generation only
+    // Calculate total balance with proper string to number conversion
     val totalBalance = remember(filteredEntries) {
         try {
-            filteredEntries.sumOf { it.balance.toDoubleOrNull() ?: 0.0 }
+            filteredEntries.sumOf { entry ->
+                try {
+                    // Remove currency symbols, commas, and convert to double
+                    val cleanBalance = entry.balance
+                        .replace("₹", "")
+                        .replace(",", "")
+                        .replace(" ", "")
+                        .trim()
+                    cleanBalance.toDoubleOrNull() ?: 0.0
+                } catch (e: Exception) {
+                    0.0
+                }
+            }
         } catch (e: Exception) {
             timber.log.Timber.e(e, "Error calculating total balance")
             0.0
@@ -178,17 +220,22 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                 IconButton(
                     onClick = {
                         if (finalUserId != null) {
-                            viewModel.syncOutstanding(finalUserId, year)
+                            isLoading = true
+                            scope.launch {
+                                viewModel.syncOutstanding(finalUserId, year, context)
+                                kotlinx.coroutines.delay(1000) // Show loading for at least 1 second
+                                isLoading = false
+                            }
                         }
                     },
-                    enabled = finalUserId != null && !uiState.isLoading,
+                    enabled = finalUserId != null && !isLoading,
                     modifier = Modifier
                         .background(
                             JivaColors.White.copy(alpha = 0.2f),
                             RoundedCornerShape(8.dp)
                         )
                 ) {
-                    if (uiState.isLoading) {
+                    if (isLoading) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
                             color = JivaColors.White,
@@ -255,6 +302,11 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                             )
                                         }
                                     },
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = Color.Black,
+                                        unfocusedTextColor = Color.Black,
+                                        cursorColor = JivaColors.DeepBlue
+                                    ),
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(8.dp)
                                 )
@@ -281,6 +333,11 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                             )
                                         }
                                     },
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = Color.Black,
+                                        unfocusedTextColor = Color.Black,
+                                        cursorColor = JivaColors.DeepBlue
+                                    ),
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(8.dp)
@@ -337,43 +394,156 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
 
 
 
-            // Action Buttons
+            // WhatsApp Messaging Section
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = JivaColors.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
-                    // Single Share Button
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                generateAndSharePDF(context, filteredEntries, totalBalance)
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = JivaColors.Purple
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        Text(
+                            text = "WhatsApp Message",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = JivaColors.DeepBlue
+                        )
+
+                        // Selection summary and controls
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Selected: ${selectedEntries.size} of ${filteredEntries.size} entries",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = JivaColors.DeepBlue
+                            )
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = selectAll,
+                                    onCheckedChange = { selectAll = it },
+                                    colors = CheckboxDefaults.colors(checkedColor = JivaColors.Purple)
+                                )
+                                Text(
+                                    text = "Select All",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = JivaColors.DeepBlue
+                                )
+                            }
+                        }
+
+                        // WhatsApp template preview
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = JivaColors.LightGray),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp)
+                            ) {
+                                Text(
+                                    text = "Message Template:",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = JivaColors.DarkGray
+                                )
+                                Text(
+                                    text = whatsappTemplate,
+                                    fontSize = 14.sp,
+                                    color = JivaColors.DeepBlue,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                            }
+                        }
+
+                        // Send WhatsApp button
+                        Button(
+                            onClick = {
+                                if (selectedEntries.isNotEmpty()) {
+                                    scope.launch {
+                                        sendWhatsAppMessages(context, filteredEntries, selectedEntries, whatsappTemplate)
+                                    }
+                                }
+                            },
+                            enabled = selectedEntries.isNotEmpty(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF25D366), // WhatsApp green
+                                disabledContainerColor = JivaColors.LightGray
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Share,
-                                contentDescription = "Share",
-                                tint = JivaColors.White
+                                imageVector = Icons.Default.Send,
+                                contentDescription = "WhatsApp",
+                                modifier = Modifier.size(18.dp)
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "SHARE REPORT",
-                                color = JivaColors.White,
-                                fontWeight = FontWeight.Medium
+                                text = "Send WhatsApp to ${selectedEntries.size} contacts",
+                                fontWeight = FontWeight.SemiBold
                             )
+                        }
+                    }
+                }
+            }
+
+            // Action Buttons - Width adjusted to match table
+            item {
+                // Calculate table width: 50+80+180+140+160+120+140+80+140+140+72(spacing) = 1302dp
+                val tableWidth = 1302.dp
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Card(
+                        modifier = Modifier.width(tableWidth),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        // Single Share Button
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    generateAndSharePDF(context, filteredEntries, totalBalance)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = JivaColors.Purple
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "Share",
+                                    tint = JivaColors.White
+                                )
+                                Text(
+                                    text = "SHARE REPORT",
+                                    color = JivaColors.White,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
                     }
                 }
@@ -409,29 +579,30 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                             // Table Header
                             OutstandingTableHeader()
 
-                            // Optimized table rows
-                            if (filteredEntries.isNotEmpty()) {
-                                filteredEntries.take(100).forEach { entry -> // Limit to 100 entries for performance
-                                    OutstandingTableRow(entry = entry)
+                            // Show loading or data
+                            if (isLoading) {
+                                // Loading animation
+                                repeat(5) {
+                                    OutstandingLoadingRow()
+                                }
+                            } else if (filteredEntries.isNotEmpty()) {
+                                // Show all entries (removed 100 limit)
+                                filteredEntries.forEach { entry ->
+                                    OutstandingTableRow(
+                                        entry = entry,
+                                        isSelected = selectedEntries.contains(entry.acId),
+                                        onSelectionChange = { isSelected ->
+                                            selectedEntries = if (isSelected) {
+                                                selectedEntries + entry.acId
+                                            } else {
+                                                selectedEntries - entry.acId
+                                            }
+                                        }
+                                    )
                                 }
 
-                                // Show message if there are more entries
-                                if (filteredEntries.size > 100) {
-                                    Card(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(8.dp),
-                                        colors = CardDefaults.cardColors(containerColor = JivaColors.LightGray)
-                                    ) {
-                                        Text(
-                                            text = "Showing first 100 of ${filteredEntries.size} entries. Use filters to narrow down results.",
-                                            modifier = Modifier.padding(16.dp),
-                                            fontSize = 14.sp,
-                                            color = JivaColors.DeepBlue,
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
-                                }
+                                // Total row
+                                OutstandingTotalRow(totalBalance = totalBalance)
                             } else {
                                 // Empty state
                                 Card(
@@ -469,6 +640,18 @@ private fun OutstandingTableHeader() {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Checkbox column header
+        Box(
+            modifier = Modifier.width(50.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = "Select",
+                tint = JivaColors.DeepBlue,
+                modifier = Modifier.size(16.dp)
+            )
+        }
         OutstandingHeaderCell("AC ID", Modifier.width(80.dp))
         OutstandingHeaderCell("Account Name", Modifier.width(180.dp))
         OutstandingHeaderCell("Mobile", Modifier.width(140.dp))
@@ -497,7 +680,9 @@ private fun OutstandingHeaderCell(text: String, modifier: Modifier = Modifier) {
 
 @Composable
 private fun OutstandingTableRow(
-    entry: OutstandingEntry
+    entry: OutstandingEntry,
+    isSelected: Boolean,
+    onSelectionChange: (Boolean) -> Unit
 ) {
     // Safe data processing before rendering
     val safeEntry = remember(entry) {
@@ -535,6 +720,18 @@ private fun OutstandingTableRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Checkbox column
+            Box(
+                modifier = Modifier.width(50.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = onSelectionChange,
+                    colors = CheckboxDefaults.colors(checkedColor = JivaColors.Purple),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
             OutstandingCell(safeEntry.acId, Modifier.width(80.dp))
             OutstandingCell(safeEntry.accountName, Modifier.width(180.dp))
             OutstandingCell(safeEntry.mobile, Modifier.width(140.dp))
@@ -766,6 +963,142 @@ private fun sharePDF(context: Context, file: File) {
 
     } catch (e: Exception) {
         Toast.makeText(context, "Error sharing PDF: ${e.message}", Toast.LENGTH_LONG).show()
+    }
+}
+
+@Composable
+private fun OutstandingLoadingRow() {
+    Row(
+        modifier = Modifier
+            .padding(vertical = 8.dp, horizontal = 8.dp)
+            .shimmerEffect(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Checkbox placeholder
+        Box(
+            modifier = Modifier
+                .width(50.dp)
+                .height(20.dp)
+                .background(JivaColors.LightGray, RoundedCornerShape(4.dp))
+        )
+        // Data placeholders
+        repeat(8) { index ->
+            val width = when (index) {
+                0 -> 80.dp
+                1 -> 180.dp
+                2 -> 140.dp
+                3 -> 160.dp
+                4 -> 120.dp
+                5 -> 140.dp
+                6 -> 80.dp
+                7 -> 140.dp
+                else -> 140.dp
+            }
+            Box(
+                modifier = Modifier
+                    .width(width)
+                    .height(16.dp)
+                    .background(JivaColors.LightGray, RoundedCornerShape(4.dp))
+            )
+        }
+    }
+}
+
+@Composable
+private fun OutstandingTotalRow(
+    totalBalance: Double
+) {
+    Row(
+        modifier = Modifier
+            .background(
+                JivaColors.DeepBlue.copy(alpha = 0.1f),
+                RoundedCornerShape(8.dp)
+            )
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Empty space for checkbox column
+        Box(modifier = Modifier.width(50.dp))
+
+        Text(
+            text = "TOTAL",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = JivaColors.DeepBlue,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.width(560.dp) // AC ID + Account Name + Mobile + Under columns
+        )
+        OutstandingCell(
+            text = "₹${String.format("%.2f", totalBalance)}",
+            modifier = Modifier.width(120.dp),
+            color = if (totalBalance >= 0) JivaColors.Green else JivaColors.Red
+        )
+        // Skip Last Date, Days, Credit limits in total row
+        repeat(3) {
+            Box(modifier = Modifier.width(140.dp))
+        }
+    }
+}
+
+// Shimmer effect for loading animation
+fun Modifier.shimmerEffect(): Modifier = composed {
+    var size by remember { mutableStateOf(IntSize.Zero) }
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val startOffsetX by transition.animateFloat(
+        initialValue = -2 * size.width.toFloat(),
+        targetValue = 2 * size.width.toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000)
+        ), label = "shimmer"
+    )
+
+    background(
+        brush = Brush.linearGradient(
+            colors = listOf(
+                Color(0xFFB8B5B5),
+                Color(0xFF8F8B8B),
+                Color(0xFFB8B5B5),
+            ),
+            start = Offset(startOffsetX, 0f),
+            end = Offset(startOffsetX + size.width.toFloat(), size.height.toFloat())
+        )
+    ).onGloballyPositioned {
+        size = it.size
+    }
+}
+
+// WhatsApp messaging function
+private suspend fun sendWhatsAppMessages(
+    context: Context,
+    entries: List<OutstandingEntry>,
+    selectedIds: Set<String>,
+    template: String
+) {
+    try {
+        val selectedEntries = entries.filter { it.acId in selectedIds }
+
+        for (entry in selectedEntries) {
+            if (entry.mobile.isNotBlank()) {
+                val message = "$template\n\nDear ${entry.accountName},\nYour outstanding balance: ₹${entry.balance}"
+                val phoneNumber = entry.mobile.replace("+91", "").replace(" ", "")
+
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    data = Uri.parse("https://wa.me/91$phoneNumber?text=${Uri.encode(message)}")
+                    setPackage("com.whatsapp")
+                }
+
+                try {
+                    context.startActivity(intent)
+                    kotlinx.coroutines.delay(2000) // Delay between messages
+                } catch (e: Exception) {
+                    timber.log.Timber.e(e, "Failed to send WhatsApp to ${entry.mobile}")
+                }
+            }
+        }
+    } catch (e: Exception) {
+        timber.log.Timber.e(e, "Error in bulk WhatsApp messaging")
     }
 }
 

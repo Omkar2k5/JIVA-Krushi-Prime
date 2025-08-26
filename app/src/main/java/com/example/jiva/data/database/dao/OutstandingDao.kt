@@ -14,6 +14,9 @@ interface OutstandingDao {
     @Query("SELECT * FROM Outstanding WHERE yearString = :year ORDER BY accountName ASC")
     fun getAll(year: String): Flow<List<OutstandingEntity>>
 
+    @Query("SELECT * FROM Outstanding WHERE yearString = :year ORDER BY accountName ASC")
+    suspend fun getAllSync(year: String): List<OutstandingEntity>
+
     @Query("SELECT * FROM Outstanding WHERE yearString = :year AND accountName LIKE '%' || :search || '%' ORDER BY accountName ASC")
     fun searchByName(year: String, search: String): Flow<List<OutstandingEntity>>
 
