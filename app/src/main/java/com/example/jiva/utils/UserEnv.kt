@@ -9,6 +9,7 @@ import android.content.Context
 object UserEnv {
     private const val PREF_NAME = "jiva_env_prefs"
     private const val KEY_USER_ID = "user_id"
+    private const val KEY_COMPANY_NAME = "company_name"
 
     fun setUserId(context: Context, userId: String) {
         context.applicationContext
@@ -29,6 +30,28 @@ object UserEnv {
             .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
             .edit()
             .remove(KEY_USER_ID)
+            .apply()
+    }
+
+    fun setCompanyName(context: Context, companyName: String) {
+        context.applicationContext
+            .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_COMPANY_NAME, companyName)
+            .apply()
+    }
+
+    fun getCompanyName(context: Context): String? {
+        return context.applicationContext
+            .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_COMPANY_NAME, null)
+    }
+
+    fun clearCompanyName(context: Context) {
+        context.applicationContext
+            .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .remove(KEY_COMPANY_NAME)
             .apply()
     }
 }

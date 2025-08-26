@@ -238,9 +238,21 @@ private fun ModernHeader(
     viewModel: HomeViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    // Dummy client name - in real app this would come from database
-    val clientName = "Tushar Elinje"
-    val businessType = "Agricultural Business"
+    val companyName = com.example.jiva.utils.UserEnv.getCompanyName(context) ?: ""
+    val clientName = if (companyName.isNotBlank()) companyName else ""
+    val businessType = ""
+
+    // Responsive sizing based on screen width
+    val configuration = LocalConfiguration.current
+    val widthDp = configuration.screenWidthDp
+    val isCompact = widthDp < 360
+    val isMedium = widthDp in 360..599
+    val logoSize = if (isCompact) 36.dp else if (isMedium) 44.dp else 56.dp
+    val titleSize = if (isCompact) 18.sp else if (isMedium) 22.sp else 26.sp
+    val subtitleSize = if (isCompact) 12.sp else if (isMedium) 14.sp else 16.sp
+    val iconSize = if (isCompact) 20.dp else if (isMedium) 24.dp else 28.dp
+    val horizontalPadding = if (isCompact) 12.dp else if (isMedium) 16.dp else 24.dp
+    val verticalPadding = if (isCompact) 10.dp else if (isMedium) 12.dp else 16.dp
     
     // Observe UI state for sync status
     val uiState by viewModel.uiState.collectAsState()
@@ -263,10 +275,10 @@ private fun ModernHeader(
                 )
             )
             .padding(
-                top = statusBarHeight + 8.dp,
-                start = 16.dp,
-                end = 16.dp,
-                bottom = 16.dp
+                top = statusBarHeight + (verticalPadding / 2),
+                start = horizontalPadding,
+                end = horizontalPadding,
+                bottom = verticalPadding
             )
     ) {
         Row(
@@ -282,23 +294,29 @@ private fun ModernHeader(
                 Image(
                     painter = painterResource(id = R.drawable.logo),
                     contentDescription = "Business Logo",
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier.size(logoSize)
                 )
 
                 Column {
                     Text(
                         text = clientName,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontSize = titleSize,
+                        fontWeight = FontWeight.SemiBold,
                         fontFamily = FontFamily.SansSerif,
-                        color = JivaColors.White
+                        color = JivaColors.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
-                    Text(
-                        text = businessType,
-                        fontSize = 14.sp,
-                        fontFamily = FontFamily.SansSerif,
-                        color = JivaColors.White.copy(alpha = 0.8f)
-                    )
+                    if (businessType.isNotBlank()) {
+                        Text(
+                            text = businessType,
+                            fontSize = subtitleSize,
+                            fontFamily = FontFamily.SansSerif,
+                            color = JivaColors.White.copy(alpha = 0.85f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
 
@@ -314,27 +332,27 @@ private fun ModernHeader(
                             JivaColors.White.copy(alpha = 0.2f),
                             CircleShape
                         )
+                        .size(iconSize + 12.dp)
                 ) {
                     if (uiState.isSyncing) {
-                        // Show loading indicator when syncing
                         CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
+                            modifier = Modifier.size(iconSize),
                             color = Color.White,
                             strokeWidth = 2.dp
                         )
                     } else if (uiState.syncSuccess) {
-                        // Show success icon briefly
                         Icon(
                             imageVector = Icons.Default.Check,
                             contentDescription = "Sync Successful",
-                            tint = JivaColors.White
+                            tint = JivaColors.White,
+                            modifier = Modifier.size(iconSize)
                         )
                     } else {
-                        // Show refresh icon
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = "Sync Data",
-                            tint = JivaColors.White
+                            tint = JivaColors.White,
+                            modifier = Modifier.size(iconSize)
                         )
                     }
                 }
@@ -342,21 +360,20 @@ private fun ModernHeader(
                 // Logout button
                 IconButton(
                     onClick = {
-                        // Clear saved credentials and logout
-                        AuthUtils.logout(context) {
-                            onLogout()
-                        }
+                        AuthUtils.logout(context) { onLogout() }
                     },
                     modifier = Modifier
                         .background(
                             JivaColors.White.copy(alpha = 0.2f),
                             CircleShape
                         )
+                        .size(iconSize + 12.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.ExitToApp,
                         contentDescription = "Logout",
-                        tint = JivaColors.White
+                        tint = JivaColors.White,
+                        modifier = Modifier.size(iconSize)
                     )
                 }
             }

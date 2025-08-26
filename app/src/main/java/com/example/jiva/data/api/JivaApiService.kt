@@ -4,6 +4,8 @@ import com.example.jiva.data.database.entities.*
 import com.example.jiva.data.api.models.SyncDataResponse
 import com.example.jiva.data.api.models.ApiLoginRequest
 import com.example.jiva.data.api.models.ApiLoginResponse
+import com.example.jiva.data.api.models.CompanyInfoRequest
+import com.example.jiva.data.api.models.CompanyInfoResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -94,6 +96,13 @@ interface JivaApiService {
      */
     @GET("api/priceScreen")
     suspend fun getPriceScreenData(): List<PriceDataEntity>
+
+    /**
+     * POST /api/JivaBusiness/CompanyInfo
+     */
+    @Headers("Content-Type: application/json")
+    @POST("api/JivaBusiness/CompanyInfo")
+    suspend fun getCompanyInfo(@Body request: CompanyInfoRequest): CompanyInfoResponse
     
     // Additional filtered endpoints for better performance
     

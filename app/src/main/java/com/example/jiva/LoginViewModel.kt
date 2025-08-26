@@ -135,6 +135,30 @@ class LoginViewModel(
                             viewModelScope.launch {
                                 saveCredentialsIfNeeded()
                             }
+
+                            // Fetch company info and store companyName
+                            viewModelScope.launch {
+                                try {
+                                    val uidStr = response.user?.id?.toString()
+                                    val uid = uidStr?.toIntOrNull()
+                                    if (uid != null) {
+                                        val api = com.example.jiva.data.network.RetrofitClient.jivaApiService
+                                        val companyRes = api.getCompanyInfo(
+                                            com.example.jiva.data.api.models.CompanyInfoRequest(userId = uid)
+                                        )
+                                        if (companyRes.isSuccess) {
+                                            val name = companyRes.data?.companyName?.takeIf { !it.isNullOrBlank() }
+                                            if (name != null) {
+                                                context?.let { ctx ->
+                                                    com.example.jiva.utils.UserEnv.setCompanyName(ctx, name)
+                                                }
+                                            }
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    Timber.w(e, "CompanyInfo fetch failed")
+                                }
+                            }
                         } else {
                             handleLoginFailure(response.message ?: "Login failed")
                         }
@@ -257,6 +281,30 @@ class LoginViewModel(
                             response.user?.let { u ->
                                 context?.let { ctx ->
                                     com.example.jiva.utils.UserEnv.setUserId(ctx, u.id.toString())
+                                }
+                            }
+
+                            // Fetch company info and store companyName
+                            viewModelScope.launch {
+                                try {
+                                    val uidStr = response.user?.id?.toString()
+                                    val uid = uidStr?.toIntOrNull()
+                                    if (uid != null) {
+                                        val api = com.example.jiva.data.network.RetrofitClient.jivaApiService
+                                        val companyRes = api.getCompanyInfo(
+                                            com.example.jiva.data.api.models.CompanyInfoRequest(userId = uid)
+                                        )
+                                        if (companyRes.isSuccess) {
+                                            val name = companyRes.data?.companyName?.takeIf { !it.isNullOrBlank() }
+                                            if (name != null) {
+                                                context?.let { ctx ->
+                                                    com.example.jiva.utils.UserEnv.setCompanyName(ctx, name)
+                                                }
+                                            }
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    Timber.w(e, "CompanyInfo fetch failed")
                                 }
                             }
 
