@@ -1,6 +1,7 @@
 package com.example.jiva.data.network
 
 import com.example.jiva.BuildConfig
+import com.example.jiva.data.api.JivaApiService
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -36,6 +37,6 @@ object RetrofitClient {
         .addConverterFactory(GsonConverterFactory.create())
         .build()
     
-    // Create API service
+    // Create API service (use the data.api.JivaApiService which returns models directly)
     val jivaApiService: JivaApiService = retrofit.create(JivaApiService::class.java)
 }

@@ -3,6 +3,8 @@ package com.example.jiva.utils
 import com.example.jiva.data.sync.DataSyncService
 import com.example.jiva.data.sync.SyncResult
 import com.example.jiva.data.sync.EntityType
+import com.example.jiva.data.sync.SyncAction
+import com.example.jiva.data.sync.SyncStatus
 import kotlinx.coroutines.*
 import timber.log.Timber
 
@@ -110,9 +112,11 @@ class SyncManager(
                 Timber.e(e, "Exception getting sync status")
                 withContext(Dispatchers.Main) {
                     onResult(SyncStatus(
-                        isRequired = false,
+                        lastSyncTimestamp = 0,
+                        isDataFresh = false,
                         canSync = false,
-                        message = "Error checking sync status: ${e.message}"
+                        recommendedAction = SyncAction.RETRY_LATER,
+                        error = "Error checking sync status: ${e.message}"
                     ))
                 }
             }
@@ -139,12 +143,7 @@ class SyncManager(
 /**
  * Simple sync status for UI components
  */
-data class SyncStatus(
-    val isRequired: Boolean,
-    val canSync: Boolean,
-    val message: String,
-    val lastSyncTime: Long = 0
-)
+
 
 /**
  * Extension functions for easy sync operations in UI components

@@ -16,29 +16,15 @@ class RemoteDataSource {
     /**
      * Generic function to make API calls with error handling
      */
-    private suspend fun <T> safeApiCall(apiCall: suspend () -> retrofit2.Response<T>): Result<T> {
+    private suspend fun <T> safeApiCall(apiCall: suspend () -> T): Result<T> {
         return try {
-            // Simulate API call for development - remove this in production
-            // This will make the app use dummy data without crashing
+            // Simulate API call failure for development. Comment this return to enable real calls.
             Timber.d("Simulating API call failure for development")
             return Result.failure(IOException("Server not available - using dummy data"))
             
-            /* Uncomment this for real API calls
-            val response = apiCall()
-            if (response.isSuccessful) {
-                val body = response.body()
-                if (body != null) {
-                    Result.success(body)
-                } else {
-                    Timber.e("API call successful but body is null")
-                    Result.failure(IOException("Empty response body"))
-                }
-            } else {
-                val errorMsg = response.errorBody()?.string() ?: "Unknown error"
-                Timber.e("API call failed with code ${response.code()}: $errorMsg")
-                Result.failure(IOException("API call failed: ${response.code()} - $errorMsg"))
-            }
-            */
+            // For real API calls, use:
+            // val body = apiCall()
+            // Result.success(body)
         } catch (e: Exception) {
             Timber.e(e, "Exception during API call: ${e.message}")
             Result.failure(IOException("Server not available - using dummy data", e))
@@ -104,14 +90,14 @@ class RemoteDataSource {
     /**
      * Get price screen data from API
      */
-    suspend fun getPriceScreenData(): Result<Map<String, Any>> {
+    suspend fun getPriceScreenData(): Result<List<PriceDataEntity>> {
         return safeApiCall { apiService.getPriceScreenData() }
     }
     
     /**
      * Get all data in a single call (for initial sync)
      */
-    suspend fun getAllData(): Result<Map<String, List<Any>>> {
-        return safeApiCall { apiService.getAllData() }
+    suspend fun syncAllData(): Result<SyncDataResponse> {
+        return safeApiCall { apiService.syncAllData() }
     }
 }

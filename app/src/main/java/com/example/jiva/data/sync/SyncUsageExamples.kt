@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.jiva.utils.SyncManager
 import com.example.jiva.utils.syncAllBusinessData
 import com.example.jiva.utils.syncCustomerData
+import com.example.jiva.utils.syncInventoryData
+import com.example.jiva.utils.syncTransactionData
 import kotlinx.coroutines.launch
 import timber.log.Timber
 

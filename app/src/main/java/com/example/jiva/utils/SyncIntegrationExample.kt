@@ -244,7 +244,8 @@ object SyncHelpers {
             }
         } else {
             syncManager.checkSyncStatus { status ->
-                if (status.isRequired) {
+                if (status.recommendedAction == com.example.jiva.data.sync.SyncAction.FULL_SYNC ||
+                    status.recommendedAction == com.example.jiva.data.sync.SyncAction.PARTIAL_SYNC) {
                     syncManager.syncAllBusinessData { result ->
                         onComplete(result.success)
                     }

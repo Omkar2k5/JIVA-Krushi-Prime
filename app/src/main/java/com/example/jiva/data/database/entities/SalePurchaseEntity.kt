@@ -23,6 +23,7 @@ data class SalePurchaseEntity(
     val cmpCode: Int,
     
     @ColumnInfo(name = "trDate")
+    @Contextual
     val trDate: Date,
     
     @ColumnInfo(name = "PartyName")
