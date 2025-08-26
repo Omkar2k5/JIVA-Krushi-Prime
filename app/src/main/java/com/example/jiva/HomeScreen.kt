@@ -288,7 +288,8 @@ private fun ModernHeader(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
             ) {
                 // App Logo
                 Image(
@@ -297,15 +298,17 @@ private fun ModernHeader(
                     modifier = Modifier.size(logoSize)
                 )
 
-                Column {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text(
                         text = clientName,
                         fontSize = titleSize,
                         fontWeight = FontWeight.SemiBold,
                         fontFamily = FontFamily.SansSerif,
                         color = JivaColors.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        maxLines = if (isCompact) 3 else 2,
+                        overflow = TextOverflow.Clip
                     )
                     if (businessType.isNotBlank()) {
                         Text(
