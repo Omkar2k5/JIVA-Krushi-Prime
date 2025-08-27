@@ -36,6 +36,9 @@ import com.example.jiva.components.ResponsiveReportHeader
 import com.example.jiva.viewmodel.StockReportViewModel
 import kotlinx.coroutines.launch
 import com.example.jiva.utils.PDFGenerator
+import com.example.jiva.utils.LowEndDeviceOptimizer
+import com.example.jiva.ui.components.MemoryEfficientStockTable
+import com.example.jiva.ui.components.EmergencyStockTable
 
 // Data model for Stock Report entries - All String for faster retrieval
 data class StockEntry(
@@ -82,8 +85,22 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     var loadingMessage by remember { mutableStateOf("") }
     var dataLoadingProgress by remember { mutableStateOf(0f) }
 
-    // Low-end device optimization
-    val optimalSettings = remember { com.example.jiva.utils.LowEndDeviceOptimizer.getOptimalSettings() }
+    // Low-end device optimization with error handling
+    val optimalSettings = remember {
+        try {
+            LowEndDeviceOptimizer.getOptimalSettings()
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error getting optimal settings")
+            LowEndDeviceOptimizer.OptimalSettings(
+                pageSize = 25,
+                maxVisibleItems = 50,
+                filterChunkSize = 15,
+                enableVirtualScrolling = true,
+                enableProgressiveLoading = true,
+                message = "Default settings applied due to error"
+            )
+        }
+    }
     var isEmergencyMode by remember { mutableStateOf(false) }
 
     // Input state management (for UI inputs)
@@ -150,28 +167,44 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     // Re-read userId after potential initialization
     val finalUserId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
-    // Optimized data loading - only from Room DB for better performance
-    val stockEntities by viewModel.observeStock(year).collectAsState(initial = emptyList())
+    // Optimized data loading with error handling
+    val stockEntities by try {
+        viewModel.observeStock(year).collectAsState(initial = emptyList())
+    } catch (e: Exception) {
+        timber.log.Timber.e(e, "Error observing stock data")
+        remember { mutableStateOf(emptyList()) }
+    }
 
-    // High-performance data mapping - direct string mapping for fastest performance
+    // High-performance data mapping with null safety
     val allStockEntries = remember(stockEntities) {
         try {
-            stockEntities.map { entity ->
-                StockEntry(
-                    itemId = entity.itemId,
-                    itemName = entity.itemName,
-                    openingStock = entity.opening,
-                    inQty = entity.inWard,
-                    outQty = entity.outWard,
-                    closingStock = entity.closingStock,
-                    avgRate = entity.avgRate,
-                    valuation = entity.valuation,
-                    itemType = entity.itemType,
-                    companyName = entity.company,
-                    cgst = entity.cgst,
-                    sgst = entity.sgst,
-                    igst = entity.igst
-                )
+            if (stockEntities.isEmpty()) {
+                timber.log.Timber.d("No stock entities found for year: $year")
+                emptyList()
+            } else {
+                timber.log.Timber.d("Mapping ${stockEntities.size} stock entities")
+                stockEntities.mapNotNull { entity ->
+                    try {
+                        StockEntry(
+                            itemId = entity.itemId ?: "",
+                            itemName = entity.itemName ?: "",
+                            openingStock = entity.opening ?: "",
+                            inQty = entity.inWard ?: "",
+                            outQty = entity.outWard ?: "",
+                            closingStock = entity.closingStock ?: "",
+                            avgRate = entity.avgRate ?: "",
+                            valuation = entity.valuation ?: "",
+                            itemType = entity.itemType ?: "",
+                            companyName = entity.company ?: "",
+                            cgst = entity.cgst ?: "",
+                            sgst = entity.sgst ?: "",
+                            igst = entity.igst ?: ""
+                        )
+                    } catch (e: Exception) {
+                        timber.log.Timber.e(e, "Error mapping entity: ${entity.itemId}")
+                        null
+                    }
+                }
             }
         } catch (e: Exception) {
             timber.log.Timber.e(e, "Error mapping stock entities")
@@ -228,12 +261,28 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
         }
     }
 
-    // Use paginated data for memory efficiency
-    val paginatedData = com.example.jiva.utils.LowEndDeviceOptimizer.rememberPaginatedData(
-        allData = allStockEntries,
-        pageSize = optimalSettings.pageSize,
-        filterPredicate = filterPredicate
-    )
+    // Use paginated data for memory efficiency with error handling
+    val paginatedData = try {
+        LowEndDeviceOptimizer.rememberPaginatedData(
+            allData = allStockEntries,
+            pageSize = optimalSettings.pageSize,
+            filterPredicate = filterPredicate
+        )
+    } catch (e: Exception) {
+        timber.log.Timber.e(e, "Error creating paginated data")
+        remember {
+            LowEndDeviceOptimizer.PaginatedDataState(
+                currentPage = 0,
+                pageSize = 25,
+                totalItems = 0,
+                visibleItems = emptyList(),
+                isLoading = false,
+                hasMorePages = false,
+                filterProgress = 100f,
+                filterMessage = "Error loading data"
+            )
+        }
+    }
 
     // Handle select all functionality
     LaunchedEffect(selectAll, paginatedData.visibleItems) {
@@ -351,7 +400,7 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
         )
 
         // High-performance loading screen with progress and device optimization info
-        if (isScreenLoading || allStockEntries.isEmpty()) {
+        if (isScreenLoading) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -404,6 +453,50 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                             )
                         }
                     }
+                }
+            }
+        } else if (allStockEntries.isEmpty()) {
+            // Empty data fallback
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = "No Data",
+                    modifier = Modifier.size(64.dp),
+                    tint = JivaColors.Orange
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "No Stock Data Available",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = JivaColors.DeepBlue
+                )
+                Text(
+                    text = "No stock data found for year $year",
+                    fontSize = 14.sp,
+                    color = JivaColors.DarkGray,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = {
+                        isScreenLoading = true
+                        // Trigger data refresh
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = JivaColors.DeepBlue)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Refresh"
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Refresh Data")
                 }
             }
         } else {
@@ -825,30 +918,61 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                         // Horizontally scrollable table
                         val tableScrollState = rememberScrollState()
 
-                        // Memory-efficient table based on device capabilities
-                        if (isEmergencyMode) {
-                            // Emergency mode for extremely low memory situations
-                            com.example.jiva.ui.components.EmergencyStockTable(
-                                entries = paginatedData.visibleItems,
-                                maxItems = 20
-                            )
-                        } else {
-                            // Memory-efficient paginated table
-                            com.example.jiva.ui.components.MemoryEfficientStockTable(
-                                paginatedData = paginatedData,
-                                onLoadMore = {
-                                    scope.launch {
-                                        try {
-                                            // Load more data in background
-                                            // This will be handled by the paginated data state
-                                            com.example.jiva.utils.LowEndDeviceOptimizer.optimizeForLowEndDevice()
-                                        } catch (e: Exception) {
-                                            timber.log.Timber.e(e, "Error loading more data")
+                        // Memory-efficient table based on device capabilities with error handling
+                        try {
+                            if (isEmergencyMode || paginatedData.totalItems == 0) {
+                                // Emergency mode for extremely low memory situations
+                                EmergencyStockTable(
+                                    entries = paginatedData.visibleItems,
+                                    maxItems = 20
+                                )
+                            } else {
+                                // Memory-efficient paginated table
+                                MemoryEfficientStockTable(
+                                    paginatedData = paginatedData,
+                                    onLoadMore = {
+                                        scope.launch {
+                                            try {
+                                                // Load more data in background
+                                                LowEndDeviceOptimizer.optimizeForLowEndDevice()
+                                            } catch (e: Exception) {
+                                                timber.log.Timber.e(e, "Error loading more data")
+                                            }
                                         }
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        } catch (e: Exception) {
+                            timber.log.Timber.e(e, "Error rendering table")
+                            // Fallback to simple text display
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = JivaColors.Orange.copy(alpha = 0.1f))
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Error,
+                                        contentDescription = "Error",
+                                        tint = JivaColors.Orange
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Error displaying table",
+                                        fontSize = 14.sp,
+                                        color = JivaColors.Orange,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "Please try refreshing the data",
+                                        fontSize = 12.sp,
+                                        color = JivaColors.DarkGray
+                                    )
+                                }
+                            }
                         }
                     }
                 }
