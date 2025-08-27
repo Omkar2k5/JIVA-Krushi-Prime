@@ -37,21 +37,21 @@ import com.example.jiva.viewmodel.StockReportViewModel
 import kotlinx.coroutines.launch
 import com.example.jiva.utils.PDFGenerator
 
-// Data model for Stock Report entries
+// Data model for Stock Report entries - All String for faster retrieval
 data class StockEntry(
     val itemId: String,
     val itemName: String,
-    val openingStock: Double,
-    val inQty: Double,
-    val outQty: Double,
-    val closingStock: Double,
-    val avgRate: Double,
-    val valuation: Double,
+    val openingStock: String,
+    val inQty: String,
+    val outQty: String,
+    val closingStock: String,
+    val avgRate: String,
+    val valuation: String,
     val itemType: String,
     val companyName: String,
-    val cgst: Double,
-    val sgst: Double,
-    val igst: Double // Added IGST field
+    val cgst: String,
+    val sgst: String,
+    val igst: String // Added IGST field
 )
 
 @Composable
@@ -102,14 +102,13 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
     val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
-    // Initialize test environment and load permanent data
+    // Initialize test environment only
     LaunchedEffect(Unit) {
         if (userId == null) {
             com.example.jiva.utils.OutstandingDebugHelper.initializeTestEnvironment(context)
         }
-
-        // Load data from permanent storage on startup
-        viewModel.loadFromPermanentStorage(context, year)
+        // Note: Data loading is now handled automatically by AppDataLoader at app startup
+        // No manual loading needed here - data is already available
     }
 
     // Re-read userId after potential initialization
@@ -118,24 +117,24 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     // Optimized data loading - only from Room DB for better performance
     val stockEntities by viewModel.observeStock(year).collectAsState(initial = emptyList())
 
-    // Use only Stock DB data for better performance and stability
+    // Use only Stock DB data - Direct string mapping for fastest performance
     val allStockEntries = remember(stockEntities) {
         try {
-            stockEntities.map {
+            stockEntities.map { entity ->
                 StockEntry(
-                    itemId = it.itemId.toString(),
-                    itemName = it.itemName,
-                    openingStock = it.opening.toDouble(),
-                    inQty = it.inWard.toDouble(),
-                    outQty = it.outWard.toDouble(),
-                    closingStock = it.closingStock.toDouble(),
-                    avgRate = it.avgRate.toDouble(),
-                    valuation = it.valuation.toDouble(),
-                    itemType = it.itemType ?: "",
-                    companyName = it.company ?: "",
-                    cgst = it.cgst.toDouble(),
-                    sgst = it.sgst.toDouble(),
-                    igst = it.igst.toDouble()
+                    itemId = entity.itemId,
+                    itemName = entity.itemName,
+                    openingStock = entity.opening,
+                    inQty = entity.inWard,
+                    outQty = entity.outWard,
+                    closingStock = entity.closingStock,
+                    avgRate = entity.avgRate,
+                    valuation = entity.valuation,
+                    itemType = entity.itemType,
+                    companyName = entity.company,
+                    cgst = entity.cgst,
+                    sgst = entity.sgst,
+                    igst = entity.igst
                 )
             }
         } catch (e: Exception) {
@@ -186,12 +185,29 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
         selectAll = filteredEntries.isNotEmpty() && selectedEntries.containsAll(filteredEntries.map { it.itemId })
     }
 
-    // Calculate totals
-    val totalOpeningStock = filteredEntries.sumOf { it.openingStock }
-    val totalInQty = filteredEntries.sumOf { it.inQty }
-    val totalOutQty = filteredEntries.sumOf { it.outQty }
-    val totalClosingStock = filteredEntries.sumOf { it.closingStock }
-    val totalValuation = filteredEntries.sumOf { it.valuation }
+    // Calculate totals from string values
+    val totalOpeningStock = remember(filteredEntries) {
+        filteredEntries.sumOf { it.openingStock.toDoubleOrNull() ?: 0.0 }
+    }
+    val totalInQty = remember(filteredEntries) {
+        filteredEntries.sumOf { it.inQty.toDoubleOrNull() ?: 0.0 }
+    }
+    val totalOutQty = remember(filteredEntries) {
+        filteredEntries.sumOf { it.outQty.toDoubleOrNull() ?: 0.0 }
+    }
+    val totalClosingStock = remember(filteredEntries) {
+        filteredEntries.sumOf { it.closingStock.toDoubleOrNull() ?: 0.0 }
+    }
+    val totalValuation = remember(filteredEntries) {
+        filteredEntries.sumOf {
+            val cleanValuation = it.valuation
+                .replace("₹", "")
+                .replace(",", "")
+                .replace(" ", "")
+                .trim()
+            cleanValuation.toDoubleOrNull() ?: 0.0
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -707,12 +723,12 @@ private fun StockTableRow(entry: StockEntry) {
         ) {
             StockCell(entry.itemId, Modifier.width(80.dp))
             StockCell(entry.itemName, Modifier.width(150.dp))
-            StockCell("${entry.openingStock.toInt()}", Modifier.width(80.dp))
-            StockCell("${entry.inQty.toInt()}", Modifier.width(80.dp))
-            StockCell("${entry.outQty.toInt()}", Modifier.width(80.dp))
-            StockCell("${entry.closingStock.toInt()}", Modifier.width(80.dp))
-            StockCell("₹${String.format("%.2f", entry.avgRate)}", Modifier.width(80.dp))
-            StockCell("₹${String.format("%.2f", entry.valuation)}", Modifier.width(100.dp))
+            StockCell(entry.openingStock, Modifier.width(80.dp))
+            StockCell(entry.inQty, Modifier.width(80.dp))
+            StockCell(entry.outQty, Modifier.width(80.dp))
+            StockCell(entry.closingStock, Modifier.width(80.dp))
+            StockCell("₹${entry.avgRate}", Modifier.width(80.dp))
+            StockCell("₹${entry.valuation}", Modifier.width(100.dp))
             StockCell(entry.itemType, Modifier.width(80.dp))
             StockCell(entry.companyName, Modifier.width(100.dp))
             StockCell("${entry.cgst}%", Modifier.width(60.dp))

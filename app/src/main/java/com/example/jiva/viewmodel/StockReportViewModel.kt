@@ -24,7 +24,7 @@ class StockReportViewModel(
         val stockEntries: List<StockEntry> = emptyList()
     )
 
-    // Legacy data model for compatibility
+    // Data model for Stock entries - All strings for optimal performance
     data class StockEntry(
         val itemId: String,
         val itemName: String,
@@ -86,31 +86,9 @@ class StockReportViewModel(
         }
     }
     
-    // Load data from permanent storage only (for UI display)
-    fun loadFromPermanentStorage(context: android.content.Context, year: String) {
-        viewModelScope.launch {
-            try {
-                Timber.d("📁 Loading Stock data from permanent storage for year: $year")
-                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-
-                val permanentData = com.example.jiva.utils.ApiDataManager.loadStockDataForUI(context, year)
-                if (permanentData.isNotEmpty()) {
-                    Timber.d("✅ Found ${permanentData.size} entries in permanent storage")
-                    // Update Room DB for reactive UI
-                    database.stockDao().clearYear(year)
-                    database.stockDao().insertAll(permanentData)
-
-                    _uiState.value = _uiState.value.copy(isLoading = false, error = null)
-                } else {
-                    Timber.d("📁 No permanent data found, showing empty until refresh")
-                    _uiState.value = _uiState.value.copy(isLoading = false, error = null)
-                }
-            } catch (e: Exception) {
-                Timber.e(e, "❌ Failed to load from permanent storage")
-                _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
-            }
-        }
-    }
+    // Note: Data loading is now handled automatically by AppDataLoader
+    // This ViewModel only handles refresh (API calls) and observes Room DB
+    // No manual loading needed - data is automatically available from app startup
 
     // Factory for creating ViewModel with database dependency
     class Factory(private val database: JivaDatabase) : androidx.lifecycle.ViewModelProvider.Factory {

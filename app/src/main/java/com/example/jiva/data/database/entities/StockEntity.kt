@@ -3,9 +3,7 @@ package com.example.jiva.data.database.entities
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
-import java.math.BigDecimal
 
 /**
  * Room entity for tb_stock table
@@ -19,56 +17,47 @@ data class StockEntity(
     val srNo: Int = 0,
     
     @ColumnInfo(name = "CmpCode")
-    val cmpCode: Int,
-    
+    val cmpCode: String,
+
     @ColumnInfo(name = "ITEM_ID")
-    val itemId: Int,
+    val itemId: String,
     
     @ColumnInfo(name = "Item_Name")
     val itemName: String,
     
     @ColumnInfo(name = "Opening")
-    @Contextual
-    val opening: BigDecimal = BigDecimal.ZERO,
-    
+    val opening: String = "0.000",
+
     @ColumnInfo(name = "InWard")
-    @Contextual
-    val inWard: BigDecimal = BigDecimal.ZERO,
-    
+    val inWard: String = "0.000",
+
     @ColumnInfo(name = "OutWard")
-    @Contextual
-    val outWard: BigDecimal = BigDecimal.ZERO,
-    
+    val outWard: String = "0.000",
+
     @ColumnInfo(name = "Closing_Stock")
-    @Contextual
-    val closingStock: BigDecimal = BigDecimal.ZERO,
-    
+    val closingStock: String = "0.000",
+
     @ColumnInfo(name = "AvgRate")
-    @Contextual
-    val avgRate: BigDecimal = BigDecimal.ZERO,
-    
+    val avgRate: String = "0.00",
+
     @ColumnInfo(name = "Valuation")
-    @Contextual
-    val valuation: BigDecimal = BigDecimal.ZERO,
+    val valuation: String = "0.00",
     
     @ColumnInfo(name = "ItemType")
-    val itemType: String? = null,
-    
+    val itemType: String = "",
+
     @ColumnInfo(name = "Company")
-    val company: String? = null,
-    
+    val company: String = "",
+
     @ColumnInfo(name = "cgst")
-    @Contextual
-    val cgst: BigDecimal = BigDecimal.ZERO,
-    
+    val cgst: String = "0.00",
+
     @ColumnInfo(name = "sgst")
-    @Contextual
-    val sgst: BigDecimal = BigDecimal.ZERO,
-    
+    val sgst: String = "0.00",
+
     @ColumnInfo(name = "igst")
-    @Contextual
-    val igst: BigDecimal = BigDecimal.ZERO,
-    
+    val igst: String = "0.00",
+
     @ColumnInfo(name = "YearString")
-    val yearString: String? = null
+    val yearString: String = ""
 )

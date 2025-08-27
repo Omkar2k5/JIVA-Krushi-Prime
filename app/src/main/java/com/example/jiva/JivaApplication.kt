@@ -58,6 +58,9 @@ class JivaApplication : MultiDexApplication() {
         // Initialize database with dummy data
         initializeDatabase()
 
+        // Load all data from permanent storage to Room DB
+        loadAllDataFromPermanentStorage()
+
         Timber.d("JIVA Application started successfully")
 
         // Log basic device information
@@ -75,6 +78,41 @@ class JivaApplication : MultiDexApplication() {
                 Timber.d("Database populated successfully")
             } catch (e: Exception) {
                 Timber.e(e, "Error populating database with dummy data")
+            }
+        }
+    }
+
+    /**
+     * Load all data from permanent storage to Room DB at app startup
+     * This ensures all screens have data available immediately
+     */
+    private fun loadAllDataFromPermanentStorage() {
+        applicationScope.launch {
+            try {
+                Timber.d("🚀 APP STARTUP: Loading all data from permanent storage")
+
+                val year = com.example.jiva.utils.UserEnv.getFinancialYear(this@JivaApplication) ?: "2025-26"
+                val summary = com.example.jiva.utils.AppDataLoader.loadAllDataFromPermanentStorage(
+                    context = this@JivaApplication,
+                    database = database,
+                    year = year
+                )
+
+                Timber.d("✅ App startup data loading completed: ${summary.overallMessage}")
+
+                // Log summary for debugging
+                if (summary.loadedScreens.isNotEmpty()) {
+                    Timber.d("📊 Loaded screens: ${summary.loadedScreens.joinToString(", ")}")
+                }
+                if (summary.emptyScreens.isNotEmpty()) {
+                    Timber.d("📁 Empty screens: ${summary.emptyScreens.joinToString(", ")}")
+                }
+                if (summary.errorScreens.isNotEmpty()) {
+                    Timber.e("❌ Error screens: ${summary.errorScreens.joinToString(", ")}")
+                }
+
+            } catch (e: Exception) {
+                Timber.e(e, "❌ Critical error during app startup data loading")
             }
         }
     }

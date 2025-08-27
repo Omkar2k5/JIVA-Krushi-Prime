@@ -484,23 +484,23 @@ class JivaRepositoryImpl(
                     val items = body.data.orEmpty()
                     Timber.d("Processing ${items.size} stock items")
 
-                    // Map API model -> Room entity
+                    // Map API model -> Room entity (direct string mapping for performance)
                     val entities = items.map {
                         StockEntity(
-                            cmpCode = it.cmpCode.toIntOrNull() ?: 0,
-                            itemId = it.itemId.toIntOrNull() ?: 0,
+                            cmpCode = it.cmpCode,
+                            itemId = it.itemId,
                             itemName = it.itemName,
-                            opening = it.opening.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO,
-                            inWard = it.inWard.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO,
-                            outWard = it.outWard.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO,
-                            closingStock = it.closingStock.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO,
-                            avgRate = it.avgRate.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO,
-                            valuation = it.valuation.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO,
+                            opening = it.opening,
+                            inWard = it.inWard,
+                            outWard = it.outWard,
+                            closingStock = it.closingStock,
+                            avgRate = it.avgRate,
+                            valuation = it.valuation,
                             itemType = it.itemType,
                             company = it.company,
-                            cgst = it.cgst.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO,
-                            sgst = it.sgst.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO,
-                            igst = it.igst.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO,
+                            cgst = it.cgst,
+                            sgst = it.sgst,
+                            igst = it.igst,
                             yearString = it.yearString
                         )
                     }

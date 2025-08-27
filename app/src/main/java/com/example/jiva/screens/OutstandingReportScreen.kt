@@ -104,14 +104,13 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
     val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
-    // Initialize test environment and load permanent data
+    // Initialize test environment only
     LaunchedEffect(Unit) {
         if (userId == null) {
             com.example.jiva.utils.OutstandingDebugHelper.initializeTestEnvironment(context)
         }
-
-        // Load data from permanent storage on startup
-        viewModel.loadFromPermanentStorage(context, year)
+        // Note: Data loading is now handled automatically by AppDataLoader at app startup
+        // No manual loading needed here - data is already available
     }
 
     // Re-read userId after potential initialization
