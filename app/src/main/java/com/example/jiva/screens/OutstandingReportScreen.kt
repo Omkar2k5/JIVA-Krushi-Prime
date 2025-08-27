@@ -81,7 +81,11 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
     
     // Observe UI state
     val uiState by viewModel.uiState.collectAsState()
-    
+
+    // Local loading states for better UX
+    var isScreenLoading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
+
     // State management
     var outstandingOf by remember { mutableStateOf("Customer") }
     var viewAll by remember { mutableStateOf(false) }
@@ -104,8 +108,14 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
     val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
-    // Note: Removed test environment initialization to prevent conflicts
-    // Data loading is now handled automatically by AppDataLoader at app startup
+    // Handle initial screen loading
+    LaunchedEffect(Unit) {
+        // Simulate initial loading time for smooth UX
+        kotlinx.coroutines.delay(500)
+        isScreenLoading = false
+    }
+
+    // Note: Data loading is now handled automatically by AppDataLoader at app startup
     // No manual loading needed here - data is already available
 
     // Re-read userId after potential initialization
@@ -214,22 +224,22 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                 IconButton(
                     onClick = {
                         if (finalUserId != null) {
-                            isLoading = true
+                            isRefreshing = true
                             scope.launch {
                                 viewModel.refreshOutstandingData(finalUserId, year, context)
                                 kotlinx.coroutines.delay(1000) // Show loading for at least 1 second
-                                isLoading = false
+                                isRefreshing = false
                             }
                         }
                     },
-                    enabled = finalUserId != null && !isLoading,
+                    enabled = finalUserId != null && !isRefreshing,
                     modifier = Modifier
                         .background(
                             JivaColors.White.copy(alpha = 0.2f),
                             RoundedCornerShape(8.dp)
                         )
                 ) {
-                    if (isLoading) {
+                    if (isRefreshing) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
                             color = JivaColors.White,
@@ -246,13 +256,37 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
             }
         )
 
-        // Main content with performance optimizations
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            userScrollEnabled = true
-        ) {
+        // Show loading screen overlay during initial load
+        if (isScreenLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(48.dp),
+                        color = JivaColors.DeepBlue,
+                        strokeWidth = 4.dp
+                    )
+                    Text(
+                        text = "Loading Outstanding Report...",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = JivaColors.DeepBlue
+                    )
+                }
+            }
+        } else {
+            // Main content with performance optimizations
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                userScrollEnabled = true
+            ) {
             // Control Panel Card
             item {
                 Card(
@@ -619,6 +653,7 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                 }
             }
         }
+        } // Close the else block for loading screen
     }
 }
 

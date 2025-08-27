@@ -471,10 +471,10 @@ class JivaRepositoryImpl(
 
     override suspend fun syncStock(userId: Int, yearString: String): Result<Unit> {
         return try {
-            Timber.d("Starting Stock API call for userId: $userId, yearString: $yearString")
+            Timber.d("🚀 Starting Stock API call for userId: $userId, yearString: $yearString")
             val apiResult = remoteDataSource.getStock(userId, yearString)
 
-            Timber.d("API call completed. Success: ${apiResult.isSuccess}")
+            Timber.d("📡 Stock API call completed. Success: ${apiResult.isSuccess}")
 
             if (apiResult.isSuccess) {
                 val body = apiResult.getOrNull()
@@ -482,7 +482,7 @@ class JivaRepositoryImpl(
 
                 if (body?.isSuccess == true) {
                     val items = body.data.orEmpty()
-                    Timber.d("Processing ${items.size} stock items")
+                    Timber.d("📦 Processing ${items.size} stock items from API")
 
                     // Map API model -> Room entity (direct string mapping for performance)
                     val entities = items.map {
@@ -515,7 +515,7 @@ class JivaRepositoryImpl(
                         index = end
                     }
 
-                    Timber.d("Successfully inserted ${entities.size} stock rows for $yearString")
+                    Timber.d("✅ Successfully inserted ${entities.size} stock rows for $yearString")
                     Result.success(Unit)
                 } else {
                     val errorMsg = "API returned isSuccess=false: ${body?.message}"
