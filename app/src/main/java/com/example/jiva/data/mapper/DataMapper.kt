@@ -29,22 +29,22 @@ object DataMapper {
         )
     }
     
-    // Convert StockEntity to StockEntry for Stock Report Screen
+    // Convert StockEntity to StockEntry for Stock Report Screen (all strings)
     fun StockEntity.toStockEntry(): StockEntry {
         return StockEntry(
-            itemId = this.itemId.toString(),
+            itemId = this.itemId,
             itemName = this.itemName,
-            openingStock = this.opening.toDouble(),
-            inQty = this.inWard.toDouble(),
-            outQty = this.outWard.toDouble(),
-            closingStock = this.closingStock.toDouble(),
-            avgRate = this.avgRate.toDouble(),
-            valuation = this.valuation.toDouble(),
-            itemType = this.itemType ?: "",
-            companyName = this.company ?: "",
-            cgst = this.cgst.toDouble(),
-            sgst = this.sgst.toDouble(),
-            igst = this.igst.toDouble()
+            openingStock = this.opening,
+            inQty = this.inWard,
+            outQty = this.outWard,
+            closingStock = this.closingStock,
+            avgRate = this.avgRate,
+            valuation = this.valuation,
+            itemType = this.itemType,
+            companyName = this.company,
+            cgst = this.cgst,
+            sgst = this.sgst,
+            igst = this.igst
         )
     }
     
@@ -131,7 +131,4 @@ object DataMapper {
             date = dateString
         )
     }
-    
-    // Helper extension functions
-    private fun BigDecimal.toDouble(): Double = this.toDouble()
 }

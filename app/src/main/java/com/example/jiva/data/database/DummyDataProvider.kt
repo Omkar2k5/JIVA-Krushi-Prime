@@ -139,39 +139,39 @@ object DummyDataProvider {
     fun getDummyStocks(): List<StockEntity> {
         return listOf(
             StockEntity(
-                srNo = 1, cmpCode = 1, itemId = 1, itemName = "Rogar 100ml",
-                opening = BigDecimal("50.000"), inWard = BigDecimal("20.000"), outWard = BigDecimal("15.000"),
-                closingStock = BigDecimal("55.000"), avgRate = BigDecimal("125.50"), valuation = BigDecimal("6902.50"),
-                itemType = "General", company = "Bayer Corp", cgst = BigDecimal("9.00"), sgst = BigDecimal("9.00"),
-                igst = BigDecimal("0.00"), yearString = "2024-25"
+                srNo = 1, cmpCode = "1", itemId = "1", itemName = "Rogar 100ml",
+                opening = "50.000", inWard = "20.000", outWard = "15.000",
+                closingStock = "55.000", avgRate = "125.50", valuation = "6902.50",
+                itemType = "General", company = "Bayer Corp", cgst = "9.00", sgst = "9.00",
+                igst = "0.00", yearString = "2024-25"
             ),
             StockEntity(
-                srNo = 2, cmpCode = 1, itemId = 2, itemName = "Roundup Herbicide",
-                opening = BigDecimal("30.000"), inWard = BigDecimal("10.000"), outWard = BigDecimal("8.000"),
-                closingStock = BigDecimal("32.000"), avgRate = BigDecimal("450.00"), valuation = BigDecimal("14400.00"),
-                itemType = "Pesticides", company = "Monsanto", cgst = BigDecimal("18.00"), sgst = BigDecimal("18.00"),
-                igst = BigDecimal("0.00"), yearString = "2024-25"
+                srNo = 2, cmpCode = "1", itemId = "2", itemName = "Roundup Herbicide",
+                opening = "30.000", inWard = "10.000", outWard = "8.000",
+                closingStock = "32.000", avgRate = "450.00", valuation = "14400.00",
+                itemType = "Pesticides", company = "Monsanto", cgst = "18.00", sgst = "18.00",
+                igst = "0.00", yearString = "2024-25"
             ),
             StockEntity(
-                srNo = 3, cmpCode = 1, itemId = 3, itemName = "NPK Fertilizer",
-                opening = BigDecimal("100.000"), inWard = BigDecimal("50.000"), outWard = BigDecimal("40.000"),
-                closingStock = BigDecimal("110.000"), avgRate = BigDecimal("85.75"), valuation = BigDecimal("9432.50"),
-                itemType = "Fertilizers", company = "IFFCO", cgst = BigDecimal("5.00"), sgst = BigDecimal("5.00"),
-                igst = BigDecimal("0.00"), yearString = "2024-25"
+                srNo = 3, cmpCode = "1", itemId = "3", itemName = "NPK Fertilizer",
+                opening = "100.000", inWard = "50.000", outWard = "40.000",
+                closingStock = "110.000", avgRate = "85.75", valuation = "9432.50",
+                itemType = "Fertilizers", company = "IFFCO", cgst = "5.00", sgst = "5.00",
+                igst = "0.00", yearString = "2024-25"
             ),
             StockEntity(
-                srNo = 4, cmpCode = 1, itemId = 4, itemName = "Growth Booster",
-                opening = BigDecimal("25.000"), inWard = BigDecimal("15.000"), outWard = BigDecimal("10.000"),
-                closingStock = BigDecimal("30.000"), avgRate = BigDecimal("275.00"), valuation = BigDecimal("8250.00"),
-                itemType = "PGR", company = "UPL Limited", cgst = BigDecimal("12.00"), sgst = BigDecimal("12.00"),
-                igst = BigDecimal("0.00"), yearString = "2024-25"
+                srNo = 4, cmpCode = "1", itemId = "4", itemName = "Growth Booster",
+                opening = "25.000", inWard = "15.000", outWard = "10.000",
+                closingStock = "30.000", avgRate = "275.00", valuation = "8250.00",
+                itemType = "PGR", company = "UPL Limited", cgst = "12.00", sgst = "12.00",
+                igst = "0.00", yearString = "2024-25"
             ),
             StockEntity(
-                srNo = 5, cmpCode = 1, itemId = 5, itemName = "Hybrid Tomato Seeds",
-                opening = BigDecimal("200.000"), inWard = BigDecimal("100.000"), outWard = BigDecimal("80.000"),
-                closingStock = BigDecimal("220.000"), avgRate = BigDecimal("15.50"), valuation = BigDecimal("3410.00"),
-                itemType = "Seeds", company = "Mahyco", cgst = BigDecimal("5.00"), sgst = BigDecimal("5.00"),
-                igst = BigDecimal("0.00"), yearString = "2024-25"
+                srNo = 5, cmpCode = "1", itemId = "5", itemName = "Hybrid Tomato Seeds",
+                opening = "200.000", inWard = "100.000", outWard = "80.000",
+                closingStock = "220.000", avgRate = "15.50", valuation = "3410.00",
+                itemType = "Seeds", company = "Mahyco", cgst = "5.00", sgst = "5.00",
+                igst = "0.00", yearString = "2024-25"
             )
         )
     }
