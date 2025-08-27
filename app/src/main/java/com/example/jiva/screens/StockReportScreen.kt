@@ -102,14 +102,14 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
     val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
-    // Initialize test environment and load local data
+    // Initialize test environment and load permanent data
     LaunchedEffect(Unit) {
         if (userId == null) {
             com.example.jiva.utils.OutstandingDebugHelper.initializeTestEnvironment(context)
         }
 
-        // Load data from local storage on startup for faster loading
-        viewModel.loadFromLocalStorage(context, year)
+        // Load data from permanent storage on startup
+        viewModel.loadFromPermanentStorage(context, year)
     }
 
     // Re-read userId after potential initialization
@@ -209,7 +209,7 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                         if (finalUserId != null) {
                             isLoading = true
                             scope.launch {
-                                viewModel.syncStock(finalUserId, year, context)
+                                viewModel.refreshStockData(finalUserId, year, context)
                                 kotlinx.coroutines.delay(1000) // Show loading for at least 1 second
                                 isLoading = false
                             }

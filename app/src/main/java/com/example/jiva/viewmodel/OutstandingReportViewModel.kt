@@ -35,65 +35,58 @@ class OutstandingReportViewModel(
         return repository.getOutstandingFlow(year)
     }
 
-    // Trigger Outstanding sync with explicit params and local storage
-    fun syncOutstanding(userId: Int, year: String, context: android.content.Context) {
+    // Refresh Outstanding data - API call → Permanent Storage
+    fun refreshOutstandingData(userId: Int, year: String, context: android.content.Context) {
         viewModelScope.launch {
             try {
-                Timber.d("Starting Outstanding sync for userId: $userId, year: $year")
+                Timber.d("🔄 Starting Outstanding refresh for userId: $userId, year: $year")
                 _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-                // First, try to load from local storage
-                val localData = com.example.jiva.utils.LocalDataStorage.loadOutstandingData(context, year)
-                if (localData.isNotEmpty()) {
-                    Timber.d("Loading ${localData.size} entries from local storage")
-                    // Update Room DB with local data
-                    database.outstandingDao().clearYear(year)
-                    database.outstandingDao().insertAll(localData)
-                }
+                // Use ApiDataManager to handle API → Permanent Storage
+                val result = com.example.jiva.utils.ApiDataManager.refreshOutstandingData(
+                    context = context,
+                    repository = repository,
+                    database = database,
+                    userId = userId,
+                    year = year
+                )
 
-                // Then sync from API and update local storage
-                val result = repository.syncOutstanding(userId, year)
                 if (result.isSuccess) {
-                    Timber.d("Outstanding sync completed successfully")
-
-                    // Save updated data to local storage
-                    val updatedData = database.outstandingDao().getAllSync(year)
-                    com.example.jiva.utils.LocalDataStorage.saveOutstandingData(context, updatedData, year)
-
+                    Timber.d("✅ Outstanding refresh completed successfully")
                     _uiState.value = _uiState.value.copy(isLoading = false, error = null)
                 } else {
-                    val errorMsg = result.exceptionOrNull()?.message ?: "Outstanding sync failed"
-                    Timber.e("Outstanding sync failed: $errorMsg")
+                    val errorMsg = result.exceptionOrNull()?.message ?: "Outstanding refresh failed"
+                    Timber.e("❌ Outstanding refresh failed: $errorMsg")
                     _uiState.value = _uiState.value.copy(isLoading = false, error = errorMsg)
                 }
             } catch (e: Exception) {
-                Timber.e(e, "Outstanding sync failed with exception")
+                Timber.e(e, "❌ Outstanding refresh failed with exception")
                 _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
             }
         }
     }
 
-    // Load data from local storage on startup
-    fun loadFromLocalStorage(context: android.content.Context, year: String) {
+    // Load data from permanent storage only (for UI display)
+    fun loadFromPermanentStorage(context: android.content.Context, year: String) {
         viewModelScope.launch {
             try {
-                Timber.d("Loading Outstanding data from local storage for year: $year")
+                Timber.d("📁 Loading Outstanding data from permanent storage for year: $year")
                 _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-                val localData = com.example.jiva.utils.LocalDataStorage.loadOutstandingData(context, year)
-                if (localData.isNotEmpty()) {
-                    Timber.d("Found ${localData.size} entries in local storage")
-                    // Update Room DB with local data
+                val permanentData = com.example.jiva.utils.ApiDataManager.loadOutstandingDataForUI(context, year)
+                if (permanentData.isNotEmpty()) {
+                    Timber.d("✅ Found ${permanentData.size} entries in permanent storage")
+                    // Update Room DB for reactive UI
                     database.outstandingDao().clearYear(year)
-                    database.outstandingDao().insertAll(localData)
+                    database.outstandingDao().insertAll(permanentData)
 
                     _uiState.value = _uiState.value.copy(isLoading = false, error = null)
                 } else {
-                    Timber.d("No local data found, database will show empty until refresh")
+                    Timber.d("📁 No permanent data found, showing empty until refresh")
                     _uiState.value = _uiState.value.copy(isLoading = false, error = null)
                 }
             } catch (e: Exception) {
-                Timber.e(e, "Failed to load from local storage")
+                Timber.e(e, "❌ Failed to load from permanent storage")
                 _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
             }
         }

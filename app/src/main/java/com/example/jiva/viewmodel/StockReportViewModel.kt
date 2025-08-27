@@ -52,66 +52,65 @@ class StockReportViewModel(
         return database.stockDao().getAll(year)
     }
 
-    // Trigger Stock sync with explicit params and local storage
-    fun syncStock(userId: Int, year: String, context: android.content.Context) {
+    // Refresh Stock data - API call → Permanent Storage
+    fun refreshStockData(userId: Int, year: String, context: android.content.Context) {
         viewModelScope.launch {
             try {
-                Timber.d("Starting Stock sync for userId: $userId, year: $year")
+                Timber.d("🔄 Starting Stock refresh for userId: $userId, year: $year")
                 _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-                
-                // First, try to load from local storage
-                val localData = com.example.jiva.utils.LocalDataStorage.loadStockData(context, year)
-                if (localData.isNotEmpty()) {
-                    Timber.d("Loading ${localData.size} entries from local storage")
-                    // Update Room DB with local data
-                    database.stockDao().clearYear(year)
-                    database.stockDao().insertAll(localData)
-                }
-                
-                // Then sync from API and update local storage
-                val repository = com.example.jiva.data.repository.JivaRepositoryImpl(database)
-                val result = repository.syncStock(userId, year)
+
+                // Create repository instance
+                val repository = com.example.jiva.data.repository.JivaRepositoryImpl(database,
+                    com.example.jiva.data.network.RemoteDataSource(
+                        com.example.jiva.data.network.RetrofitClient.jivaApiService
+                    )
+                )
+
+                // Use ApiDataManager to handle API → Permanent Storage
+                val result = com.example.jiva.utils.ApiDataManager.refreshStockData(
+                    context = context,
+                    repository = repository,
+                    database = database,
+                    userId = userId,
+                    year = year
+                )
+
                 if (result.isSuccess) {
-                    Timber.d("Stock sync completed successfully")
-                    
-                    // Save updated data to local storage
-                    val updatedData = database.stockDao().getAllSync(year)
-                    com.example.jiva.utils.LocalDataStorage.saveStockData(context, updatedData, year)
-                    
+                    Timber.d("✅ Stock refresh completed successfully")
                     _uiState.value = _uiState.value.copy(isLoading = false, error = null)
                 } else {
-                    val errorMsg = result.exceptionOrNull()?.message ?: "Stock sync failed"
-                    Timber.e("Stock sync failed: $errorMsg")
+                    val errorMsg = result.exceptionOrNull()?.message ?: "Stock refresh failed"
+                    Timber.e("❌ Stock refresh failed: $errorMsg")
                     _uiState.value = _uiState.value.copy(isLoading = false, error = errorMsg)
                 }
             } catch (e: Exception) {
-                Timber.e(e, "Stock sync failed with exception")
+                Timber.e(e, "❌ Stock refresh failed with exception")
                 _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
             }
         }
     }
     
-    // Load data from local storage on startup
-    fun loadFromLocalStorage(context: android.content.Context, year: String) {
+    // Load data from permanent storage only (for UI display)
+    fun loadFromPermanentStorage(context: android.content.Context, year: String) {
         viewModelScope.launch {
             try {
-                Timber.d("Loading Stock data from local storage for year: $year")
+                Timber.d("📁 Loading Stock data from permanent storage for year: $year")
                 _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-                
-                val localData = com.example.jiva.utils.LocalDataStorage.loadStockData(context, year)
-                if (localData.isNotEmpty()) {
-                    Timber.d("Found ${localData.size} entries in local storage")
-                    // Update Room DB with local data
+
+                val permanentData = com.example.jiva.utils.ApiDataManager.loadStockDataForUI(context, year)
+                if (permanentData.isNotEmpty()) {
+                    Timber.d("✅ Found ${permanentData.size} entries in permanent storage")
+                    // Update Room DB for reactive UI
                     database.stockDao().clearYear(year)
-                    database.stockDao().insertAll(localData)
-                    
+                    database.stockDao().insertAll(permanentData)
+
                     _uiState.value = _uiState.value.copy(isLoading = false, error = null)
                 } else {
-                    Timber.d("No local data found, database will show empty until refresh")
+                    Timber.d("📁 No permanent data found, showing empty until refresh")
                     _uiState.value = _uiState.value.copy(isLoading = false, error = null)
                 }
             } catch (e: Exception) {
-                Timber.e(e, "Failed to load from local storage")
+                Timber.e(e, "❌ Failed to load from permanent storage")
                 _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
             }
         }
