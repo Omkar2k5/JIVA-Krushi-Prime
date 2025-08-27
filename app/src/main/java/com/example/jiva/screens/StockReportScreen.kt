@@ -82,13 +82,24 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     var loadingMessage by remember { mutableStateOf("") }
     var dataLoadingProgress by remember { mutableStateOf(0f) }
 
-    // State management
-    var stockOf by remember { mutableStateOf("All Items") }
-    var viewAll by remember { mutableStateOf(false) }
+    // Input state management (for UI inputs)
+    var stockOfInput by remember { mutableStateOf("All Items") }
+    var viewAllInput by remember { mutableStateOf(false) }
+    var itemCodeSearch by remember { mutableStateOf("") }
     var itemNameSearch by remember { mutableStateOf("") }
     var companySearch by remember { mutableStateOf("") }
     var isStockDropdownExpanded by remember { mutableStateOf(false) }
     var isItemTypeDropdownExpanded by remember { mutableStateOf(false) }
+
+    // Additional UI state variables
+    var selectedItemType by remember { mutableStateOf("All Items") }
+
+    // Applied filters state (only updated when SHOW button is clicked)
+    var appliedStockOf by remember { mutableStateOf("All Items") }
+    var appliedViewAll by remember { mutableStateOf(false) }
+    var appliedItemCodeSearch by remember { mutableStateOf("") }
+    var appliedItemNameSearch by remember { mutableStateOf("") }
+    var appliedCompanySearch by remember { mutableStateOf("") }
     // Additional local states used in input fields
     var brandName by remember { mutableStateOf("") }
     var itemName by remember { mutableStateOf("") }
@@ -139,6 +150,9 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     // Optimized data loading - only from Room DB for better performance
     val stockEntities by viewModel.observeStock(year).collectAsState(initial = emptyList())
 
+    // Use optimized data loading from Room DB
+    val stockEntities by viewModel.observeStock(year).collectAsState(initial = emptyList())
+
     // High-performance data mapping - direct string mapping for fastest performance
     val allStockEntries = remember(stockEntities) {
         try {
@@ -168,16 +182,16 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     // Item type options
     val itemTypeOptions = listOf("All", "General", "Pesticides", "Fertilizers", "PGR", "Seeds")
 
-    // Comprehensive filtering with all filter options
-    val filteredEntries = remember(stockOf, viewAll, itemNameSearch, companySearch, allStockEntries) {
+    // Filtering based on applied filters (only when SHOW button is clicked)
+    val filteredEntries = remember(appliedStockOf, appliedViewAll, appliedItemCodeSearch, appliedItemNameSearch, appliedCompanySearch, allStockEntries) {
         try {
             if (allStockEntries.isEmpty()) {
                 emptyList()
             } else {
                 allStockEntries.filter { entry ->
                     try {
-                        // Stock Type Filter (stockOf dropdown)
-                        val stockTypeMatch = when (stockOf) {
+                        // Item Type Filter (using correct database field)
+                        val stockTypeMatch = when (appliedStockOf) {
                             "All Items" -> true
                             "Pesticides" -> entry.itemType.equals("Pesticides", ignoreCase = true)
                             "Fertilizers" -> entry.itemType.equals("Fertilizers", ignoreCase = true)
@@ -188,7 +202,7 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                         }
 
                         // Stock Status Filter (viewAll toggle)
-                        val stockStatusMatch = if (viewAll) {
+                        val stockStatusMatch = if (appliedViewAll) {
                             true // Show all items
                         } else {
                             // Show only items with stock (closing stock > 0)
@@ -196,16 +210,20 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                             closingStock > 0
                         }
 
+                        // Item Code (Item ID) Search Filter
+                        val itemCodeMatch = if (appliedItemCodeSearch.isBlank()) true else
+                            entry.itemId.contains(appliedItemCodeSearch, ignoreCase = true)
+
                         // Item Name Search Filter
-                        val nameMatch = if (itemNameSearch.isBlank()) true else
-                            entry.itemName.contains(itemNameSearch, ignoreCase = true)
+                        val nameMatch = if (appliedItemNameSearch.isBlank()) true else
+                            entry.itemName.contains(appliedItemNameSearch, ignoreCase = true)
 
                         // Company Search Filter
-                        val companyMatch = if (companySearch.isBlank()) true else
-                            entry.companyName.contains(companySearch, ignoreCase = true)
+                        val companyMatch = if (appliedCompanySearch.isBlank()) true else
+                            entry.companyName.contains(appliedCompanySearch, ignoreCase = true)
 
                         // All filters must match
-                        stockTypeMatch && stockStatusMatch && nameMatch && companyMatch
+                        stockTypeMatch && stockStatusMatch && itemCodeMatch && nameMatch && companyMatch
 
                     } catch (e: Exception) {
                         timber.log.Timber.e(e, "Error filtering entry: ${entry.itemId}")
@@ -382,12 +400,13 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                                 color = JivaColors.DeepBlue
                             )
 
-                            // Active filters indicator
+                            // Active filters indicator (based on applied filters)
                             val activeFilters = mutableListOf<String>()
-                            if (stockOf != "All Items") activeFilters.add("Type: $stockOf")
-                            if (!viewAll) activeFilters.add("In Stock Only")
-                            if (itemNameSearch.isNotBlank()) activeFilters.add("Name: $itemNameSearch")
-                            if (companySearch.isNotBlank()) activeFilters.add("Company: $companySearch")
+                            if (appliedStockOf != "All Items") activeFilters.add("Type: $appliedStockOf")
+                            if (!appliedViewAll) activeFilters.add("In Stock Only")
+                            if (appliedItemCodeSearch.isNotBlank()) activeFilters.add("Code: $appliedItemCodeSearch")
+                            if (appliedItemNameSearch.isNotBlank()) activeFilters.add("Name: $appliedItemNameSearch")
+                            if (appliedCompanySearch.isNotBlank()) activeFilters.add("Company: $appliedCompanySearch")
 
                             if (activeFilters.isNotEmpty()) {
                                 Card(
@@ -419,14 +438,14 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                                     modifier = Modifier.padding(bottom = 4.dp)
                                 )
                                 OutlinedTextField(
-                                    value = itemNameSearch,
-                                    onValueChange = { itemNameSearch = it },
-                                    placeholder = { Text("Search by item name...") },
+                                    value = itemCodeSearch,
+                                    onValueChange = { itemCodeSearch = it },
+                                    placeholder = { Text("Search by item code...") },
                                     trailingIcon = {
-                                        IconButton(onClick = { itemNameSearch = "" }) {
+                                        IconButton(onClick = { itemCodeSearch = "" }) {
                                             Icon(
-                                                imageVector = if (itemNameSearch.isNotEmpty()) Icons.Default.Clear else Icons.Default.Search,
-                                                contentDescription = if (itemNameSearch.isNotEmpty()) "Clear" else "Search"
+                                                imageVector = if (itemCodeSearch.isNotEmpty()) Icons.Default.Clear else Icons.Default.Search,
+                                                contentDescription = if (itemCodeSearch.isNotEmpty()) "Clear" else "Search"
                                             )
                                         }
                                     },
@@ -443,16 +462,16 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
 
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Brand Name",
+                                    text = "Company",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = JivaColors.DeepBlue,
                                     modifier = Modifier.padding(bottom = 4.dp)
                                 )
                                 OutlinedTextField(
-                                    value = brandName,
-                                    onValueChange = { brandName = it },
-                                    placeholder = { Text("Enter brand name") },
+                                    value = companySearch,
+                                    onValueChange = { companySearch = it },
+                                    placeholder = { Text("Enter company name") },
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(8.dp),
                                     singleLine = true
@@ -468,8 +487,8 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                                     modifier = Modifier.padding(bottom = 4.dp)
                                 )
                                 OutlinedTextField(
-                                    value = itemName,
-                                    onValueChange = { itemName = it },
+                                    value = itemNameSearch,
+                                    onValueChange = { itemNameSearch = it },
                                     placeholder = { Text("Enter item name") },
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(8.dp),
@@ -514,7 +533,7 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                                     onExpandedChange = { isItemTypeDropdownExpanded = it }
                                 ) {
                                     OutlinedTextField(
-                                        value = selectedItemType,
+                                        value = stockOfInput,
                                         onValueChange = {},
                                         readOnly = true,
                                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isItemTypeDropdownExpanded) },
@@ -531,7 +550,7 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                                             DropdownMenuItem(
                                                 text = { Text(option) },
                                                 onClick = {
-                                                    selectedItemType = option
+                                                    stockOfInput = option
                                                     isItemTypeDropdownExpanded = false
                                                 }
                                             )
@@ -541,77 +560,31 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                             }
                         }
 
-                        // Third row: Company Name, Packaging Size
+                        // View All toggle
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Company Name",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                                OutlinedTextField(
-                                    value = companySearch,
-                                    onValueChange = { companySearch = it },
-                                    placeholder = { Text("Search by company...") },
-                                    trailingIcon = {
-                                        IconButton(onClick = { companySearch = "" }) {
-                                            Icon(
-                                                imageVector = if (companySearch.isNotEmpty()) Icons.Default.Clear else Icons.Default.Business,
-                                                contentDescription = if (companySearch.isNotEmpty()) "Clear" else "Company"
-                                            )
-                                        }
-                                    },
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = Color.Black,
-                                        unfocusedTextColor = Color.Black,
-                                        cursorColor = JivaColors.DeepBlue
-                                    ),
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(8.dp),
-                                    singleLine = true
-                                )
-                            }
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Packaging Size",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                                OutlinedTextField(
-                                    value = packagingSize,
-                                    onValueChange = { packagingSize = it },
-                                    placeholder = { Text("Enter packaging size") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(8.dp),
-                                    singleLine = true
-                                )
-                            }
-                        }
-
-                        // Exempted checkbox
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = exempted,
-                                onCheckedChange = { exempted = it },
-                                colors = CheckboxDefaults.colors(checkedColor = JivaColors.Purple)
-                            )
                             Text(
-                                text = "Exempted Items",
+                                text = "Show all items (including zero stock)",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = JivaColors.DeepBlue
                             )
+                            Switch(
+                                checked = viewAllInput,
+                                onCheckedChange = { viewAllInput = it },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = JivaColors.White,
+                                    checkedTrackColor = JivaColors.Green,
+                                    uncheckedThumbColor = JivaColors.White,
+                                    uncheckedTrackColor = JivaColors.DarkGray
+                                )
+                            )
                         }
+
+
 
                         // Action Buttons
                         Row(
@@ -620,10 +593,14 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                         ) {
                             Button(
                                 onClick = {
-                                    // Force recomposition to apply filters
-                                    // The filters are already applied automatically through remember()
-                                    // This button provides user feedback that filters are applied
-                                    timber.log.Timber.d("🔍 Filters applied: stockOf=$stockOf, viewAll=$viewAll, itemName='$itemNameSearch', company='$companySearch'")
+                                    // Apply filters by updating applied filter states
+                                    appliedStockOf = stockOfInput
+                                    appliedViewAll = viewAllInput
+                                    appliedItemCodeSearch = itemCodeSearch
+                                    appliedItemNameSearch = itemNameSearch
+                                    appliedCompanySearch = companySearch
+
+                                    timber.log.Timber.d("🔍 Filters applied: stockOf=$appliedStockOf, viewAll=$appliedViewAll, itemCode='$appliedItemCodeSearch', itemName='$appliedItemNameSearch', company='$appliedCompanySearch'")
                                     timber.log.Timber.d("📊 Filtered results: ${filteredEntries.size} items out of ${allStockEntries.size} total")
                                 },
                                 colors = ButtonDefaults.buttonColors(
@@ -647,11 +624,20 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                             // Clear Filters Button
                             Button(
                                 onClick = {
-                                    // Reset all filters to default values
-                                    stockOf = "All Items"
-                                    viewAll = true
+                                    // Reset all input fields and applied filters to default values
+                                    stockOfInput = "All Items"
+                                    viewAllInput = true
+                                    itemCodeSearch = ""
                                     itemNameSearch = ""
                                     companySearch = ""
+
+                                    // Also reset applied filters
+                                    appliedStockOf = "All Items"
+                                    appliedViewAll = true
+                                    appliedItemCodeSearch = ""
+                                    appliedItemNameSearch = ""
+                                    appliedCompanySearch = ""
+
                                     timber.log.Timber.d("🧹 All filters cleared - showing all ${allStockEntries.size} items")
                                 },
                                 colors = ButtonDefaults.buttonColors(
