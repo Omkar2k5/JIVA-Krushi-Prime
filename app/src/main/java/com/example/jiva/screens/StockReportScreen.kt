@@ -179,13 +179,7 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     var debugInfo by remember { mutableStateOf("Initializing...") }
 
     // Primary data loading with error handling
-    val stockEntities by try {
-        viewModel.observeStock(year).collectAsState(initial = emptyList())
-    } catch (e: Exception) {
-        timber.log.Timber.e(e, "Error observing stock data from ViewModel")
-        debugInfo = "ViewModel error: ${e.message}"
-        remember { mutableStateOf(emptyList()) }
-    }
+    val stockEntities by viewModel.observeStock(year).collectAsState(initial = emptyList())
 
     // Alternative direct database loading for debugging
     var directDbEntities by remember { mutableStateOf<List<com.example.jiva.data.database.entities.StockEntity>>(emptyList()) }
@@ -252,20 +246,8 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                         debugInfo = "Database empty - no stock data available"
 
                         // Check if this is the first time loading
-                        try {
-                            // Try to get any stock data at all (any year)
-                            val anyData = application.database.stockDao().getAllStocks().value
-                            if (anyData.isNullOrEmpty()) {
-                                timber.log.Timber.i("💡 No stock data found in database - this appears to be a fresh install")
-                                debugInfo = "Fresh install detected - no data in database"
-                            } else {
-                                timber.log.Timber.i("📊 Found ${anyData.size} stock entries for other years")
-                                debugInfo = "Data exists for other years, but none for $year"
-                            }
-                        } catch (e: Exception) {
-                            timber.log.Timber.e(e, "Error checking for any stock data")
-                            debugInfo = "Error checking database: ${e.message}"
-                        }
+                        timber.log.Timber.i("💡 No stock data found in database for year: $year")
+                        debugInfo = "No stock data available for year: $year"
                     }
                 } catch (e: Exception) {
                     timber.log.Timber.e(e, "❌ Direct DB access failed")
