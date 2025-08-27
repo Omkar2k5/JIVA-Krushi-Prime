@@ -1,6 +1,6 @@
 package com.example.jiva.screens
 
-import androidx.compose.foundation.Image
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.horizontalScroll
@@ -15,21 +15,25 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.jiva.JivaColors
-import com.example.jiva.R
-import com.example.jiva.components.ResponsiveReportHeader
-import com.example.jiva.utils.PDFGenerator
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.jiva.JivaApplication
+import com.example.jiva.JivaColors
+import com.example.jiva.components.ResponsiveReportHeader
+import com.example.jiva.viewmodel.StockReportViewModel
 import kotlinx.coroutines.launch
 
 // Data model for Stock Report entries
@@ -49,55 +53,129 @@ data class StockEntry(
     val igst: Double // Added IGST field
 )
 
+@Composable
+fun StockReportScreen(onBackClick: () -> Unit = {}) {
+    StockReportScreenImpl(onBackClick = onBackClick)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    // State management for input fields
-    var itemCode by remember { mutableStateOf("") }
-    var brandName by remember { mutableStateOf("") }
-    var itemName by remember { mutableStateOf("") }
-    var itemDescription by remember { mutableStateOf("") }
-    var selectedItemType by remember { mutableStateOf("All") }
-    var companyName by remember { mutableStateOf("") }
-    var packagingSize by remember { mutableStateOf("") }
-    var exempted by remember { mutableStateOf(false) }
-    
-    // Dropdown states
+
+    // Get the application instance to access the repository
+    val application = context.applicationContext as JivaApplication
+
+    // Create the ViewModel with the repository
+    val viewModel: StockReportViewModel = viewModel(
+        factory = StockReportViewModel.Factory(application.database)
+    )
+
+    val uiState by viewModel.uiState.collectAsState()
+
+    // State management
+    var stockOf by remember { mutableStateOf("All Items") }
+    var viewAll by remember { mutableStateOf(false) }
+    var itemNameSearch by remember { mutableStateOf("") }
+    var companySearch by remember { mutableStateOf("") }
+    var isStockDropdownExpanded by remember { mutableStateOf(false) }
     var isItemTypeDropdownExpanded by remember { mutableStateOf(false) }
 
-    // Dummy data for stock entries
-    val allStockEntries = remember {
-        listOf(
-            StockEntry("ITM001", "Rogar 100ml", 50.0, 20.0, 15.0, 55.0, 125.50, 6902.50, "General", "Bayer Corp", 9.0, 9.0, 0.0),
-            StockEntry("ITM002", "Roundup Herbicide", 30.0, 10.0, 8.0, 32.0, 450.00, 14400.00, "Pesticides", "Monsanto", 18.0, 18.0, 0.0),
-            StockEntry("ITM003", "NPK Fertilizer", 100.0, 50.0, 40.0, 110.0, 85.75, 9432.50, "Fertilizers", "IFFCO", 5.0, 5.0, 0.0),
-            StockEntry("ITM004", "Growth Booster", 25.0, 15.0, 10.0, 30.0, 275.00, 8250.00, "PGR", "UPL Limited", 12.0, 12.0, 0.0),
-            StockEntry("ITM005", "Hybrid Tomato Seeds", 200.0, 100.0, 80.0, 220.0, 15.50, 3410.00, "Seeds", "Mahyco", 5.0, 5.0, 0.0),
-            StockEntry("ITM006", "Insecticide Spray", 40.0, 25.0, 20.0, 45.0, 320.00, 14400.00, "Pesticides", "Syngenta", 18.0, 18.0, 0.0),
-            StockEntry("ITM007", "Organic Manure", 75.0, 30.0, 25.0, 80.0, 65.00, 5200.00, "Fertilizers", "Coromandel", 5.0, 5.0, 0.0),
-            StockEntry("ITM008", "Plant Growth Regulator", 20.0, 12.0, 8.0, 24.0, 180.00, 4320.00, "PGR", "Dhanuka", 12.0, 12.0, 0.0),
-            StockEntry("ITM009", "Cotton Seeds", 150.0, 75.0, 60.0, 165.0, 25.00, 4125.00, "Seeds", "Rasi Seeds", 5.0, 5.0, 0.0),
-            StockEntry("ITM010", "Multi-Purpose Cleaner", 60.0, 20.0, 18.0, 62.0, 45.00, 2790.00, "General", "Henkel", 9.0, 9.0, 0.0)
-        )
+    // WhatsApp messaging state
+    var selectedEntries by remember { mutableStateOf(setOf<String>()) }
+    var selectAll by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+
+    // WhatsApp template message
+    val whatsappTemplate = "Hello Kurshi Prime"
+
+    // Sync + observe Stock table
+    val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
+    val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
+
+    // Initialize test environment and load local data
+    LaunchedEffect(Unit) {
+        if (userId == null) {
+            com.example.jiva.utils.OutstandingDebugHelper.initializeTestEnvironment(context)
+        }
+
+        // Load data from local storage on startup for faster loading
+        viewModel.loadFromLocalStorage(context, year)
+    }
+
+    // Re-read userId after potential initialization
+    val finalUserId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
+
+    // Optimized data loading - only from Room DB for better performance
+    val stockEntities by viewModel.observeStock(year).collectAsState(initial = emptyList())
+
+    // Use only Stock DB data for better performance and stability
+    val allStockEntries = remember(stockEntities) {
+        try {
+            stockEntities.map {
+                StockEntry(
+                    itemId = it.itemId.toString(),
+                    itemName = it.itemName,
+                    openingStock = it.opening.toDouble(),
+                    inQty = it.inWard.toDouble(),
+                    outQty = it.outWard.toDouble(),
+                    closingStock = it.closingStock.toDouble(),
+                    avgRate = it.avgRate.toDouble(),
+                    valuation = it.valuation.toDouble(),
+                    itemType = it.itemType ?: "",
+                    companyName = it.company ?: "",
+                    cgst = it.cgst.toDouble(),
+                    sgst = it.sgst.toDouble(),
+                    igst = it.igst.toDouble()
+                )
+            }
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error mapping stock entities")
+            emptyList()
+        }
     }
 
     // Item type options
     val itemTypeOptions = listOf("All", "General", "Pesticides", "Fertilizers", "PGR", "Seeds")
 
-    // Filtered entries based on search criteria
-    val filteredEntries = remember(itemCode, brandName, itemName, itemDescription, selectedItemType, companyName, packagingSize, allStockEntries) {
-        allStockEntries.filter { entry ->
-            val matchesItemCode = if (itemCode.isBlank()) true else entry.itemId.contains(itemCode, ignoreCase = true)
-            val matchesBrandName = if (brandName.isBlank()) true else entry.companyName.contains(brandName, ignoreCase = true)
-            val matchesItemName = if (itemName.isBlank()) true else entry.itemName.contains(itemName, ignoreCase = true)
-            val matchesDescription = if (itemDescription.isBlank()) true else entry.itemName.contains(itemDescription, ignoreCase = true)
-            val matchesItemType = if (selectedItemType == "All") true else entry.itemType == selectedItemType
-            val matchesCompany = if (companyName.isBlank()) true else entry.companyName.contains(companyName, ignoreCase = true)
-            
-            matchesItemCode && matchesBrandName && matchesItemName && matchesDescription && matchesItemType && matchesCompany
+    // Optimized filtering with error handling
+    val filteredEntries = remember(itemNameSearch, companySearch, allStockEntries) {
+        try {
+            if (allStockEntries.isEmpty()) {
+                emptyList()
+            } else {
+                allStockEntries.filter { entry ->
+                    try {
+                        val nameMatch = if (itemNameSearch.isBlank()) true else
+                            entry.itemName.contains(itemNameSearch, ignoreCase = true)
+                        val companyMatch = if (companySearch.isBlank()) true else
+                            entry.companyName.contains(companySearch, ignoreCase = true)
+                        nameMatch && companyMatch
+                    } catch (e: Exception) {
+                        timber.log.Timber.e(e, "Error filtering entry: ${entry.itemId}")
+                        false
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error during filtering")
+            emptyList()
         }
+    }
+
+    // Handle select all functionality
+    LaunchedEffect(selectAll, filteredEntries) {
+        if (selectAll) {
+            selectedEntries = filteredEntries.map { it.itemId }.toSet()
+        } else {
+            selectedEntries = emptySet()
+        }
+    }
+
+    // Update selectAll state based on individual selections
+    LaunchedEffect(selectedEntries, filteredEntries) {
+        selectAll = filteredEntries.isNotEmpty() && selectedEntries.containsAll(filteredEntries.map { it.itemId })
     }
 
     // Calculate totals
@@ -112,11 +190,45 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
             .fillMaxSize()
             .background(JivaColors.LightGray)
     ) {
-        // Responsive Header
+        // Responsive Header with Refresh Button
         ResponsiveReportHeader(
             title = "Stock Report",
             subtitle = "Inventory management and stock analysis",
-            onBackClick = onBackClick
+            onBackClick = onBackClick,
+            actions = {
+                IconButton(
+                    onClick = {
+                        if (finalUserId != null) {
+                            isLoading = true
+                            scope.launch {
+                                viewModel.syncStock(finalUserId, year, context)
+                                kotlinx.coroutines.delay(1000) // Show loading for at least 1 second
+                                isLoading = false
+                            }
+                        }
+                    },
+                    enabled = finalUserId != null && !isLoading,
+                    modifier = Modifier
+                        .background(
+                            JivaColors.White.copy(alpha = 0.2f),
+                            RoundedCornerShape(8.dp)
+                        )
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = JivaColors.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh Stock Data",
+                            tint = JivaColors.White
+                        )
+                    }
+                }
+            }
         )
 
         // Main content with performance optimizations
@@ -159,9 +271,22 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                                     modifier = Modifier.padding(bottom = 4.dp)
                                 )
                                 OutlinedTextField(
-                                    value = itemCode,
-                                    onValueChange = { itemCode = it },
-                                    placeholder = { Text("Enter item code") },
+                                    value = itemNameSearch,
+                                    onValueChange = { itemNameSearch = it },
+                                    placeholder = { Text("Search by item name...") },
+                                    trailingIcon = {
+                                        IconButton(onClick = { itemNameSearch = "" }) {
+                                            Icon(
+                                                imageVector = if (itemNameSearch.isNotEmpty()) Icons.Default.Clear else Icons.Default.Search,
+                                                contentDescription = if (itemNameSearch.isNotEmpty()) "Clear" else "Search"
+                                            )
+                                        }
+                                    },
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = Color.Black,
+                                        unfocusedTextColor = Color.Black,
+                                        cursorColor = JivaColors.DeepBlue
+                                    ),
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(8.dp),
                                     singleLine = true
@@ -282,9 +407,22 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                                     modifier = Modifier.padding(bottom = 4.dp)
                                 )
                                 OutlinedTextField(
-                                    value = companyName,
-                                    onValueChange = { companyName = it },
-                                    placeholder = { Text("Enter company name") },
+                                    value = companySearch,
+                                    onValueChange = { companySearch = it },
+                                    placeholder = { Text("Search by company...") },
+                                    trailingIcon = {
+                                        IconButton(onClick = { companySearch = "" }) {
+                                            Icon(
+                                                imageVector = if (companySearch.isNotEmpty()) Icons.Default.Clear else Icons.Default.Business,
+                                                contentDescription = if (companySearch.isNotEmpty()) "Clear" else "Company"
+                                            )
+                                        }
+                                    },
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = Color.Black,
+                                        unfocusedTextColor = Color.Black,
+                                        cursorColor = JivaColors.DeepBlue
+                                    ),
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(8.dp),
                                     singleLine = true
@@ -480,9 +618,16 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                             // Table Header
                             StockTableHeader()
 
-                            // Table Rows
-                            filteredEntries.forEach { entry ->
-                                StockTableRow(entry = entry)
+                            // Table Rows with Loading Animation
+                            if (isLoading && filteredEntries.isEmpty()) {
+                                // Show loading animation when data is loading
+                                repeat(5) {
+                                    StockLoadingRow()
+                                }
+                            } else {
+                                filteredEntries.forEach { entry ->
+                                    StockTableRow(entry = entry)
+                                }
                             }
 
                             // Total Row
@@ -633,6 +778,70 @@ private fun StockTotalRow(
         StockCell("-", Modifier.width(60.dp), JivaColors.DeepBlue) // CGST column
         StockCell("-", Modifier.width(60.dp), JivaColors.DeepBlue) // SGST column
         StockCell("-", Modifier.width(60.dp), JivaColors.DeepBlue) // IGST column
+    }
+}
+
+// Shimmer effect for loading animation
+fun Modifier.shimmerEffect(): Modifier = composed {
+    var size by remember { mutableStateOf(IntSize.Zero) }
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val startOffsetX by transition.animateFloat(
+        initialValue = -2 * size.width.toFloat(),
+        targetValue = 2 * size.width.toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000)
+        ), label = "shimmer"
+    )
+
+    background(
+        brush = Brush.linearGradient(
+            colors = listOf(
+                Color(0xFFB8B5B5),
+                Color(0xFF8F8B8B),
+                Color(0xFFB8B5B5),
+            ),
+            start = Offset(startOffsetX, 0f),
+            end = Offset(startOffsetX + size.width.toFloat(), size.height.toFloat())
+        )
+    ).onGloballyPositioned {
+        size = it.size
+    }
+}
+
+@Composable
+private fun StockLoadingRow() {
+    Row(
+        modifier = Modifier
+            .padding(vertical = 8.dp, horizontal = 8.dp)
+            .shimmerEffect(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Data placeholders for stock columns
+        repeat(13) { index ->
+            val width = when (index) {
+                0 -> 80.dp   // Item ID
+                1 -> 150.dp  // Item Name
+                2 -> 80.dp   // Opening
+                3 -> 80.dp   // IN Qty
+                4 -> 80.dp   // Out Qty
+                5 -> 80.dp   // Closing
+                6 -> 80.dp   // Avg Rate
+                7 -> 100.dp  // Valuation
+                8 -> 80.dp   // Type
+                9 -> 100.dp  // Company
+                10 -> 60.dp  // CGST
+                11 -> 60.dp  // SGST
+                12 -> 60.dp  // IGST
+                else -> 80.dp
+            }
+            Box(
+                modifier = Modifier
+                    .width(width)
+                    .height(16.dp)
+                    .background(JivaColors.LightGray, RoundedCornerShape(4.dp))
+            )
+        }
     }
 }
 
