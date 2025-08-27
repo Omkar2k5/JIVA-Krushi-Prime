@@ -35,6 +35,7 @@ import com.example.jiva.JivaColors
 import com.example.jiva.components.ResponsiveReportHeader
 import com.example.jiva.viewmodel.StockReportViewModel
 import kotlinx.coroutines.launch
+import com.example.jiva.utils.PDFGenerator
 
 // Data model for Stock Report entries
 data class StockEntry(
@@ -81,6 +82,13 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     var companySearch by remember { mutableStateOf("") }
     var isStockDropdownExpanded by remember { mutableStateOf(false) }
     var isItemTypeDropdownExpanded by remember { mutableStateOf(false) }
+    // Additional local states used in input fields
+    var brandName by remember { mutableStateOf("") }
+    var itemName by remember { mutableStateOf("") }
+    var itemDescription by remember { mutableStateOf("") }
+    var selectedItemType by remember { mutableStateOf("All") }
+    var packagingSize by remember { mutableStateOf("") }
+    var exempted by remember { mutableStateOf(false) }
 
     // WhatsApp messaging state
     var selectedEntries by remember { mutableStateOf(setOf<String>()) }
@@ -782,7 +790,7 @@ private fun StockTotalRow(
 }
 
 // Shimmer effect for loading animation
-fun Modifier.shimmerEffect(): Modifier = composed {
+fun Modifier.stockShimmerEffect(): Modifier = composed {
     var size by remember { mutableStateOf(IntSize.Zero) }
     val transition = rememberInfiniteTransition(label = "shimmer")
     val startOffsetX by transition.animateFloat(
@@ -813,7 +821,7 @@ private fun StockLoadingRow() {
     Row(
         modifier = Modifier
             .padding(vertical = 8.dp, horizontal = 8.dp)
-            .shimmerEffect(),
+            .stockShimmerEffect(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

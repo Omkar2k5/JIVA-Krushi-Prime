@@ -98,10 +98,7 @@ fun LedgerScreen(onBackClick: () -> Unit = {}) {
     LedgerReportScreenImpl(onBackClick = onBackClick)
 }
 
-@Composable
-fun StockReportScreen(onBackClick: () -> Unit = {}) {
-    StockReportScreenImpl(onBackClick = onBackClick)
-}
+ 
 
 @Composable
 fun ItemSellPurchaseScreen(onBackClick: () -> Unit = {}) {
