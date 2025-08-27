@@ -82,9 +82,12 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
     // Observe UI state
     val uiState by viewModel.uiState.collectAsState()
 
-    // Local loading states for better UX
+    // High-performance loading states
     var isScreenLoading by remember { mutableStateOf(true) }
     var isRefreshing by remember { mutableStateOf(false) }
+    var loadingProgress by remember { mutableStateOf(0) }
+    var loadingMessage by remember { mutableStateOf("") }
+    var dataLoadingProgress by remember { mutableStateOf(0f) }
 
     // State management
     var outstandingOf by remember { mutableStateOf("Customer") }
@@ -108,11 +111,30 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
     val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
-    // Handle initial screen loading
+    // High-performance data loading with progress
+    val outstandingDataFlow = remember(year) {
+        com.example.jiva.utils.HighPerformanceDataLoader.loadOutstandingDataProgressive(
+            database = application.database,
+            year = year,
+            onProgress = { current, total, message ->
+                loadingProgress = current
+                loadingMessage = message
+                dataLoadingProgress = current.toFloat()
+            }
+        )
+    }
+
+    // Handle initial screen loading with progressive data loading
     LaunchedEffect(Unit) {
-        // Simulate initial loading time for smooth UX
-        kotlinx.coroutines.delay(500)
-        isScreenLoading = false
+        isScreenLoading = true
+        loadingMessage = "Initializing..."
+
+        // Start data loading
+        outstandingDataFlow.collect { data ->
+            if (data.isNotEmpty()) {
+                isScreenLoading = false
+            }
+        }
     }
 
     // Note: Data loading is now handled automatically by AppDataLoader at app startup
@@ -256,27 +278,51 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
             }
         )
 
-        // Show loading screen overlay during initial load
-        if (isScreenLoading) {
+        // High-performance loading screen with progress
+        if (isScreenLoading || allEntries.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.padding(32.dp)
                 ) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(48.dp),
                         color = JivaColors.DeepBlue,
                         strokeWidth = 4.dp
                     )
+
                     Text(
                         text = "Loading Outstanding Report...",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium,
                         color = JivaColors.DeepBlue
                     )
+
+                    if (loadingProgress > 0) {
+                        LinearProgressIndicator(
+                            progress = dataLoadingProgress / 100f,
+                            modifier = Modifier.fillMaxWidth(),
+                            color = JivaColors.DeepBlue,
+                            trackColor = JivaColors.LightGray
+                        )
+
+                        Text(
+                            text = loadingMessage,
+                            fontSize = 12.sp,
+                            color = JivaColors.DarkGray,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Text(
+                            text = "${loadingProgress}% Complete",
+                            fontSize = 10.sp,
+                            color = JivaColors.DarkGray
+                        )
+                    }
                 }
             }
         } else {
