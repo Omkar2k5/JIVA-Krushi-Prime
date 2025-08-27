@@ -55,8 +55,8 @@ class JivaApplication : MultiDexApplication() {
         // Performance optimizations
         initializePerformanceOptimizations()
         
-        // Initialize database with dummy data
-        initializeDatabase()
+        // Note: Removed dummy data initialization to prevent conflicts
+        // Database will be populated from API calls and permanent storage
 
         // Load all data from permanent storage to Room DB
         loadAllDataFromPermanentStorage()
@@ -68,23 +68,14 @@ class JivaApplication : MultiDexApplication() {
     }
     
     /**
-     * Initialize the database with dummy data
+     * Note: Removed dummy data initialization to prevent schema conflicts
+     * Database will be populated from API calls and permanent storage only
      */
-    private fun initializeDatabase() {
-        applicationScope.launch {
-            try {
-                Timber.d("Populating database with dummy data")
-                DummyDataProvider.populateDatabase(database)
-                Timber.d("Database populated successfully")
-            } catch (e: Exception) {
-                Timber.e(e, "Error populating database with dummy data")
-            }
-        }
-    }
 
     /**
      * Load all data from permanent storage to Room DB at app startup
      * This ensures all screens have data available immediately
+     * Made more robust with better error handling
      */
     private fun loadAllDataFromPermanentStorage() {
         applicationScope.launch {
@@ -92,27 +83,39 @@ class JivaApplication : MultiDexApplication() {
                 Timber.d("🚀 APP STARTUP: Loading all data from permanent storage")
 
                 val year = com.example.jiva.utils.UserEnv.getFinancialYear(this@JivaApplication) ?: "2025-26"
-                val summary = com.example.jiva.utils.AppDataLoader.loadAllDataFromPermanentStorage(
+
+                // Check if permanent storage has any data first
+                val hasData = com.example.jiva.utils.AppDataLoader.hasAnyDataInPermanentStorage(
                     context = this@JivaApplication,
-                    database = database,
                     year = year
                 )
 
-                Timber.d("✅ App startup data loading completed: ${summary.overallMessage}")
+                if (hasData) {
+                    val summary = com.example.jiva.utils.AppDataLoader.loadAllDataFromPermanentStorage(
+                        context = this@JivaApplication,
+                        database = database,
+                        year = year
+                    )
 
-                // Log summary for debugging
-                if (summary.loadedScreens.isNotEmpty()) {
-                    Timber.d("📊 Loaded screens: ${summary.loadedScreens.joinToString(", ")}")
-                }
-                if (summary.emptyScreens.isNotEmpty()) {
-                    Timber.d("📁 Empty screens: ${summary.emptyScreens.joinToString(", ")}")
-                }
-                if (summary.errorScreens.isNotEmpty()) {
-                    Timber.e("❌ Error screens: ${summary.errorScreens.joinToString(", ")}")
+                    Timber.d("✅ App startup data loading completed: ${summary.overallMessage}")
+
+                    // Log summary for debugging
+                    if (summary.loadedScreens.isNotEmpty()) {
+                        Timber.d("📊 Loaded screens: ${summary.loadedScreens.joinToString(", ")}")
+                    }
+                    if (summary.emptyScreens.isNotEmpty()) {
+                        Timber.d("📁 Empty screens: ${summary.emptyScreens.joinToString(", ")}")
+                    }
+                    if (summary.errorScreens.isNotEmpty()) {
+                        Timber.e("❌ Error screens: ${summary.errorScreens.joinToString(", ")}")
+                    }
+                } else {
+                    Timber.d("📁 No permanent storage data found - app will show empty screens until first refresh")
                 }
 
             } catch (e: Exception) {
-                Timber.e(e, "❌ Critical error during app startup data loading")
+                Timber.e(e, "❌ Non-critical error during app startup data loading - app will continue normally")
+                // Don't crash the app - just log the error and continue
             }
         }
     }

@@ -28,7 +28,7 @@ import com.example.jiva.data.database.entities.*
         PriceDataEntity::class,
         OutstandingEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -89,6 +89,35 @@ abstract class JivaDatabase : RoomDatabase() {
                 database.execSQL("CREATE INDEX IF NOT EXISTS index_Outstanding_cmpCode_acId_yearString ON Outstanding(cmpCode, acId, yearString)")
             }
         }
+
+        // Migration from version 3 to 4 - updates Stock table to use String fields
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Drop and recreate tb_stock table with String fields for better performance
+                database.execSQL("DROP TABLE IF EXISTS `tb_stock`")
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `tb_stock` (
+                        `SrNO` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `CmpCode` TEXT NOT NULL,
+                        `ITEM_ID` TEXT NOT NULL,
+                        `Item_Name` TEXT NOT NULL,
+                        `Opening` TEXT NOT NULL DEFAULT '0.000',
+                        `InWard` TEXT NOT NULL DEFAULT '0.000',
+                        `OutWard` TEXT NOT NULL DEFAULT '0.000',
+                        `Closing_Stock` TEXT NOT NULL DEFAULT '0.000',
+                        `AvgRate` TEXT NOT NULL DEFAULT '0.00',
+                        `Valuation` TEXT NOT NULL DEFAULT '0.00',
+                        `ItemType` TEXT NOT NULL DEFAULT '',
+                        `Company` TEXT NOT NULL DEFAULT '',
+                        `cgst` TEXT NOT NULL DEFAULT '0.00',
+                        `sgst` TEXT NOT NULL DEFAULT '0.00',
+                        `igst` TEXT NOT NULL DEFAULT '0.00',
+                        `YearString` TEXT NOT NULL DEFAULT ''
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_tb_stock_CmpCode_ITEM_ID_YearString ON tb_stock(CmpCode, ITEM_ID, YearString)")
+            }
+        }
         
         fun getDatabase(context: Context): JivaDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -97,7 +126,7 @@ abstract class JivaDatabase : RoomDatabase() {
                     JivaDatabase::class.java,
                     "jiva_database"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance

@@ -122,13 +122,27 @@ object AppDataLoader {
             val totalPending = summary.pendingScreens.size
             
             summary.overallMessage = "📊 App Startup Loading: ${totalLoaded}✅ ${totalEmpty}📁 ${totalErrors}❌ ${totalPending}⏳"
-            
+
             Timber.d(summary.overallMessage)
             summary.loadedScreens.forEach { Timber.d("  ✅ $it") }
             summary.emptyScreens.forEach { Timber.d("  📁 $it") }
             summary.errorScreens.forEach { Timber.e("  ❌ $it") }
             summary.pendingScreens.forEach { Timber.d("  ⏳ $it") }
-            
+
+            // If no data was loaded, add simple test data for development
+            if (totalLoaded == 0 && totalErrors == 0) {
+                try {
+                    Timber.d("🔧 No permanent data found - adding simple test data for development")
+                    val testDataAdded = SimpleTestDataProvider.populateIfEmpty(context, database, year)
+                    if (testDataAdded) {
+                        summary.loadedScreens.add("Test Data: Added for development")
+                        summary.overallMessage = "🔧 Development: Simple test data added"
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "❌ Failed to add test data")
+                }
+            }
+
             summary
             
         } catch (e: Exception) {
