@@ -108,7 +108,6 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     var brandName by remember { mutableStateOf("") }
     var itemName by remember { mutableStateOf("") }
     var itemDescription by remember { mutableStateOf("") }
-    var selectedItemType by remember { mutableStateOf("All") }
     var packagingSize by remember { mutableStateOf("") }
     var exempted by remember { mutableStateOf(false) }
 
@@ -152,9 +151,6 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     val finalUserId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
     // Optimized data loading - only from Room DB for better performance
-    val stockEntities by viewModel.observeStock(year).collectAsState(initial = emptyList())
-
-    // Use optimized data loading from Room DB
     val stockEntities by viewModel.observeStock(year).collectAsState(initial = emptyList())
 
     // High-performance data mapping - direct string mapping for fastest performance
@@ -240,17 +236,17 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     )
 
     // Handle select all functionality
-    LaunchedEffect(selectAll, filteredEntries) {
+    LaunchedEffect(selectAll, paginatedData.visibleItems) {
         if (selectAll) {
-            selectedEntries = filteredEntries.map { it.itemId }.toSet()
+            selectedEntries = paginatedData.visibleItems.map { it.itemId }.toSet()
         } else {
             selectedEntries = emptySet()
         }
     }
 
     // Update selectAll state based on individual selections
-    LaunchedEffect(selectedEntries, filteredEntries) {
-        selectAll = filteredEntries.isNotEmpty() && selectedEntries.containsAll(filteredEntries.map { it.itemId })
+    LaunchedEffect(selectedEntries, paginatedData.visibleItems) {
+        selectAll = paginatedData.visibleItems.isNotEmpty() && selectedEntries.containsAll(paginatedData.visibleItems.map { it.itemId })
     }
 
     // Memory monitoring and emergency mode detection
