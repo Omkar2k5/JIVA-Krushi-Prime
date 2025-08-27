@@ -402,6 +402,10 @@ class JivaRepositoryImpl(
         return database.outstandingDao().getAll(year)
     }
 
+    override fun getStockFlow(year: String): Flow<List<StockEntity>> {
+        return database.stockDao().getAll(year)
+    }
+
     override suspend fun syncOutstanding(userId: Int, yearString: String): Result<Unit> {
         return try {
             Timber.d("Starting Outstanding API call for userId: $userId, yearString: $yearString")
@@ -461,6 +465,71 @@ class JivaRepositoryImpl(
             }
         } catch (e: Exception) {
             Timber.e(e, "Error syncing outstanding data")
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun syncStock(userId: Int, yearString: String): Result<Unit> {
+        return try {
+            Timber.d("Starting Stock API call for userId: $userId, yearString: $yearString")
+            val apiResult = remoteDataSource.getStock(userId, yearString)
+
+            Timber.d("API call completed. Success: ${apiResult.isSuccess}")
+
+            if (apiResult.isSuccess) {
+                val body = apiResult.getOrNull()
+                Timber.d("API response body: isSuccess=${body?.isSuccess}, message=${body?.message}, data size=${body?.data?.size}")
+
+                if (body?.isSuccess == true) {
+                    val items = body.data.orEmpty()
+                    Timber.d("Processing ${items.size} stock items")
+
+                    // Map API model -> Room entity
+                    val entities = items.map {
+                        StockEntity(
+                            cmpCode = it.cmpCode.toIntOrNull() ?: 0,
+                            itemId = it.itemId.toIntOrNull() ?: 0,
+                            itemName = it.itemName,
+                            opening = it.opening.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO,
+                            inWard = it.inWard.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO,
+                            outWard = it.outWard.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO,
+                            closingStock = it.closingStock.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO,
+                            avgRate = it.avgRate.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO,
+                            valuation = it.valuation.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO,
+                            itemType = it.itemType,
+                            company = it.company,
+                            cgst = it.cgst.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO,
+                            sgst = it.sgst.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO,
+                            igst = it.igst.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO,
+                            yearString = it.yearString
+                        )
+                    }
+
+                    // Chunked inserts for huge payloads
+                    database.stockDao().clearYear(yearString)
+                    val chunkSize = 1000
+                    var index = 0
+                    while (index < entities.size) {
+                        val end = minOf(index + chunkSize, entities.size)
+                        database.stockDao().insertAll(entities.subList(index, end))
+                        index = end
+                    }
+
+                    Timber.d("Successfully inserted ${entities.size} stock rows for $yearString")
+                    Result.success(Unit)
+                } else {
+                    val errorMsg = "API returned isSuccess=false: ${body?.message}"
+                    Timber.e(errorMsg)
+                    Result.failure(IllegalStateException(errorMsg))
+                }
+            } else {
+                val exception = apiResult.exceptionOrNull()
+                val errorMsg = "Stock API call failed: ${exception?.message}"
+                Timber.e(exception, errorMsg)
+                Result.failure(exception ?: IllegalStateException(errorMsg))
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error syncing stock data")
             Result.failure(e)
         }
     }

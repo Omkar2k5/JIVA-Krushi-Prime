@@ -45,7 +45,8 @@ data class StockEntry(
     val itemType: String,
     val companyName: String,
     val cgst: Double,
-    val sgst: Double
+    val sgst: Double,
+    val igst: Double // Added IGST field
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -69,16 +70,16 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     // Dummy data for stock entries
     val allStockEntries = remember {
         listOf(
-            StockEntry("ITM001", "Rogar 100ml", 50.0, 20.0, 15.0, 55.0, 125.50, 6902.50, "General", "Bayer Corp", 9.0, 9.0),
-            StockEntry("ITM002", "Roundup Herbicide", 30.0, 10.0, 8.0, 32.0, 450.00, 14400.00, "Pesticides", "Monsanto", 18.0, 18.0),
-            StockEntry("ITM003", "NPK Fertilizer", 100.0, 50.0, 40.0, 110.0, 85.75, 9432.50, "Fertilizers", "IFFCO", 5.0, 5.0),
-            StockEntry("ITM004", "Growth Booster", 25.0, 15.0, 10.0, 30.0, 275.00, 8250.00, "PGR", "UPL Limited", 12.0, 12.0),
-            StockEntry("ITM005", "Hybrid Tomato Seeds", 200.0, 100.0, 80.0, 220.0, 15.50, 3410.00, "Seeds", "Mahyco", 5.0, 5.0),
-            StockEntry("ITM006", "Insecticide Spray", 40.0, 25.0, 20.0, 45.0, 320.00, 14400.00, "Pesticides", "Syngenta", 18.0, 18.0),
-            StockEntry("ITM007", "Organic Manure", 75.0, 30.0, 25.0, 80.0, 65.00, 5200.00, "Fertilizers", "Coromandel", 5.0, 5.0),
-            StockEntry("ITM008", "Plant Growth Regulator", 20.0, 12.0, 8.0, 24.0, 180.00, 4320.00, "PGR", "Dhanuka", 12.0, 12.0),
-            StockEntry("ITM009", "Cotton Seeds", 150.0, 75.0, 60.0, 165.0, 25.00, 4125.00, "Seeds", "Rasi Seeds", 5.0, 5.0),
-            StockEntry("ITM010", "Multi-Purpose Cleaner", 60.0, 20.0, 18.0, 62.0, 45.00, 2790.00, "General", "Henkel", 9.0, 9.0)
+            StockEntry("ITM001", "Rogar 100ml", 50.0, 20.0, 15.0, 55.0, 125.50, 6902.50, "General", "Bayer Corp", 9.0, 9.0, 0.0),
+            StockEntry("ITM002", "Roundup Herbicide", 30.0, 10.0, 8.0, 32.0, 450.00, 14400.00, "Pesticides", "Monsanto", 18.0, 18.0, 0.0),
+            StockEntry("ITM003", "NPK Fertilizer", 100.0, 50.0, 40.0, 110.0, 85.75, 9432.50, "Fertilizers", "IFFCO", 5.0, 5.0, 0.0),
+            StockEntry("ITM004", "Growth Booster", 25.0, 15.0, 10.0, 30.0, 275.00, 8250.00, "PGR", "UPL Limited", 12.0, 12.0, 0.0),
+            StockEntry("ITM005", "Hybrid Tomato Seeds", 200.0, 100.0, 80.0, 220.0, 15.50, 3410.00, "Seeds", "Mahyco", 5.0, 5.0, 0.0),
+            StockEntry("ITM006", "Insecticide Spray", 40.0, 25.0, 20.0, 45.0, 320.00, 14400.00, "Pesticides", "Syngenta", 18.0, 18.0, 0.0),
+            StockEntry("ITM007", "Organic Manure", 75.0, 30.0, 25.0, 80.0, 65.00, 5200.00, "Fertilizers", "Coromandel", 5.0, 5.0, 0.0),
+            StockEntry("ITM008", "Plant Growth Regulator", 20.0, 12.0, 8.0, 24.0, 180.00, 4320.00, "PGR", "Dhanuka", 12.0, 12.0, 0.0),
+            StockEntry("ITM009", "Cotton Seeds", 150.0, 75.0, 60.0, 165.0, 25.00, 4125.00, "Seeds", "Rasi Seeds", 5.0, 5.0, 0.0),
+            StockEntry("ITM010", "Multi-Purpose Cleaner", 60.0, 20.0, 18.0, 62.0, 45.00, 2790.00, "General", "Henkel", 9.0, 9.0, 0.0)
         )
     }
 
@@ -524,6 +525,7 @@ private fun StockTableHeader() {
         StockHeaderCell("Company", modifier = Modifier.width(100.dp))
         StockHeaderCell("CGST", modifier = Modifier.width(60.dp))
         StockHeaderCell("SGST", modifier = Modifier.width(60.dp))
+        StockHeaderCell("IGST", modifier = Modifier.width(60.dp))
     }
 }
 
@@ -562,6 +564,7 @@ private fun StockTableRow(entry: StockEntry) {
             StockCell(entry.companyName, Modifier.width(100.dp))
             StockCell("${entry.cgst}%", Modifier.width(60.dp))
             StockCell("${entry.sgst}%", Modifier.width(60.dp))
+            StockCell("${entry.igst}%", Modifier.width(60.dp))
         }
 
         HorizontalDivider(
@@ -629,6 +632,7 @@ private fun StockTotalRow(
         StockCell("-", Modifier.width(100.dp), JivaColors.DeepBlue) // Company column
         StockCell("-", Modifier.width(60.dp), JivaColors.DeepBlue) // CGST column
         StockCell("-", Modifier.width(60.dp), JivaColors.DeepBlue) // SGST column
+        StockCell("-", Modifier.width(60.dp), JivaColors.DeepBlue) // IGST column
     }
 }
 

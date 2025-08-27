@@ -73,7 +73,11 @@ interface JivaRepository {
     // Outstanding operations
     fun getOutstandingFlow(year: String): Flow<List<com.example.jiva.data.database.entities.OutstandingEntity>>
     suspend fun syncOutstanding(userId: Int, yearString: String): Result<Unit>
-    
+
+    // Stock operations
+    fun getStockFlow(year: String): Flow<List<com.example.jiva.data.database.entities.StockEntity>>
+    suspend fun syncStock(userId: Int, yearString: String): Result<Unit>
+
     // Sync all data from server
     suspend fun syncAllData(): Result<Unit>
 }

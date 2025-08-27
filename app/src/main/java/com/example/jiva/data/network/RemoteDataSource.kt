@@ -105,6 +105,23 @@ class RemoteDataSource {
             Result.failure(e)
         }
     }
+
+    /** Stock API */
+    suspend fun getStock(userId: Int, yearString: String): Result<com.example.jiva.data.api.models.StockResponse> {
+        return try {
+            Timber.d("Making Stock API call with userId: $userId, yearString: $yearString")
+            val request = com.example.jiva.data.api.models.StockRequest(userID = userId, yearString = yearString)
+            Timber.d("Request body: $request")
+
+            val response = apiService.getStock(request)
+            Timber.d("API response received: isSuccess=${response.isSuccess}, message=${response.message}, data size=${response.data?.size}")
+
+            Result.success(response)
+        } catch (e: Exception) {
+            Timber.e(e, "Stock API call failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
     
     /**
      * Get all data in a single call (for initial sync)

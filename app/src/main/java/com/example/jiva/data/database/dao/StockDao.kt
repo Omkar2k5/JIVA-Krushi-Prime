@@ -64,4 +64,23 @@ interface StockDao {
     
     @Query("DELETE FROM tb_stock")
     suspend fun deleteAllStocks()
+
+    // Additional methods for Stock Report functionality
+    @Query("SELECT * FROM tb_stock WHERE YearString = :year ORDER BY Item_Name ASC")
+    fun getAll(year: String): Flow<List<StockEntity>>
+
+    @Query("SELECT * FROM tb_stock WHERE YearString = :year ORDER BY Item_Name ASC")
+    suspend fun getAllSync(year: String): List<StockEntity>
+
+    @Query("DELETE FROM tb_stock WHERE YearString = :year")
+    suspend fun clearYear(year: String)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(list: List<StockEntity>)
+
+    @Transaction
+    suspend fun replaceForYear(year: String, list: List<StockEntity>) {
+        clearYear(year)
+        if (list.isNotEmpty()) insertAll(list)
+    }
 }
