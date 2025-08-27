@@ -109,30 +109,25 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
     val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
-    // High-performance data loading with progress
-    val stockDataFlow = remember(year) {
-        com.example.jiva.utils.HighPerformanceDataLoader.loadStockDataProgressive(
-            database = application.database,
-            year = year,
-            onProgress = { current, total, message ->
-                loadingProgress = current
-                loadingMessage = message
-                dataLoadingProgress = current.toFloat()
-            }
-        )
-    }
-
-    // Handle initial screen loading with progressive data loading
+    // Handle initial screen loading with progress tracking
     LaunchedEffect(Unit) {
         isScreenLoading = true
-        loadingMessage = "Initializing..."
+        loadingMessage = "Initializing Stock data..."
 
-        // Start data loading
-        stockDataFlow.collect { data ->
-            if (data.isNotEmpty()) {
-                isScreenLoading = false
+        // Simulate progressive loading for better UX
+        for (i in 0..100 step 10) {
+            loadingProgress = i
+            dataLoadingProgress = i.toFloat()
+            loadingMessage = when {
+                i < 30 -> "Loading Stock data..."
+                i < 70 -> "Processing ${i}% complete..."
+                i < 100 -> "Finalizing data..."
+                else -> "Complete!"
             }
+            kotlinx.coroutines.delay(50) // Smooth progress animation
         }
+
+        isScreenLoading = false
     }
 
     // Note: Data loading is now handled automatically by AppDataLoader at app startup
@@ -144,12 +139,13 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     // Optimized data loading - only from Room DB for better performance
     val stockEntities by viewModel.observeStock(year).collectAsState(initial = emptyList())
 
-    // High-performance data collection from flow
-    var allStockEntries by remember { mutableStateOf<List<StockEntry>>(emptyList()) }
+    // Use optimized data loading from Room DB
+    val stockEntities by viewModel.observeStock(year).collectAsState(initial = emptyList())
 
-    LaunchedEffect(stockDataFlow) {
-        stockDataFlow.collect { entities ->
-            allStockEntries = entities.map { entity ->
+    // High-performance data mapping - direct string mapping for fastest performance
+    val allStockEntries = remember(stockEntities) {
+        try {
+            stockEntities.map { entity ->
                 StockEntry(
                     itemId = entity.itemId,
                     itemName = entity.itemName,
@@ -166,6 +162,9 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                     igst = entity.igst
                 )
             }
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error mapping stock entities")
+            emptyList()
         }
     }
 

@@ -187,7 +187,7 @@ object HighPerformanceDataLoader {
     /**
      * Paginated data loading for extremely large datasets
      */
-    suspend fun loadDataPaginated<T>(
+    suspend fun <T> loadDataPaginated(
         loadPage: suspend (offset: Int, limit: Int) -> List<T>,
         pageSize: Int = 100,
         onProgress: (Int, String) -> Unit = { _, _ -> }

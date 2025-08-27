@@ -15,7 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.jiva.ui.theme.JivaColors
+import com.example.jiva.JivaColors
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
@@ -112,7 +112,7 @@ fun <T> VirtualScrollingTable(
         ) {
             itemsIndexed(
                 items = data,
-                key = { index, item -> "${column.keyExtractor(item)}_$index" }
+                key = { index, item -> "${columns.firstOrNull()?.keyExtractor?.invoke(item) ?: index}_$index" }
             ) { index, item ->
                 // Only render if in visible range (virtual scrolling)
                 if (index in visibleRange || data.size < 100) {

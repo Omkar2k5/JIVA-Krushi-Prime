@@ -61,11 +61,8 @@ class JivaApplication : MultiDexApplication() {
         // Load all data from permanent storage to Room DB
         loadAllDataFromPermanentStorage()
 
-        // Optimize database for performance
-        optimizeDatabaseForPerformance()
-
-        // Preload data for instant access
-        preloadDataForPerformance()
+        // Simple performance optimization for immediate benefits
+        optimizePerformanceSimple()
 
         Timber.d("JIVA Application started successfully")
 
@@ -276,45 +273,33 @@ class JivaApplication : MultiDexApplication() {
     }
 
     /**
-     * Preload data for instant access and better performance
+     * Simple performance optimization for immediate benefits
      */
-    private fun preloadDataForPerformance() {
+    private fun optimizePerformanceSimple() {
         applicationScope.launch {
             try {
                 val year = com.example.jiva.utils.UserEnv.getFinancialYear(this@JivaApplication) ?: "2025-26"
 
-                Timber.d("🚀 Starting data preloading for performance optimization")
+                Timber.d("🚀 Starting simple performance optimization")
 
-                // Preload data using high-performance loader
-                com.example.jiva.utils.HighPerformanceDataLoader.preloadData(
+                // Apply simple optimizations
+                com.example.jiva.utils.SimplePerformanceOptimizer.optimizeAppStartup(
+                    context = this@JivaApplication,
+                    database = database,
+                    scope = applicationScope
+                )
+
+                // Preload data in background
+                com.example.jiva.utils.SimplePerformanceOptimizer.preloadDataInBackground(
                     database = database,
                     year = year,
                     scope = applicationScope
                 )
 
-                Timber.d("✅ Data preloading completed - app ready for instant access")
+                Timber.d("✅ Simple performance optimization completed")
 
             } catch (e: Exception) {
-                Timber.e(e, "❌ Error during data preloading - app will still work normally")
-            }
-        }
-    }
-
-    /**
-     * Optimize database for better performance with large datasets
-     */
-    private fun optimizeDatabaseForPerformance() {
-        applicationScope.launch {
-            try {
-                Timber.d("🔧 Starting database performance optimization")
-
-                // Initialize all database optimizations
-                com.example.jiva.utils.DatabaseOptimizer.initializeOptimizations(database)
-
-                Timber.d("✅ Database optimization completed")
-
-            } catch (e: Exception) {
-                Timber.e(e, "❌ Error during database optimization - app will continue normally")
+                Timber.e(e, "❌ Error during performance optimization - app will continue normally")
             }
         }
     }
