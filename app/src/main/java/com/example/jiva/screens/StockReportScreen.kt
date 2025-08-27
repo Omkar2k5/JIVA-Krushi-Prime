@@ -171,19 +171,45 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     // Item type options
     val itemTypeOptions = listOf("All", "General", "Pesticides", "Fertilizers", "PGR", "Seeds")
 
-    // Optimized filtering with error handling
-    val filteredEntries = remember(itemNameSearch, companySearch, allStockEntries) {
+    // Comprehensive filtering with all filter options
+    val filteredEntries = remember(stockOf, viewAll, itemNameSearch, companySearch, allStockEntries) {
         try {
             if (allStockEntries.isEmpty()) {
                 emptyList()
             } else {
                 allStockEntries.filter { entry ->
                     try {
+                        // Stock Type Filter (stockOf dropdown)
+                        val stockTypeMatch = when (stockOf) {
+                            "All Items" -> true
+                            "Pesticides" -> entry.itemType.equals("Pesticides", ignoreCase = true)
+                            "Fertilizers" -> entry.itemType.equals("Fertilizers", ignoreCase = true)
+                            "Seeds" -> entry.itemType.equals("Seeds", ignoreCase = true)
+                            "PGR" -> entry.itemType.equals("PGR", ignoreCase = true)
+                            "General" -> entry.itemType.equals("General", ignoreCase = true)
+                            else -> true
+                        }
+
+                        // Stock Status Filter (viewAll toggle)
+                        val stockStatusMatch = if (viewAll) {
+                            true // Show all items
+                        } else {
+                            // Show only items with stock (closing stock > 0)
+                            val closingStock = entry.closingStock.toDoubleOrNull() ?: 0.0
+                            closingStock > 0
+                        }
+
+                        // Item Name Search Filter
                         val nameMatch = if (itemNameSearch.isBlank()) true else
                             entry.itemName.contains(itemNameSearch, ignoreCase = true)
+
+                        // Company Search Filter
                         val companyMatch = if (companySearch.isBlank()) true else
                             entry.companyName.contains(companySearch, ignoreCase = true)
-                        nameMatch && companyMatch
+
+                        // All filters must match
+                        stockTypeMatch && stockStatusMatch && nameMatch && companyMatch
+
                     } catch (e: Exception) {
                         timber.log.Timber.e(e, "Error filtering entry: ${entry.itemId}")
                         false
@@ -347,12 +373,40 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                         modifier = Modifier.padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Text(
-                            text = "Stock Filter Options",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = JivaColors.DeepBlue
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Stock Filter Options",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = JivaColors.DeepBlue
+                            )
+
+                            // Active filters indicator
+                            val activeFilters = mutableListOf<String>()
+                            if (stockOf != "All Items") activeFilters.add("Type: $stockOf")
+                            if (!viewAll) activeFilters.add("In Stock Only")
+                            if (itemNameSearch.isNotBlank()) activeFilters.add("Name: $itemNameSearch")
+                            if (companySearch.isNotBlank()) activeFilters.add("Company: $companySearch")
+
+                            if (activeFilters.isNotEmpty()) {
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = JivaColors.Green.copy(alpha = 0.1f)),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        text = "${activeFilters.size} filter(s) active",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = JivaColors.Green,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
 
                         // First row: Item Code, Brand Name, Item Name
                         Row(
@@ -568,7 +622,13 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Button(
-                                onClick = { /* TODO: Show filtered results */ },
+                                onClick = {
+                                    // Force recomposition to apply filters
+                                    // The filters are already applied automatically through remember()
+                                    // This button provides user feedback that filters are applied
+                                    timber.log.Timber.d("🔍 Filters applied: stockOf=$stockOf, viewAll=$viewAll, itemName='$itemNameSearch', company='$companySearch'")
+                                    timber.log.Timber.d("📊 Filtered results: ${filteredEntries.size} items out of ${allStockEntries.size} total")
+                                },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = JivaColors.Green
                                 ),
@@ -582,7 +642,35 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "SHOW",
+                                    text = "SHOW (${filteredEntries.size})",
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
+                            // Clear Filters Button
+                            Button(
+                                onClick = {
+                                    // Reset all filters to default values
+                                    stockOf = "All Items"
+                                    viewAll = true
+                                    itemNameSearch = ""
+                                    companySearch = ""
+                                    timber.log.Timber.d("🧹 All filters cleared - showing all ${allStockEntries.size} items")
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = JivaColors.Orange
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = "Clear",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "CLEAR",
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
@@ -668,12 +756,21 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                text = "Total Items: ${filteredEntries.size}",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = JivaColors.White
-                            )
+                            Column {
+                                Text(
+                                    text = "Showing: ${filteredEntries.size} of ${allStockEntries.size} items",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = JivaColors.White
+                                )
+                                if (filteredEntries.size < allStockEntries.size) {
+                                    Text(
+                                        text = "Filters applied",
+                                        fontSize = 10.sp,
+                                        color = JivaColors.White.copy(alpha = 0.8f)
+                                    )
+                                }
+                            }
                             Text(
                                 text = "Total Valuation: ₹${String.format("%.2f", totalValuation)}",
                                 fontSize = 14.sp,
