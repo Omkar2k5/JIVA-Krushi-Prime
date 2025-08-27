@@ -43,7 +43,8 @@ object DataMapper {
             itemType = this.itemType ?: "",
             companyName = this.company ?: "",
             cgst = this.cgst.toDouble(),
-            sgst = this.sgst.toDouble()
+            sgst = this.sgst.toDouble(),
+            igst = this.igst.toDouble()
         )
     }
     
