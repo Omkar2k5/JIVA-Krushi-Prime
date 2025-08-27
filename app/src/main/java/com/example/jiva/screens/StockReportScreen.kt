@@ -82,6 +82,10 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     var loadingMessage by remember { mutableStateOf("") }
     var dataLoadingProgress by remember { mutableStateOf(0f) }
 
+    // Low-end device optimization
+    val optimalSettings = remember { com.example.jiva.utils.LowEndDeviceOptimizer.getOptimalSettings() }
+    var isEmergencyMode by remember { mutableStateOf(false) }
+
     // Input state management (for UI inputs)
     var stockOfInput by remember { mutableStateOf("All Items") }
     var viewAllInput by remember { mutableStateOf(false) }
@@ -182,60 +186,58 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     // Item type options
     val itemTypeOptions = listOf("All", "General", "Pesticides", "Fertilizers", "PGR", "Seeds")
 
-    // Filtering based on applied filters (only when SHOW button is clicked)
-    val filteredEntries = remember(appliedStockOf, appliedViewAll, appliedItemCodeSearch, appliedItemNameSearch, appliedCompanySearch, allStockEntries) {
-        try {
-            if (allStockEntries.isEmpty()) {
-                emptyList()
-            } else {
-                allStockEntries.filter { entry ->
-                    try {
-                        // Item Type Filter (using correct database field)
-                        val stockTypeMatch = when (appliedStockOf) {
-                            "All Items" -> true
-                            "Pesticides" -> entry.itemType.equals("Pesticides", ignoreCase = true)
-                            "Fertilizers" -> entry.itemType.equals("Fertilizers", ignoreCase = true)
-                            "Seeds" -> entry.itemType.equals("Seeds", ignoreCase = true)
-                            "PGR" -> entry.itemType.equals("PGR", ignoreCase = true)
-                            "General" -> entry.itemType.equals("General", ignoreCase = true)
-                            else -> true
-                        }
-
-                        // Stock Status Filter (viewAll toggle)
-                        val stockStatusMatch = if (appliedViewAll) {
-                            true // Show all items
-                        } else {
-                            // Show only items with stock (closing stock > 0)
-                            val closingStock = entry.closingStock.toDoubleOrNull() ?: 0.0
-                            closingStock > 0
-                        }
-
-                        // Item Code (Item ID) Search Filter
-                        val itemCodeMatch = if (appliedItemCodeSearch.isBlank()) true else
-                            entry.itemId.contains(appliedItemCodeSearch, ignoreCase = true)
-
-                        // Item Name Search Filter
-                        val nameMatch = if (appliedItemNameSearch.isBlank()) true else
-                            entry.itemName.contains(appliedItemNameSearch, ignoreCase = true)
-
-                        // Company Search Filter
-                        val companyMatch = if (appliedCompanySearch.isBlank()) true else
-                            entry.companyName.contains(appliedCompanySearch, ignoreCase = true)
-
-                        // All filters must match
-                        stockTypeMatch && stockStatusMatch && itemCodeMatch && nameMatch && companyMatch
-
-                    } catch (e: Exception) {
-                        timber.log.Timber.e(e, "Error filtering entry: ${entry.itemId}")
-                        false
-                    }
+    // Memory-efficient filtering with pagination for low-end devices
+    val filterPredicate: (StockEntry) -> Boolean = remember(appliedStockOf, appliedViewAll, appliedItemCodeSearch, appliedItemNameSearch, appliedCompanySearch) {
+        { entry ->
+            try {
+                // Item Type Filter (using correct database field)
+                val stockTypeMatch = when (appliedStockOf) {
+                    "All Items" -> true
+                    "Pesticides" -> entry.itemType.equals("Pesticides", ignoreCase = true)
+                    "Fertilizers" -> entry.itemType.equals("Fertilizers", ignoreCase = true)
+                    "Seeds" -> entry.itemType.equals("Seeds", ignoreCase = true)
+                    "PGR" -> entry.itemType.equals("PGR", ignoreCase = true)
+                    "General" -> entry.itemType.equals("General", ignoreCase = true)
+                    else -> true
                 }
+
+                // Stock Status Filter (viewAll toggle)
+                val stockStatusMatch = if (appliedViewAll) {
+                    true // Show all items
+                } else {
+                    // Show only items with stock (closing stock > 0)
+                    val closingStock = entry.closingStock.toDoubleOrNull() ?: 0.0
+                    closingStock > 0
+                }
+
+                // Item Code (Item ID) Search Filter
+                val itemCodeMatch = if (appliedItemCodeSearch.isBlank()) true else
+                    entry.itemId.contains(appliedItemCodeSearch, ignoreCase = true)
+
+                // Item Name Search Filter
+                val nameMatch = if (appliedItemNameSearch.isBlank()) true else
+                    entry.itemName.contains(appliedItemNameSearch, ignoreCase = true)
+
+                // Company Search Filter
+                val companyMatch = if (appliedCompanySearch.isBlank()) true else
+                    entry.companyName.contains(appliedCompanySearch, ignoreCase = true)
+
+                // All filters must match
+                stockTypeMatch && stockStatusMatch && itemCodeMatch && nameMatch && companyMatch
+
+            } catch (e: Exception) {
+                timber.log.Timber.e(e, "Error filtering entry: ${entry.itemId}")
+                false
             }
-        } catch (e: Exception) {
-            timber.log.Timber.e(e, "Error during filtering")
-            emptyList()
         }
     }
+
+    // Use paginated data for memory efficiency
+    val paginatedData = com.example.jiva.utils.LowEndDeviceOptimizer.rememberPaginatedData(
+        allData = allStockEntries,
+        pageSize = optimalSettings.pageSize,
+        filterPredicate = filterPredicate
+    )
 
     // Handle select all functionality
     LaunchedEffect(selectAll, filteredEntries) {
@@ -251,21 +253,52 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
         selectAll = filteredEntries.isNotEmpty() && selectedEntries.containsAll(filteredEntries.map { it.itemId })
     }
 
-    // Calculate totals from string values
-    val totalOpeningStock = remember(filteredEntries) {
-        filteredEntries.sumOf { it.openingStock.toDoubleOrNull() ?: 0.0 }
+    // Memory monitoring and emergency mode detection
+    LaunchedEffect(allStockEntries.size) {
+        try {
+            com.example.jiva.utils.LowEndDeviceOptimizer.optimizeForLowEndDevice()
+
+            // Enable emergency mode for very large datasets on low-end devices
+            if (allStockEntries.size > 500 && optimalSettings.enableVirtualScrolling) {
+                isEmergencyMode = true
+                timber.log.Timber.w("📱 Emergency mode enabled for ${allStockEntries.size} items")
+            }
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error during memory optimization")
+            isEmergencyMode = true
+        }
     }
-    val totalInQty = remember(filteredEntries) {
-        filteredEntries.sumOf { it.inQty.toDoubleOrNull() ?: 0.0 }
+
+    // Emergency memory cleanup on memory pressure
+    LaunchedEffect(paginatedData.totalItems) {
+        try {
+            if (paginatedData.totalItems > 1000) {
+                com.example.jiva.utils.LowEndDeviceOptimizer.emergencyMemoryCleanup()
+            }
+        } catch (e: OutOfMemoryError) {
+            timber.log.Timber.e("🚨 OutOfMemoryError detected - enabling emergency mode")
+            isEmergencyMode = true
+            com.example.jiva.utils.LowEndDeviceOptimizer.emergencyMemoryCleanup()
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error during emergency cleanup")
+        }
     }
-    val totalOutQty = remember(filteredEntries) {
-        filteredEntries.sumOf { it.outQty.toDoubleOrNull() ?: 0.0 }
+
+    // Calculate totals from visible data only (for performance)
+    val totalOpeningStock = remember(paginatedData.visibleItems) {
+        paginatedData.visibleItems.sumOf { it.openingStock.toDoubleOrNull() ?: 0.0 }
     }
-    val totalClosingStock = remember(filteredEntries) {
-        filteredEntries.sumOf { it.closingStock.toDoubleOrNull() ?: 0.0 }
+    val totalInQty = remember(paginatedData.visibleItems) {
+        paginatedData.visibleItems.sumOf { it.inQty.toDoubleOrNull() ?: 0.0 }
     }
-    val totalValuation = remember(filteredEntries) {
-        filteredEntries.sumOf {
+    val totalOutQty = remember(paginatedData.visibleItems) {
+        paginatedData.visibleItems.sumOf { it.outQty.toDoubleOrNull() ?: 0.0 }
+    }
+    val totalClosingStock = remember(paginatedData.visibleItems) {
+        paginatedData.visibleItems.sumOf { it.closingStock.toDoubleOrNull() ?: 0.0 }
+    }
+    val totalValuation = remember(paginatedData.visibleItems) {
+        paginatedData.visibleItems.sumOf {
             val cleanValuation = it.valuation
                 .replace("₹", "")
                 .replace(",", "")
@@ -321,7 +354,7 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
             }
         )
 
-        // High-performance loading screen with progress
+        // High-performance loading screen with progress and device optimization info
         if (isScreenLoading || allStockEntries.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -365,6 +398,15 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                             fontSize = 10.sp,
                             color = JivaColors.DarkGray
                         )
+
+                        if (optimalSettings.enableVirtualScrolling) {
+                            Text(
+                                text = "📱 ${optimalSettings.message}",
+                                fontSize = 9.sp,
+                                color = JivaColors.Orange,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
             }
@@ -601,7 +643,7 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                                     appliedCompanySearch = companySearch
 
                                     timber.log.Timber.d("🔍 Filters applied: stockOf=$appliedStockOf, viewAll=$appliedViewAll, itemCode='$appliedItemCodeSearch', itemName='$appliedItemNameSearch', company='$appliedCompanySearch'")
-                                    timber.log.Timber.d("📊 Filtered results: ${filteredEntries.size} items out of ${allStockEntries.size} total")
+                                    timber.log.Timber.d("📊 Filtered results: ${paginatedData.totalItems} items out of ${allStockEntries.size} total")
                                 },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = JivaColors.Green
@@ -616,7 +658,7 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "SHOW (${filteredEntries.size})",
+                                    text = "SHOW (${paginatedData.totalItems})",
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
@@ -685,7 +727,7 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                                             title = "Stock Report",
                                             fileName = "Stock_Report",
                                             columns = columns,
-                                            data = filteredEntries,
+                                            data = paginatedData.visibleItems,
                                             totalRow = totalRow
                                         )
 
@@ -741,12 +783,12 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                         ) {
                             Column {
                                 Text(
-                                    text = "Showing: ${filteredEntries.size} of ${allStockEntries.size} items",
+                                    text = "Showing: ${paginatedData.visibleItems.size} of ${paginatedData.totalItems} items",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = JivaColors.White
                                 )
-                                if (filteredEntries.size < allStockEntries.size) {
+                                if (paginatedData.totalItems < allStockEntries.size) {
                                     Text(
                                         text = "Filters applied",
                                         fontSize = 10.sp,
@@ -787,33 +829,29 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                         // Horizontally scrollable table
                         val tableScrollState = rememberScrollState()
 
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(tableScrollState)
-                        ) {
-                            // Table Header
-                            StockTableHeader()
-
-                            // Table Rows with Loading Animation
-                            if (isLoading && filteredEntries.isEmpty()) {
-                                // Show loading animation when data is loading
-                                repeat(5) {
-                                    StockLoadingRow()
-                                }
-                            } else {
-                                filteredEntries.forEach { entry ->
-                                    StockTableRow(entry = entry)
-                                }
-                            }
-
-                            // Total Row
-                            StockTotalRow(
-                                totalOpeningStock = totalOpeningStock,
-                                totalInQty = totalInQty,
-                                totalOutQty = totalOutQty,
-                                totalClosingStock = totalClosingStock,
-                                totalValuation = totalValuation
+                        // Memory-efficient table based on device capabilities
+                        if (isEmergencyMode) {
+                            // Emergency mode for extremely low memory situations
+                            com.example.jiva.ui.components.EmergencyStockTable(
+                                entries = paginatedData.visibleItems,
+                                maxItems = 20
+                            )
+                        } else {
+                            // Memory-efficient paginated table
+                            com.example.jiva.ui.components.MemoryEfficientStockTable(
+                                paginatedData = paginatedData,
+                                onLoadMore = {
+                                    scope.launch {
+                                        try {
+                                            // Load more data in background
+                                            // This will be handled by the paginated data state
+                                            com.example.jiva.utils.LowEndDeviceOptimizer.optimizeForLowEndDevice()
+                                        } catch (e: Exception) {
+                                            timber.log.Timber.e(e, "Error loading more data")
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
                     }
