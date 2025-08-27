@@ -59,12 +59,8 @@ class StockReportViewModel(
                 Timber.d("🔄 Starting Stock refresh for userId: $userId, year: $year")
                 _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-                // Create repository instance
-                val repository = com.example.jiva.data.repository.JivaRepositoryImpl(database,
-                    com.example.jiva.data.network.RemoteDataSource(
-                        com.example.jiva.data.network.RetrofitClient.jivaApiService
-                    )
-                )
+                // Create repository instance (RemoteDataSource has no-arg constructor)
+                val repository = com.example.jiva.data.repository.JivaRepositoryImpl(database)
 
                 // Use ApiDataManager to handle API → Permanent Storage
                 val result = com.example.jiva.utils.ApiDataManager.refreshStockData(
