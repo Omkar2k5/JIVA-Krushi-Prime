@@ -97,20 +97,20 @@ object DatabaseOptimizer {
             val db = database.openHelper.readableDatabase
             
             // Get table sizes
-            val outstandingCount = db.rawQuery("SELECT COUNT(*) FROM Outstanding", arrayOf<String>()).use { cursor ->
+            val outstandingCount = db.query("SELECT COUNT(*) FROM Outstanding").use { cursor ->
                 if (cursor.moveToFirst()) cursor.getInt(0) else 0
             }
 
-            val stockCount = db.rawQuery("SELECT COUNT(*) FROM tb_stock", arrayOf<String>()).use { cursor ->
+            val stockCount = db.query("SELECT COUNT(*) FROM tb_stock").use { cursor ->
                 if (cursor.moveToFirst()) cursor.getInt(0) else 0
             }
 
             // Get database size
-            val dbSize = db.rawQuery("PRAGMA page_count", arrayOf<String>()).use { cursor ->
+            val dbSize = db.query("PRAGMA page_count").use { cursor ->
                 if (cursor.moveToFirst()) cursor.getInt(0) else 0
             }
 
-            val pageSize = db.rawQuery("PRAGMA page_size", arrayOf<String>()).use { cursor ->
+            val pageSize = db.query("PRAGMA page_size").use { cursor ->
                 if (cursor.moveToFirst()) cursor.getInt(0) else 0
             }
 
@@ -118,7 +118,7 @@ object DatabaseOptimizer {
             val totalSizeMB = totalSizeBytes / (1024 * 1024)
 
             // Get cache info
-            val cacheSize = db.rawQuery("PRAGMA cache_size", arrayOf<String>()).use { cursor ->
+            val cacheSize = db.query("PRAGMA cache_size").use { cursor ->
                 if (cursor.moveToFirst()) cursor.getInt(0) else 0
             }
             

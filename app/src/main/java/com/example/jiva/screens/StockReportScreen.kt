@@ -139,9 +139,6 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     // Optimized data loading - only from Room DB for better performance
     val stockEntities by viewModel.observeStock(year).collectAsState(initial = emptyList())
 
-    // Use optimized data loading from Room DB
-    val stockEntities by viewModel.observeStock(year).collectAsState(initial = emptyList())
-
     // High-performance data mapping - direct string mapping for fastest performance
     val allStockEntries = remember(stockEntities) {
         try {

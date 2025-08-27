@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.jiva.data.database.JivaDatabase
 import com.example.jiva.data.database.entities.StockEntity
+import com.example.jiva.screens.StockEntry
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,23 +23,6 @@ class StockReportViewModel(
         val isLoading: Boolean = false,
         val error: String? = null,
         val stockEntries: List<StockEntry> = emptyList()
-    )
-
-    // Data model for Stock entries - All strings for optimal performance
-    data class StockEntry(
-        val itemId: String,
-        val itemName: String,
-        val opening: String,
-        val inWard: String,
-        val outWard: String,
-        val closingStock: String,
-        val avgRate: String,
-        val valuation: String,
-        val itemType: String,
-        val company: String,
-        val cgst: String,
-        val sgst: String,
-        val igst: String
     )
 
     private val _uiState = MutableStateFlow(UiState())
