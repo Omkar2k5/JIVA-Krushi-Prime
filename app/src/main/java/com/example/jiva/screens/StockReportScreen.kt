@@ -175,18 +175,139 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     // Re-read userId after potential initialization
     val finalUserId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
-    // Optimized data loading with error handling
-    val stockEntities by viewModel.observeStock(year).collectAsState(initial = emptyList())
+    // Debug data loading with multiple approaches
+    var debugInfo by remember { mutableStateOf("Initializing...") }
 
-    // High-performance data mapping with null safety
-    val allStockEntries = remember(stockEntities) {
+    // Primary data loading with error handling
+    val stockEntities by try {
+        viewModel.observeStock(year).collectAsState(initial = emptyList())
+    } catch (e: Exception) {
+        timber.log.Timber.e(e, "Error observing stock data from ViewModel")
+        debugInfo = "ViewModel error: ${e.message}"
+        remember { mutableStateOf(emptyList()) }
+    }
+
+    // Alternative direct database loading for debugging
+    var directDbEntities by remember { mutableStateOf<List<com.example.jiva.data.database.entities.StockEntity>>(emptyList()) }
+
+    // Test data for debugging (when no real data is available)
+    var useTestData by remember { mutableStateOf(false) }
+    val testStockEntries = remember {
+        listOf(
+            StockEntry(
+                itemId = "TEST001",
+                itemName = "Test Item 1",
+                openingStock = "100",
+                inQty = "50",
+                outQty = "30",
+                closingStock = "120",
+                avgRate = "10.50",
+                valuation = "1260.00",
+                itemType = "General",
+                companyName = "Test Company",
+                cgst = "9",
+                sgst = "9",
+                igst = "18"
+            ),
+            StockEntry(
+                itemId = "TEST002",
+                itemName = "Test Item 2",
+                openingStock = "200",
+                inQty = "75",
+                outQty = "50",
+                closingStock = "225",
+                avgRate = "15.00",
+                valuation = "3375.00",
+                itemType = "Pesticides",
+                companyName = "Test Company 2",
+                cgst = "9",
+                sgst = "9",
+                igst = "18"
+            )
+        )
+    }
+
+    // Debug data loading
+    LaunchedEffect(year) {
         try {
+            timber.log.Timber.d("🔍 Debug: Starting data loading for year: $year")
+            debugInfo = "Loading from ViewModel..."
+
+            // Try direct database access as fallback
+            kotlinx.coroutines.delay(1000) // Wait for ViewModel
+
             if (stockEntities.isEmpty()) {
-                timber.log.Timber.d("No stock entities found for year: $year")
+                timber.log.Timber.w("⚠️ ViewModel returned empty data, trying direct DB access")
+                debugInfo = "ViewModel empty, trying direct DB..."
+
+                try {
+                    val dbData = application.database.stockDao().getAllSync(year)
+                    directDbEntities = dbData
+                    timber.log.Timber.d("📊 Direct DB query returned ${dbData.size} entities")
+                    debugInfo = "Direct DB: ${dbData.size} entities found"
+
+                    // If database is also empty, try to populate with sample data
+                    if (dbData.isEmpty()) {
+                        timber.log.Timber.w("🔍 Database is empty, checking if we should populate sample data")
+                        debugInfo = "Database empty - no stock data available"
+
+                        // Check if this is the first time loading
+                        try {
+                            // Try to get any stock data at all (any year)
+                            val anyData = application.database.stockDao().getAllStocks().value
+                            if (anyData.isNullOrEmpty()) {
+                                timber.log.Timber.i("💡 No stock data found in database - this appears to be a fresh install")
+                                debugInfo = "Fresh install detected - no data in database"
+                            } else {
+                                timber.log.Timber.i("📊 Found ${anyData.size} stock entries for other years")
+                                debugInfo = "Data exists for other years, but none for $year"
+                            }
+                        } catch (e: Exception) {
+                            timber.log.Timber.e(e, "Error checking for any stock data")
+                            debugInfo = "Error checking database: ${e.message}"
+                        }
+                    }
+                } catch (e: Exception) {
+                    timber.log.Timber.e(e, "❌ Direct DB access failed")
+                    debugInfo = "Direct DB error: ${e.message}"
+                }
+            } else {
+                timber.log.Timber.d("✅ ViewModel returned ${stockEntities.size} entities")
+                debugInfo = "ViewModel: ${stockEntities.size} entities loaded"
+            }
+
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "❌ Error in debug data loading")
+            debugInfo = "Debug error: ${e.message}"
+        }
+    }
+
+    // High-performance data mapping with fallback sources
+    val allStockEntries = remember(stockEntities, directDbEntities, useTestData) {
+        try {
+            // Use test data if enabled, otherwise use real data sources
+            if (useTestData) {
+                timber.log.Timber.d("🧪 Using test data: ${testStockEntries.size} entries")
+                return@remember testStockEntries
+            }
+
+            // Use ViewModel data if available, otherwise use direct DB data
+            val sourceEntities = if (stockEntities.isNotEmpty()) {
+                timber.log.Timber.d("📊 Using ViewModel data: ${stockEntities.size} entities")
+                stockEntities
+            } else if (directDbEntities.isNotEmpty()) {
+                timber.log.Timber.d("📊 Using direct DB data: ${directDbEntities.size} entities")
+                directDbEntities
+            } else {
+                timber.log.Timber.w("⚠️ No data available from any source for year: $year")
+                emptyList()
+            }
+
+            if (sourceEntities.isEmpty()) {
                 emptyList()
             } else {
-                timber.log.Timber.d("Mapping ${stockEntities.size} stock entities")
-                stockEntities.mapNotNull { entity ->
+                timber.log.Timber.d("🔄 Mapping ${sourceEntities.size} stock entities")
+                sourceEntities.mapNotNull { entity ->
                     try {
                         StockEntry(
                             itemId = entity.itemId ?: "",
@@ -537,30 +658,160 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                     color = JivaColors.DarkGray,
                     textAlign = TextAlign.Center
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Debug: $debugInfo",
+                    fontSize = 12.sp,
+                    color = JivaColors.Orange,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "ViewModel entities: ${stockEntities.size}",
+                    fontSize = 10.sp,
+                    color = JivaColors.DarkGray,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "Direct DB entities: ${directDbEntities.size}",
+                    fontSize = 10.sp,
+                    color = JivaColors.DarkGray,
+                    textAlign = TextAlign.Center
+                )
                 Spacer(modifier = Modifier.height(24.dp))
-                Button(
-                    onClick = {
-                        // Safe refresh for empty data state
-                        scope.launch {
-                            try {
-                                timber.log.Timber.d("🔄 Refreshing from empty state")
-                                isScreenLoading = true
-                                kotlinx.coroutines.delay(1000) // Show loading
-                                isScreenLoading = false
-                            } catch (e: Exception) {
-                                timber.log.Timber.e(e, "Error refreshing from empty state")
-                                isScreenLoading = false
-                            }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = JivaColors.DeepBlue)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Refresh"
+                    Button(
+                        onClick = {
+                            // Safe refresh for empty data state
+                            scope.launch {
+                                try {
+                                    timber.log.Timber.d("🔄 Refreshing from empty state")
+                                    isScreenLoading = true
+                                    debugInfo = "Refreshing..."
+                                    kotlinx.coroutines.delay(1000) // Show loading
+                                    isScreenLoading = false
+                                } catch (e: Exception) {
+                                    timber.log.Timber.e(e, "Error refreshing from empty state")
+                                    isScreenLoading = false
+                                    debugInfo = "Refresh error: ${e.message}"
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = JivaColors.DeepBlue)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh"
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Refresh")
+                    }
+
+                    Button(
+                        onClick = {
+                            // Manual data loading for debugging
+                            scope.launch {
+                                try {
+                                    timber.log.Timber.d("🔧 Manual data loading")
+                                    debugInfo = "Manual loading..."
+
+                                    // Try multiple approaches
+                                    val dbData = application.database.stockDao().getAllSync(year)
+                                    directDbEntities = dbData
+
+                                    debugInfo = "Manual: Found ${dbData.size} entities"
+                                    timber.log.Timber.d("🔧 Manual loading found ${dbData.size} entities")
+
+                                } catch (e: Exception) {
+                                    timber.log.Timber.e(e, "Error in manual loading")
+                                    debugInfo = "Manual error: ${e.message}"
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = JivaColors.Orange)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Build,
+                            contentDescription = "Manual Load"
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Load")
+                    }
+
+                    Button(
+                        onClick = {
+                            useTestData = !useTestData
+                            debugInfo = if (useTestData) "Test data enabled" else "Test data disabled"
+                            timber.log.Timber.d("🧪 Test data toggled: $useTestData")
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (useTestData) JivaColors.Green else JivaColors.Purple
+                        )
+                    ) {
+                        Icon(
+                            imageVector = if (useTestData) Icons.Default.CheckCircle else Icons.Default.Science,
+                            contentDescription = "Test Data"
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(if (useTestData) "Real" else "Test")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Server data loading button
+                if (finalUserId != null) {
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                try {
+                                    timber.log.Timber.d("🌐 Attempting to load stock data from server")
+                                    debugInfo = "Loading from server..."
+                                    isScreenLoading = true
+
+                                    // Use the repository to sync stock data
+                                    val result = application.repository.syncStock(finalUserId, year)
+
+                                    if (result.isSuccess) {
+                                        timber.log.Timber.d("✅ Server data loaded successfully")
+                                        debugInfo = "Server data loaded successfully"
+
+                                        // Reload data from database
+                                        val newData = application.database.stockDao().getAllSync(year)
+                                        directDbEntities = newData
+                                        debugInfo = "Server loaded: ${newData.size} entities"
+                                    } else {
+                                        timber.log.Timber.e("❌ Server data loading failed")
+                                        debugInfo = "Server loading failed: ${result.exceptionOrNull()?.message}"
+                                    }
+
+                                    isScreenLoading = false
+
+                                } catch (e: Exception) {
+                                    timber.log.Timber.e(e, "Error loading from server")
+                                    debugInfo = "Server error: ${e.message}"
+                                    isScreenLoading = false
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = JivaColors.Green),
+                        enabled = !isScreenLoading
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudDownload,
+                            contentDescription = "Load from Server"
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Load from Server")
+                    }
+                } else {
+                    Text(
+                        text = "User ID not available - cannot load from server",
+                        fontSize = 12.sp,
+                        color = JivaColors.Orange,
+                        textAlign = TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Refresh Data")
                 }
             }
         } else {
