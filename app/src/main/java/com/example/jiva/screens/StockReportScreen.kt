@@ -168,12 +168,7 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     val finalUserId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
     // Optimized data loading with error handling
-    val stockEntities by try {
-        viewModel.observeStock(year).collectAsState(initial = emptyList())
-    } catch (e: Exception) {
-        timber.log.Timber.e(e, "Error observing stock data")
-        remember { mutableStateOf(emptyList()) }
-    }
+    val stockEntities by viewModel.observeStock(year).collectAsState(initial = emptyList())
 
     // High-performance data mapping with null safety
     val allStockEntries = remember(stockEntities) {
@@ -262,27 +257,11 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     }
 
     // Use paginated data for memory efficiency with error handling
-    val paginatedData = try {
-        LowEndDeviceOptimizer.rememberPaginatedData(
-            allData = allStockEntries,
-            pageSize = optimalSettings.pageSize,
-            filterPredicate = filterPredicate
-        )
-    } catch (e: Exception) {
-        timber.log.Timber.e(e, "Error creating paginated data")
-        remember {
-            LowEndDeviceOptimizer.PaginatedDataState(
-                currentPage = 0,
-                pageSize = 25,
-                totalItems = 0,
-                visibleItems = emptyList(),
-                isLoading = false,
-                hasMorePages = false,
-                filterProgress = 100f,
-                filterMessage = "Error loading data"
-            )
-        }
-    }
+    val paginatedData = LowEndDeviceOptimizer.rememberPaginatedData(
+        allData = allStockEntries,
+        pageSize = optimalSettings.pageSize,
+        filterPredicate = filterPredicate
+    )
 
     // Handle select all functionality
     LaunchedEffect(selectAll, paginatedData.visibleItems) {
@@ -918,61 +897,29 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                         // Horizontally scrollable table
                         val tableScrollState = rememberScrollState()
 
-                        // Memory-efficient table based on device capabilities with error handling
-                        try {
-                            if (isEmergencyMode || paginatedData.totalItems == 0) {
-                                // Emergency mode for extremely low memory situations
-                                EmergencyStockTable(
-                                    entries = paginatedData.visibleItems,
-                                    maxItems = 20
-                                )
-                            } else {
-                                // Memory-efficient paginated table
-                                MemoryEfficientStockTable(
-                                    paginatedData = paginatedData,
-                                    onLoadMore = {
-                                        scope.launch {
-                                            try {
-                                                // Load more data in background
-                                                LowEndDeviceOptimizer.optimizeForLowEndDevice()
-                                            } catch (e: Exception) {
-                                                timber.log.Timber.e(e, "Error loading more data")
-                                            }
+                        // Memory-efficient table based on device capabilities
+                        if (isEmergencyMode || paginatedData.totalItems == 0) {
+                            // Emergency mode for extremely low memory situations
+                            EmergencyStockTable(
+                                entries = paginatedData.visibleItems,
+                                maxItems = 20
+                            )
+                        } else {
+                            // Memory-efficient paginated table
+                            MemoryEfficientStockTable(
+                                paginatedData = paginatedData,
+                                onLoadMore = {
+                                    scope.launch {
+                                        try {
+                                            // Load more data in background
+                                            LowEndDeviceOptimizer.optimizeForLowEndDevice()
+                                        } catch (e: Exception) {
+                                            timber.log.Timber.e(e, "Error loading more data")
                                         }
-                                    },
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                        } catch (e: Exception) {
-                            timber.log.Timber.e(e, "Error rendering table")
-                            // Fallback to simple text display
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = JivaColors.Orange.copy(alpha = 0.1f))
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(16.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Error,
-                                        contentDescription = "Error",
-                                        tint = JivaColors.Orange
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = "Error displaying table",
-                                        fontSize = 14.sp,
-                                        color = JivaColors.Orange,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Text(
-                                        text = "Please try refreshing the data",
-                                        fontSize = 12.sp,
-                                        color = JivaColors.DarkGray
-                                    )
-                                }
-                            }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
                         }
                     }
                 }

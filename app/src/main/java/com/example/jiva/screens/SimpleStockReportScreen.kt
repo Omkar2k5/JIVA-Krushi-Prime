@@ -1,5 +1,6 @@
 package com.example.jiva.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -50,14 +51,14 @@ fun SimpleStockReportScreen() {
     // Get current year
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
     
-    // Load data with error handling
-    LaunchedEffect(year) {
+    // Observe stock data
+    val stockEntities by viewModel.observeStock(year).collectAsState(initial = emptyList())
+    
+    // Map data when stockEntities changes
+    LaunchedEffect(stockEntities) {
         try {
             isLoading = true
             errorMessage = null
-            
-            // Simple data loading
-            val stockEntities = viewModel.observeStock(year).value ?: emptyList()
             
             stockData = stockEntities.mapNotNull { entity ->
                 try {
@@ -97,15 +98,39 @@ fun SimpleStockReportScreen() {
         // Header
         ResponsiveReportHeader(
             title = "Stock Report (Simple)",
+            subtitle = "Simple stock data view",
             onBackClick = { /* Handle back */ },
-            onRefreshClick = {
-                scope.launch {
-                    isLoading = true
-                    errorMessage = null
-                    // Trigger reload
+            actions = {
+                IconButton(
+                    onClick = {
+                        scope.launch {
+                            isLoading = true
+                            errorMessage = null
+                            // Trigger reload
+                        }
+                    },
+                    enabled = !isLoading,
+                    modifier = Modifier
+                        .background(
+                            JivaColors.White.copy(alpha = 0.2f),
+                            RoundedCornerShape(8.dp)
+                        )
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = JivaColors.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh Stock Data",
+                            tint = JivaColors.White
+                        )
+                    }
                 }
-            },
-            isRefreshing = isLoading
+            }
         )
         
         // Content
