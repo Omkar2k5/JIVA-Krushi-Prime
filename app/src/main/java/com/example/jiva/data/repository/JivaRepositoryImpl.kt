@@ -609,6 +609,79 @@ class JivaRepositoryImpl(
         }
     }
 
+    override suspend fun syncSalePurchase(userId: Int, yearString: String): Result<Unit> {
+        return try {
+            Timber.d("🚀 Starting SalePurchase API call for userId: $userId, yearString: $yearString")
+            val apiResult = remoteDataSource.getSalePurchase(userId, yearString)
+
+            Timber.d("📡 SalePurchase API call completed. Success: ${apiResult.isSuccess}")
+
+            if (apiResult.isSuccess) {
+                val body = apiResult.getOrNull()
+                Timber.d("API response body: isSuccess=${body?.isSuccess}, message=${body?.message}, data size=${body?.data?.size}")
+
+                if (body?.isSuccess == true) {
+                    val items = body.data.orEmpty()
+                    Timber.d("📦 Processing ${items.size} sale/purchase items from API")
+
+                    // Map API model -> Room entity
+                    val entities = items.map { salePurchaseItem ->
+                        SalePurchaseEntity(
+                            cmpCode = salePurchaseItem.cmpCode.toIntOrNull() ?: 0,
+                            trDate = try {
+                                java.text.SimpleDateFormat("M/d/yyyy h:mm:ss a", java.util.Locale.US).parse(salePurchaseItem.trDate)
+                            } catch (e: Exception) {
+                                Timber.w("Failed to parse date: ${salePurchaseItem.trDate}")
+                                null
+                            },
+                            partyName = salePurchaseItem.partyName,
+                            gstin = salePurchaseItem.gstin,
+                            trType = salePurchaseItem.trType,
+                            refNo = salePurchaseItem.refNo,
+                            itemName = salePurchaseItem.item_Name,
+                            hsn = salePurchaseItem.hsn,
+                            category = salePurchaseItem.category,
+                            qty = java.math.BigDecimal(salePurchaseItem.qty.ifBlank { "0" }),
+                            unit = salePurchaseItem.unit,
+                            rate = java.math.BigDecimal(salePurchaseItem.rate.ifBlank { "0" }),
+                            amount = java.math.BigDecimal(salePurchaseItem.amount.ifBlank { "0" }),
+                            discount = java.math.BigDecimal(salePurchaseItem.discount.ifBlank { "0" }),
+                            yearString = salePurchaseItem.yearString
+                        )
+                    }
+
+                    // Clear existing data for this year and insert new data in chunks for performance
+                    Timber.d("🗑️ Clearing existing sale/purchase data for year: $yearString")
+                    database.salePurchaseDao().deleteByYear(yearString)
+
+                    // Insert in chunks for better performance with large datasets
+                    val chunkSize = 1000
+                    var index = 0
+                    while (index < entities.size) {
+                        val end = minOf(index + chunkSize, entities.size)
+                        database.salePurchaseDao().insertAll(entities.subList(index, end))
+                        index = end
+                    }
+
+                    Timber.d("✅ Successfully inserted ${entities.size} sale/purchase rows for $yearString")
+                    Result.success(Unit)
+                } else {
+                    val errorMsg = "API returned isSuccess=false: ${body?.message}"
+                    Timber.e(errorMsg)
+                    Result.failure(IllegalStateException(errorMsg))
+                }
+            } else {
+                val exception = apiResult.exceptionOrNull()
+                val errorMsg = "SalePurchase API call failed: ${exception?.message}"
+                Timber.e(exception, errorMsg)
+                Result.failure(exception ?: IllegalStateException(errorMsg))
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error syncing sale/purchase data")
+            Result.failure(e)
+        }
+    }
+
     // Sync all data
     override suspend fun syncAllData(): Result<Unit> {
         return try {

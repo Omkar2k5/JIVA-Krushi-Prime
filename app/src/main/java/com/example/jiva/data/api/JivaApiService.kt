@@ -12,6 +12,8 @@ import com.example.jiva.data.api.models.StockRequest
 import com.example.jiva.data.api.models.StockResponse
 import com.example.jiva.data.api.models.LedgerRequest
 import com.example.jiva.data.api.models.LedgerResponse
+import com.example.jiva.data.api.models.SalePurchaseRequest
+import com.example.jiva.data.api.models.SalePurchaseResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -130,6 +132,13 @@ interface JivaApiService {
     @Headers("Content-Type: application/json")
     @POST("api/JivaBusiness/ledger")
     suspend fun getLedger(@Body request: LedgerRequest): LedgerResponse
+
+    /**
+     * POST /api/JivaBusiness/SalePurchase
+     */
+    @Headers("Content-Type: application/json")
+    @POST("api/JivaBusiness/SalePurchase")
+    suspend fun getSalePurchase(@Body request: SalePurchaseRequest): SalePurchaseResponse
 
     // Additional filtered endpoints for better performance
     

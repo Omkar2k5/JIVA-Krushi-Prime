@@ -4,6 +4,8 @@ import com.example.jiva.data.database.entities.*
 import com.example.jiva.data.api.models.SyncDataResponse
 import com.example.jiva.data.api.models.LedgerRequest
 import com.example.jiva.data.api.models.LedgerResponse
+import com.example.jiva.data.api.models.SalePurchaseRequest
+import com.example.jiva.data.api.models.SalePurchaseResponse
 import timber.log.Timber
 import java.io.IOException
 
@@ -137,6 +139,22 @@ class RemoteDataSource {
             Result.success(response)
         } catch (e: Exception) {
             Timber.e(e, "Ledger API call failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getSalePurchase(userId: Int, yearString: String): Result<com.example.jiva.data.api.models.SalePurchaseResponse> {
+        return try {
+            Timber.d("Making SalePurchase API call with userId: $userId, yearString: $yearString")
+            val request = com.example.jiva.data.api.models.SalePurchaseRequest(userID = userId, yearString = yearString)
+            Timber.d("Request body: $request")
+
+            val response = apiService.getSalePurchase(request)
+            Timber.d("API response received: isSuccess=${response.isSuccess}, message=${response.message}, data size=${response.data?.size}")
+
+            Result.success(response)
+        } catch (e: Exception) {
+            Timber.e(e, "SalePurchase API call failed: ${e.message}")
             Result.failure(e)
         }
     }

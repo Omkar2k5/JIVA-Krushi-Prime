@@ -81,6 +81,9 @@ interface JivaRepository {
     // Ledger operations
     suspend fun syncLedger(userId: Int, yearString: String): Result<Unit>
 
+    // Sale/Purchase operations
+    suspend fun syncSalePurchase(userId: Int, yearString: String): Result<Unit>
+
     // Sync all data from server
     suspend fun syncAllData(): Result<Unit>
 }

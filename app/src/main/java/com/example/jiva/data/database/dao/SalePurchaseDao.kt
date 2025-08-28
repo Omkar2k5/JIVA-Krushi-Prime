@@ -68,6 +68,15 @@ interface SalePurchaseDao {
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSalePurchases(salePurchases: List<SalePurchaseEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(salePurchases: List<SalePurchaseEntity>)
+
+    @Query("DELETE FROM tb_salepurchase WHERE YearString = :yearString")
+    suspend fun deleteByYear(yearString: String)
+
+    @Query("SELECT * FROM tb_salepurchase WHERE YearString = :yearString ORDER BY trDate DESC")
+    fun getByYear(yearString: String): Flow<List<SalePurchaseEntity>>
     
     @Update
     suspend fun updateSalePurchase(salePurchase: SalePurchaseEntity)
