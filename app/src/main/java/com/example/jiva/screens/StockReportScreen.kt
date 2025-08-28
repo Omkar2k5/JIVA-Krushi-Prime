@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -665,22 +666,29 @@ private fun StockTableSection(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Professional table with unified horizontal scrolling
+            // Outstanding Report style table with horizontal scrolling
             Column(
                 modifier = Modifier
                     .height(400.dp)
                     .horizontalScroll(rememberScrollState())
             ) {
-                // Header
+                // Header in Outstanding Report style
                 StockTableHeader()
 
-                // Data rows in scrollable column
+                // Data rows in Outstanding Report style
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                    modifier = Modifier.fillMaxSize()
                 ) {
                     items(entries) { entry ->
                         StockTableRow(entry = entry)
+                    }
+
+                    // Total row like Outstanding Report
+                    item {
+                        StockTotalRow(
+                            totalValuation = totalValuation,
+                            totalEntries = entries.size
+                        )
                     }
                 }
             }
@@ -690,106 +698,188 @@ private fun StockTableSection(
 
 @Composable
 private fun StockTableHeader() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = JivaColors.DeepBlue),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    Row(
+        modifier = Modifier
+            .background(
+                JivaColors.LightGray,
+                RoundedCornerShape(8.dp)
+            )
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp, horizontal = 8.dp)
-        ) {
-            HeaderCell("Item ID", 80.dp)
-            HeaderCell("Item Name", 150.dp)
-            HeaderCell("Opening", 80.dp)
-            HeaderCell("InWard", 80.dp)
-            HeaderCell("OutWard", 80.dp)
-            HeaderCell("Closing", 80.dp)
-            HeaderCell("Avg Rate", 90.dp)
-            HeaderCell("Valuation", 100.dp)
-            HeaderCell("Type", 100.dp)
-            HeaderCell("Company", 120.dp)
-            HeaderCell("CGST%", 70.dp)
-            HeaderCell("SGST%", 70.dp)
-            HeaderCell("IGST%", 70.dp)
-        }
+        StockHeaderCell("Item ID", Modifier.width(80.dp))
+        StockHeaderCell("Item Name", Modifier.width(150.dp))
+        StockHeaderCell("Opening", Modifier.width(80.dp))
+        StockHeaderCell("InWard", Modifier.width(80.dp))
+        StockHeaderCell("OutWard", Modifier.width(80.dp))
+        StockHeaderCell("Closing", Modifier.width(80.dp))
+        StockHeaderCell("Avg Rate", Modifier.width(90.dp))
+        StockHeaderCell("Valuation", Modifier.width(100.dp))
+        StockHeaderCell("Type", Modifier.width(100.dp))
+        StockHeaderCell("Company", Modifier.width(120.dp))
+        StockHeaderCell("CGST%", Modifier.width(70.dp))
+        StockHeaderCell("SGST%", Modifier.width(70.dp))
+        StockHeaderCell("IGST%", Modifier.width(70.dp))
     }
 }
 
 @Composable
-private fun HeaderCell(text: String, width: androidx.compose.ui.unit.Dp) {
-    Box(
-        modifier = Modifier
-            .width(width)
-            .padding(horizontal = 4.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            color = JivaColors.White,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
+private fun StockHeaderCell(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Bold,
+        color = JivaColors.DeepBlue,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+    )
 }
 
 @Composable
 private fun StockTableRow(entry: StockEntry) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = JivaColors.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
+    // Safe data processing before rendering (Outstanding Report style)
+    val safeEntry = remember(entry) {
+        try {
+            entry.copy(
+                itemId = entry.itemId.takeIf { it.isNotBlank() } ?: "N/A",
+                itemName = entry.itemName.takeIf { it.isNotBlank() } ?: "Unknown",
+                opening = entry.opening.takeIf { it.isNotBlank() } ?: "0",
+                inWard = entry.inWard.takeIf { it.isNotBlank() } ?: "0",
+                outWard = entry.outWard.takeIf { it.isNotBlank() } ?: "0",
+                closingStock = entry.closingStock.takeIf { it.isNotBlank() } ?: "0",
+                avgRate = entry.avgRate.takeIf { it.isNotBlank() } ?: "0",
+                valuation = entry.valuation.takeIf { it.isNotBlank() } ?: "0",
+                itemType = entry.itemType.takeIf { it.isNotBlank() } ?: "",
+                company = entry.company.takeIf { it.isNotBlank() } ?: "",
+                cgst = entry.cgst.takeIf { it.isNotBlank() } ?: "0",
+                sgst = entry.sgst.takeIf { it.isNotBlank() } ?: "0",
+                igst = entry.igst.takeIf { it.isNotBlank() } ?: "0"
+            )
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error processing entry: ${entry.itemId}")
+            StockEntry("Error", "Error loading data", "0", "0", "0", "0", "0", "0", "", "", "0", "0", "0")
+        }
+    }
+
+    // Safe valuation parsing for color coding
+    val valuationValue = remember(safeEntry.valuation) {
+        try {
+            safeEntry.valuation.replace(",", "").toDoubleOrNull() ?: 0.0
+        } catch (e: Exception) {
+            0.0
+        }
+    }
+
+    Column {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
                 .padding(vertical = 8.dp, horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            DataCell(entry.itemId, 80.dp, JivaColors.DeepBlue, FontWeight.Medium)
-            DataCell(entry.itemName, 150.dp, JivaColors.DarkGray, FontWeight.Normal, maxLines = 2)
-            DataCell(entry.opening, 80.dp, JivaColors.DarkGray)
-            DataCell(entry.inWard, 80.dp, JivaColors.Green, FontWeight.Medium)
-            DataCell(entry.outWard, 80.dp, JivaColors.Orange, FontWeight.Medium)
-            DataCell(entry.closingStock, 80.dp, JivaColors.DeepBlue, FontWeight.Bold)
-            DataCell("₹${entry.avgRate}", 90.dp, JivaColors.DarkGray)
-            DataCell("₹${entry.valuation}", 100.dp, JivaColors.Green, FontWeight.Bold)
-            DataCell(entry.itemType, 100.dp, JivaColors.Purple, FontWeight.Medium)
-            DataCell(entry.company, 120.dp, JivaColors.DarkGray)
-            DataCell("${entry.cgst}%", 70.dp, JivaColors.DarkGray)
-            DataCell("${entry.sgst}%", 70.dp, JivaColors.DarkGray)
-            DataCell("${entry.igst}%", 70.dp, JivaColors.DarkGray)
+            StockCell(safeEntry.itemId, Modifier.width(80.dp), JivaColors.DeepBlue)
+            StockCell(safeEntry.itemName, Modifier.width(150.dp), JivaColors.DarkGray)
+            StockCell(safeEntry.opening, Modifier.width(80.dp))
+            StockCell(safeEntry.inWard, Modifier.width(80.dp), JivaColors.Green)
+            StockCell(safeEntry.outWard, Modifier.width(80.dp), JivaColors.Orange)
+            StockCell(safeEntry.closingStock, Modifier.width(80.dp), JivaColors.DeepBlue)
+            StockCell("₹${safeEntry.avgRate}", Modifier.width(90.dp))
+            StockCell(
+                text = "₹${safeEntry.valuation}",
+                modifier = Modifier.width(100.dp),
+                color = if (valuationValue >= 0) JivaColors.Green else JivaColors.Red
+            )
+            StockCell(safeEntry.itemType, Modifier.width(100.dp), JivaColors.Purple)
+            StockCell(safeEntry.company, Modifier.width(120.dp))
+            StockCell("${safeEntry.cgst}%", Modifier.width(70.dp))
+            StockCell("${safeEntry.sgst}%", Modifier.width(70.dp))
+            StockCell("${safeEntry.igst}%", Modifier.width(70.dp))
         }
+
+        HorizontalDivider(
+            color = JivaColors.LightGray,
+            thickness = 0.5.dp,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        )
     }
 }
 
 @Composable
-private fun DataCell(
+private fun StockCell(
     text: String,
-    width: androidx.compose.ui.unit.Dp,
-    color: Color = JivaColors.DarkGray,
-    fontWeight: FontWeight = FontWeight.Normal,
-    maxLines: Int = 1
+    modifier: Modifier = Modifier,
+    color: Color = Color(0xFF374151)
 ) {
-    Box(
-        modifier = Modifier
-            .width(width)
-            .padding(horizontal = 4.dp),
-        contentAlignment = Alignment.CenterStart
-    ) {
-        Text(
-            text = text,
-            fontSize = 9.sp,
-            color = color,
-            fontWeight = fontWeight,
-            maxLines = maxLines,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = if (maxLines > 1) TextAlign.Start else TextAlign.Center
+    // Safe text processing before rendering (Outstanding Report style)
+    val safeText = remember(text) {
+        try {
+            text.takeIf { it.isNotBlank() } ?: ""
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error processing text: $text")
+            "Error"
+        }
+    }
+
+    Text(
+        text = safeText,
+        fontSize = 11.sp,
+        color = color,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun StockTotalRow(totalValuation: Double, totalEntries: Int) {
+    Column {
+        HorizontalDivider(
+            color = JivaColors.DeepBlue,
+            thickness = 2.dp,
+            modifier = Modifier.padding(horizontal = 8.dp)
         )
+
+        Row(
+            modifier = Modifier
+                .background(JivaColors.LightBlue.copy(alpha = 0.3f))
+                .padding(vertical = 12.dp, horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Empty cells to align with data columns
+            repeat(7) {
+                Box(modifier = Modifier.width(80.dp))
+            }
+
+            // Total valuation cell
+            Text(
+                text = "Total: ₹${String.format("%.2f", totalValuation)}",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = JivaColors.Green,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(100.dp)
+            )
+
+            // Total entries cell
+            Text(
+                text = "$totalEntries items",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = JivaColors.DeepBlue,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(100.dp)
+            )
+
+            // Empty cells for remaining columns
+            repeat(3) {
+                Box(modifier = Modifier.width(70.dp))
+            }
+        }
     }
 }
 
