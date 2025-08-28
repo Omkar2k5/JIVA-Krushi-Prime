@@ -191,27 +191,92 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
         filteredEntries.sumOf { it.amt.toDoubleOrNull() ?: 0.0 }
     }
 
+    // Show loading screen if still loading
+    if (isScreenLoading) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                CircularProgressIndicator(
+                    progress = { dataLoadingProgress / 100f },
+                    color = JivaColors.Purple,
+                    modifier = Modifier.size(60.dp)
+                )
+                Text(
+                    text = loadingMessage,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = JivaColors.DeepBlue
+                )
+                Text(
+                    text = "${loadingProgress}% Complete",
+                    fontSize = 14.sp,
+                    color = JivaColors.DarkGray
+                )
+            }
+        }
+        return
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(JivaColors.LightGray)
     ) {
-        // Responsive Header
+        // Responsive Header with Refresh Button
         ResponsiveReportHeader(
             title = "Ledger Report",
-            subtitle = "Account transactions and balance",
-            onBackClick = onBackClick
+            subtitle = "Ledger entries and transactions",
+            onBackClick = onBackClick,
+            actions = {
+                // Refresh Button
+                IconButton(
+                    onClick = {
+                        if (finalUserId != null && !isRefreshing) {
+                            scope.launch {
+                                isRefreshing = true
+                                try {
+                                    val result = application.repository.syncLedger(finalUserId, year)
+                                    if (result.isSuccess) {
+                                        Toast.makeText(context, "Ledger data refreshed successfully", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, "Failed to refresh data", Toast.LENGTH_SHORT).show()
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                } finally {
+                                    isRefreshing = false
+                                }
+                            }
+                        }
+                    }
+                ) {
+                    if (isRefreshing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = JivaColors.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh",
+                            tint = JivaColors.White
+                        )
+                    }
+                }
+            }
         )
 
-        // Create shared scroll state for the entire table
-        val tableScrollState = rememberScrollState()
-
-        // Main content with performance optimizations
+        // Main content
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            userScrollEnabled = true
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Filter Controls Card
             item {
@@ -232,270 +297,137 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                             color = JivaColors.DeepBlue
                         )
 
-                        // Date Range Section
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
+                        // Entry Type Filter
+                        Column {
                             Text(
-                                text = "Date between",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = JivaColors.DeepBlue
-                            )
-                            
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                // From Date
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "From",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = JivaColors.DeepBlue,
-                                        modifier = Modifier.padding(bottom = 4.dp)
-                                    )
-                                    OutlinedTextField(
-                                        value = fromDate,
-                                        onValueChange = { fromDate = it },
-                                        placeholder = { Text("DD/MM/YYYY") },
-                                        trailingIcon = {
-                                            IconButton(onClick = { showFromDatePicker = true }) {
-                                                Icon(
-                                                    imageVector = Icons.Default.DateRange,
-                                                    contentDescription = "Select from date",
-                                                    tint = JivaColors.Purple
-                                                )
-                                            }
-                                        },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(8.dp),
-                                        singleLine = true
-                                    )
-                                }
-
-                                // To Date
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "To",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = JivaColors.DeepBlue,
-                                        modifier = Modifier.padding(bottom = 4.dp)
-                                    )
-                                    OutlinedTextField(
-                                        value = toDate,
-                                        onValueChange = { toDate = it },
-                                        placeholder = { Text("DD/MM/YYYY") },
-                                        trailingIcon = {
-                                            IconButton(onClick = { showToDatePicker = true }) {
-                                                Icon(
-                                                    imageVector = Icons.Default.DateRange,
-                                                    contentDescription = "Select to date",
-                                                    tint = JivaColors.Purple
-                                                )
-                                            }
-                                        },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(8.dp),
-                                        singleLine = true
-                                    )
-                                }
-                            }
-                        }
-
-                        // Show Item Details Checkbox
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = showItemDetails,
-                                onCheckedChange = { showItemDetails = it },
-                                colors = CheckboxDefaults.colors(checkedColor = JivaColors.Purple)
-                            )
-                            Text(
-                                text = "Show Item Details with Rates",
+                                text = "Entry Type",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = JivaColors.DeepBlue
-                            )
-                        }
-
-                        // Account Section
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Text(
-                                text = "Account",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = JivaColors.DeepBlue
+                                color = JivaColors.DeepBlue,
+                                modifier = Modifier.padding(bottom = 4.dp)
                             )
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.Bottom
+                            ExposedDropdownMenuBox(
+                                expanded = isEntryTypeDropdownExpanded,
+                                onExpandedChange = { isEntryTypeDropdownExpanded = it }
                             ) {
-                                // Account Number
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Account Number",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = JivaColors.DeepBlue,
-                                        modifier = Modifier.padding(bottom = 4.dp)
-                                    )
-                                    OutlinedTextField(
-                                        value = accountNumber,
-                                        onValueChange = { accountNumber = it },
-                                        placeholder = { Text("Enter account number") },
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(8.dp),
-                                        singleLine = true
-                                    )
-                                }
-
-                                // Account selection button
-                                Button(
-                                    onClick = { /* TODO: Open account selection dialog */ },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = JivaColors.Orange
-                                    ),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.padding(top = 24.dp)
-                                ) {
-                                    Text("...")
-                                }
-                            }
-
-                            // Account Name
-                            Column {
-                                Text(
-                                    text = "Account Name",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
                                 OutlinedTextField(
-                                    value = accountName,
-                                    onValueChange = { accountName = it },
-                                    placeholder = { Text("Enter account name") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(8.dp),
-                                    singleLine = true
+                                    value = entryTypeFilter,
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = isEntryTypeDropdownExpanded)
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                                    shape = RoundedCornerShape(8.dp)
                                 )
+
+                                ExposedDropdownMenu(
+                                    expanded = isEntryTypeDropdownExpanded,
+                                    onDismissRequest = { isEntryTypeDropdownExpanded = false }
+                                ) {
+                                    listOf("All Types", "Cash Sale", "Credit Sale", "Purchase", "Payment", "Receipt").forEach { type ->
+                                        DropdownMenuItem(
+                                            text = { Text(type) },
+                                            onClick = {
+                                                entryTypeFilter = type
+                                                isEntryTypeDropdownExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
                             }
                         }
 
-                        // Action Buttons
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Button(
-                                onClick = { /* TODO: Show filtered results */ },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = JivaColors.Green
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = "Show",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "SHOW",
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        val columns = listOf(
-                                            PDFGenerator.TableColumn("Date", 100f) { (it as LedgerEntry).entryDate },
-                                            PDFGenerator.TableColumn("Type", 80f) { (it as LedgerEntry).entryType },
-                                            PDFGenerator.TableColumn("No", 70f) { (it as LedgerEntry).entryNo },
-                                            PDFGenerator.TableColumn("Particular", 180f) { (it as LedgerEntry).particular },
-                                            PDFGenerator.TableColumn("DR", 100f) { "₹${String.format("%.2f", (it as LedgerEntry).dr)}" },
-                                            PDFGenerator.TableColumn("CR", 100f) { "₹${String.format("%.2f", (it as LedgerEntry).cr)}" }
-                                        )
-
-                                        val totalRow = mapOf(
-                                            "Date" to "TOTAL",
-                                            "Type" to "",
-                                            "No" to "",
-                                            "Particular" to "",
-                                            "DR" to "₹${String.format("%.2f", totalDr)}",
-                                            "CR" to "₹${String.format("%.2f", totalCr)}"
-                                        )
-
-                                        val config = PDFGenerator.PDFConfig(
-                                            title = "Ledger Report",
-                                            fileName = "Ledger_Report",
-                                            columns = columns,
-                                            data = filteredEntries,
-                                            totalRow = totalRow
-                                        )
-
-                                        PDFGenerator.generateAndSharePDF(context, config)
-                                    }
+                        // Narration Search
+                        Column {
+                            Text(
+                                text = "Search in Narration",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = JivaColors.DeepBlue,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                            OutlinedTextField(
+                                value = narrationSearch,
+                                onValueChange = { narrationSearch = it },
+                                placeholder = { Text("Search in descriptions...") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = "Search",
+                                        tint = JivaColors.Purple
+                                    )
                                 },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF25D366) // WhatsApp green
-                                ),
+                                modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Share,
-                                    contentDescription = "Share",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "SHARE",
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
+                                singleLine = true
+                            )
                         }
                     }
                 }
             }
 
-            // Balance Summary Card
+            // Summary Card
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (balance >= 0) JivaColors.Green else JivaColors.Red
-                    ),
+                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
-                    Box(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(20.dp),
-                        contentAlignment = Alignment.Center
+                        horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        Text(
-                            text = if (balance >= 0)
-                                "Rs. ${String.format("%.0f", balance)} to be received."
-                            else
-                                "Rs. ${String.format("%.0f", -balance)} to be paid.",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = JivaColors.White,
-                            textAlign = TextAlign.Center
-                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "Total Debit",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = JivaColors.DarkGray
+                            )
+                            Text(
+                                text = "₹${String.format("%.2f", totalDr)}",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = JivaColors.Red
+                            )
+                        }
+
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "Total Credit",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = JivaColors.DarkGray
+                            )
+                            Text(
+                                text = "₹${String.format("%.2f", totalCr)}",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = JivaColors.Green
+                            )
+                        }
+
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "Entries",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = JivaColors.DarkGray
+                            )
+                            Text(
+                                text = "${filteredEntries.size}",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = JivaColors.DeepBlue
+                            )
+                        }
                     }
                 }
             }
@@ -512,34 +444,39 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                         modifier = Modifier.padding(16.dp)
                     ) {
                         Text(
-                            text = "Ledger Entries",
+                            text = "Ledger Entries (${filteredEntries.size} entries)",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = JivaColors.DeepBlue,
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
 
-                        // Horizontally scrollable table
-                        val tableScrollState = rememberScrollState()
-
+                        // Outstanding Report style table with horizontal scrolling
                         Column(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(tableScrollState)
+                                .height(400.dp)
+                                .horizontalScroll(rememberScrollState())
                         ) {
-                            // Table Header
+                            // Header in Outstanding Report style
                             LedgerTableHeader()
 
-                            // Table Rows
-                            filteredEntries.forEach { entry ->
-                                LedgerTableRow(entry = entry, showDetails = showItemDetails)
-                            }
+                            // Data rows in Outstanding Report style
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                items(filteredEntries) { entry ->
+                                    LedgerTableRow(entry = entry)
+                                }
 
-                            // Total Row
-                            LedgerTotalRow(
-                                totalDebit = totalDr,
-                                totalCredit = totalCr
-                            )
+                                // Total row like Outstanding Report
+                                item {
+                                    LedgerTotalRow(
+                                        totalDr = totalDr,
+                                        totalCr = totalCr,
+                                        totalEntries = filteredEntries.size
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -560,14 +497,19 @@ private fun LedgerTableHeader() {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        LedgerHeaderCell("Entry No", Modifier.width(80.dp))
+        LedgerHeaderCell("Manual No", Modifier.width(80.dp))
+        LedgerHeaderCell("Type", Modifier.width(100.dp))
         LedgerHeaderCell("Date", Modifier.width(100.dp))
-        LedgerHeaderCell("Type", Modifier.width(80.dp))
-        LedgerHeaderCell("No", Modifier.width(70.dp))
-        LedgerHeaderCell("Particular", Modifier.width(180.dp))
+        LedgerHeaderCell("Ref No", Modifier.width(80.dp))
+        LedgerHeaderCell("AC ID", Modifier.width(80.dp))
         LedgerHeaderCell("DR", Modifier.width(100.dp))
         LedgerHeaderCell("CR", Modifier.width(100.dp))
-        LedgerHeaderCell("Manual", Modifier.width(80.dp))
-        LedgerHeaderCell("Details", Modifier.width(150.dp))
+        LedgerHeaderCell("Narration", Modifier.width(200.dp))
+        LedgerHeaderCell("Clear", Modifier.width(80.dp))
+        LedgerHeaderCell("GST Rate", Modifier.width(80.dp))
+        LedgerHeaderCell("Amount", Modifier.width(100.dp))
+        LedgerHeaderCell("IGST", Modifier.width(80.dp))
     }
 }
 
@@ -586,13 +528,30 @@ private fun LedgerHeaderCell(text: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun LedgerTableRow(
-    entry: LedgerEntry,
-    showDetails: Boolean
-) {
-    // Consistent styling for all rows like other tables
-    val textColor = Color(0xFF374151)
-    val fontWeight = FontWeight.Normal
+private fun LedgerTableRow(entry: LedgerEntry) {
+    // Safe data processing before rendering (Outstanding Report style)
+    val safeEntry = remember(entry) {
+        try {
+            entry.copy(
+                entryNo = entry.entryNo.takeIf { it.isNotBlank() } ?: "N/A",
+                manualNo = entry.manualNo.takeIf { it.isNotBlank() } ?: "",
+                entryType = entry.entryType.takeIf { it.isNotBlank() } ?: "",
+                entryDate = entry.entryDate.takeIf { it.isNotBlank() } ?: "",
+                refNo = entry.refNo.takeIf { it.isNotBlank() } ?: "",
+                acId = entry.acId.takeIf { it.isNotBlank() } ?: "",
+                dr = entry.dr.takeIf { it.isNotBlank() } ?: "0.00",
+                cr = entry.cr.takeIf { it.isNotBlank() } ?: "0.00",
+                narration = entry.narration.takeIf { it.isNotBlank() } ?: "",
+                isClere = entry.isClere.takeIf { it.isNotBlank() } ?: "False",
+                gstRate = entry.gstRate.takeIf { it.isNotBlank() } ?: "0.00",
+                amt = entry.amt.takeIf { it.isNotBlank() } ?: "0.00",
+                igst = entry.igst.takeIf { it.isNotBlank() } ?: "0.00"
+            )
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error processing entry: ${entry.entryNo}")
+            LedgerEntry("Error", "Error loading data", "", "", "", "", "", "", "", "", "", "", "", "", "")
+        }
+    }
 
     Column {
         Row(
@@ -601,29 +560,19 @@ private fun LedgerTableRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            LedgerCell(entry.entryDate, modifier = Modifier.width(100.dp), color = textColor, fontWeight = fontWeight)
-            LedgerCell(entry.entryType, modifier = Modifier.width(80.dp), color = textColor, fontWeight = fontWeight)
-            LedgerCell(entry.entryNo, modifier = Modifier.width(70.dp), color = textColor, fontWeight = fontWeight)
-            LedgerCell(entry.particular, modifier = Modifier.width(180.dp), color = textColor, fontWeight = fontWeight)
-            LedgerCell(
-                text = if (entry.dr > 0) "₹${String.format("%.0f", entry.dr)}" else "",
-                modifier = Modifier.width(100.dp),
-                color = textColor,
-                fontWeight = fontWeight
-            )
-            LedgerCell(
-                text = if (entry.cr > 0) "₹${String.format("%.0f", entry.cr)}" else "",
-                modifier = Modifier.width(100.dp),
-                color = textColor,
-                fontWeight = fontWeight
-            )
-            LedgerCell(entry.manualNo, modifier = Modifier.width(80.dp), color = textColor, fontWeight = fontWeight)
-            LedgerCell(
-                text = if (showDetails) entry.details else "",
-                modifier = Modifier.width(150.dp),
-                color = textColor,
-                fontWeight = fontWeight
-            )
+            LedgerCell(safeEntry.entryNo, Modifier.width(80.dp), JivaColors.DeepBlue)
+            LedgerCell(safeEntry.manualNo, Modifier.width(80.dp))
+            LedgerCell(safeEntry.entryType, Modifier.width(100.dp), JivaColors.Purple)
+            LedgerCell(safeEntry.entryDate, Modifier.width(100.dp))
+            LedgerCell(safeEntry.refNo, Modifier.width(80.dp))
+            LedgerCell(safeEntry.acId, Modifier.width(80.dp), JivaColors.DeepBlue)
+            LedgerCell("₹${safeEntry.dr}", Modifier.width(100.dp), JivaColors.Red)
+            LedgerCell("₹${safeEntry.cr}", Modifier.width(100.dp), JivaColors.Green)
+            LedgerCell(safeEntry.narration, Modifier.width(200.dp))
+            LedgerCell(safeEntry.isClere, Modifier.width(80.dp))
+            LedgerCell("${safeEntry.gstRate}%", Modifier.width(80.dp))
+            LedgerCell("₹${safeEntry.amt}", Modifier.width(100.dp))
+            LedgerCell("₹${safeEntry.igst}", Modifier.width(80.dp))
         }
 
         HorizontalDivider(
@@ -638,14 +587,22 @@ private fun LedgerTableRow(
 private fun LedgerCell(
     text: String,
     modifier: Modifier = Modifier,
-    color: Color = Color(0xFF374151),
-    fontWeight: FontWeight = FontWeight.Normal
+    color: Color = Color(0xFF374151)
 ) {
+    // Safe text processing before rendering (Outstanding Report style)
+    val safeText = remember(text) {
+        try {
+            text.takeIf { it.isNotBlank() } ?: ""
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error processing text: $text")
+            "Error"
+        }
+    }
+
     Text(
-        text = text,
+        text = safeText,
         fontSize = 11.sp,
         color = color,
-        fontWeight = fontWeight,
         textAlign = TextAlign.Center,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
@@ -654,58 +611,60 @@ private fun LedgerCell(
 }
 
 @Composable
-private fun LedgerTotalRow(
-    totalDebit: Double,
-    totalCredit: Double
-) {
-    Row(
-        modifier = Modifier
-            .background(
-                JivaColors.DeepBlue.copy(alpha = 0.1f),
-                RoundedCornerShape(8.dp)
-            )
-            .padding(vertical = 12.dp, horizontal = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Date column
-        LedgerCell("-", Modifier.width(100.dp), JivaColors.DeepBlue)
-        // Type column
-        LedgerCell("-", Modifier.width(80.dp), JivaColors.DeepBlue)
-        // No column
-        LedgerCell("-", Modifier.width(70.dp), JivaColors.DeepBlue)
-        // Particular column with TOTAL text
-        Text(
-            text = "TOTAL",
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
+private fun LedgerTotalRow(totalDr: Double, totalCr: Double, totalEntries: Int) {
+    Column {
+        HorizontalDivider(
             color = JivaColors.DeepBlue,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.width(180.dp)
+            thickness = 2.dp,
+            modifier = Modifier.padding(horizontal = 8.dp)
         )
-        // DR column
-        LedgerCell(
-            text = "₹${String.format("%.2f", totalDebit)}",
-            modifier = Modifier.width(100.dp),
-            color = JivaColors.Red
-        )
-        // CR column
-        LedgerCell(
-            text = "₹${String.format("%.2f", totalCredit)}",
-            modifier = Modifier.width(100.dp),
-            color = JivaColors.Green
-        )
-        // Manual column
-        LedgerCell("-", Modifier.width(80.dp), JivaColors.DeepBlue)
-        // Details column
-        LedgerCell("-", Modifier.width(150.dp), JivaColors.DeepBlue)
-    }
-}
 
-@Composable
-@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
-private fun LedgerReportScreenPreview() {
-    LedgerReportScreenImpl()
+        Row(
+            modifier = Modifier
+                .background(JivaColors.LightBlue.copy(alpha = 0.3f))
+                .padding(vertical = 12.dp, horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Empty cells to align with data columns
+            repeat(6) {
+                Box(modifier = Modifier.width(80.dp))
+            }
+
+            // Total DR cell
+            Text(
+                text = "Total: ₹${String.format("%.2f", totalDr)}",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = JivaColors.Red,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(100.dp)
+            )
+
+            // Total CR cell
+            Text(
+                text = "Total: ₹${String.format("%.2f", totalCr)}",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = JivaColors.Green,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(100.dp)
+            )
+
+            // Total entries cell
+            Text(
+                text = "$totalEntries entries",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = JivaColors.DeepBlue,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(200.dp)
+            )
+
+            // Empty cells for remaining columns
+            repeat(4) {
+                Box(modifier = Modifier.width(80.dp))
+            }
+        }
+    }
 }
