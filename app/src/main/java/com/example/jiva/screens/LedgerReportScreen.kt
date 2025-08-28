@@ -113,78 +113,83 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
     // Re-read userId after potential initialization
     val finalUserId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
-    // Dummy data with multiple accounts for search testing
-    val allEntries = remember {
-        listOf(
-            // Account 25 - Aman Shaikh entries
-            LedgerEntry("01-Apr-2025", "", "", "Opening Balance - Aman Shaikh (25)", 11000.0, 0.0, "25", "", true),
-            LedgerEntry("05-Aug-2025", "Credit Sale", "1", "Cash Amount Credit - Aman Shaikh", 0.0, 400.0, "25", "Account: 25"),
-            LedgerEntry("05-Aug-2025", "Credit Sale", "1", "Credit Sale No:1 - Aman Shaikh", 2400.0, 0.0, "25", "Rogar 100ml -12, Account: 25"),
-            LedgerEntry("10-Aug-2025", "Payment", "2", "Payment Received - Aman Shaikh", 0.0, 1000.0, "25", "Cash payment, Account: 25"),
+    // Optimized data loading - only from Room DB for better performance
+    val ledgerEntities by viewModel.observeLedger(year).collectAsState(initial = emptyList())
 
-            // Account 001 - ABC Traders entries
-            LedgerEntry("01-Apr-2025", "", "", "Opening Balance - ABC Traders (001)", 5000.0, 0.0, "001", "", true),
-            LedgerEntry("15-Sep-2025", "Credit Sale", "3", "Credit Sale No:3 - ABC Traders", 1500.0, 0.0, "001", "Medicine -5, Account: 001"),
-            LedgerEntry("20-Oct-2025", "Payment", "4", "Payment Received - ABC Traders", 0.0, 500.0, "001", "Bank transfer, Account: 001"),
-
-            // Account 002 - XYZ Suppliers entries
-            LedgerEntry("01-Apr-2025", "", "", "Opening Balance - XYZ Suppliers (002)", 3000.0, 0.0, "002", "", true),
-            LedgerEntry("12-Nov-2025", "Purchase", "5", "Purchase from XYZ Suppliers", 0.0, 2000.0, "002", "Inventory purchase, Account: 002"),
-            LedgerEntry("25-Dec-2025", "Payment", "6", "Payment to XYZ Suppliers", 1800.0, 0.0, "002", "Supplier payment, Account: 002"),
-
-            // Totals and closing (these will be calculated dynamically in real implementation)
-            LedgerEntry("31-Mar-2026", "", "", "Total", 24700.0, 3900.0, "", "", true),
-            LedgerEntry("31-Mar-2026", "", "", "Closing Balance", 20800.0, 0.0, "", "", true)
-        )
-    }
-
-    // Filtered entries based on date range and account
-    val filteredEntries = remember(fromDate, toDate, accountNumber, accountName, allEntries) {
-        val dateFormat = SimpleDateFormat("dd-MMM-yyyy", Locale.getDefault())
-        val fromDateParsed = try { 
-            SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(fromDate) 
-        } catch (e: Exception) { null }
-        val toDateParsed = try { 
-            SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(toDate) 
-        } catch (e: Exception) { null }
-
-        allEntries.filter { entry ->
-            // Always include special rows (Opening Balance, Total, Closing Balance)
-            if (entry.isSpecialRow) return@filter true
-            
-            // Date filter
-            val entryDateParsed = try { 
-                dateFormat.parse(entry.entryDate) 
-            } catch (e: Exception) { null }
-            
-            val dateInRange = if (fromDateParsed != null && toDateParsed != null && entryDateParsed != null) {
-                entryDateParsed >= fromDateParsed && entryDateParsed <= toDateParsed
-            } else true
-            
-            // Account filter - searches in multiple fields for better matching
-            val accountMatches = if (accountNumber.isNotBlank() || accountName.isNotBlank()) {
-                val numberMatch = if (accountNumber.isNotBlank()) {
-                    entry.manualNo.contains(accountNumber, ignoreCase = true) ||
-                    entry.particular.contains("($accountNumber)", ignoreCase = true) ||
-                    entry.details.contains("Account: $accountNumber", ignoreCase = true)
-                } else true
-
-                val nameMatch = if (accountName.isNotBlank()) {
-                    entry.particular.contains(accountName, ignoreCase = true) ||
-                    entry.details.contains(accountName, ignoreCase = true)
-                } else true
-
-                numberMatch && nameMatch
-            } else true
-            
-            dateInRange && accountMatches
+    // Use only Ledger DB data for better performance and stability
+    val allEntries = remember(ledgerEntities) {
+        try {
+            ledgerEntities.map { entity ->
+                LedgerEntry(
+                    entryNo = entity.entryNo?.toString() ?: "",
+                    manualNo = entity.manualNo ?: "",
+                    srNo = entity.srNo?.toString() ?: "",
+                    entryType = entity.entryType ?: "",
+                    entryDate = entity.entryDate?.let {
+                        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it)
+                    } ?: "",
+                    refNo = entity.refNo ?: "",
+                    acId = entity.acId?.toString() ?: "",
+                    dr = entity.dr?.toString() ?: "0.00",
+                    cr = entity.cr?.toString() ?: "0.00",
+                    narration = entity.narration ?: "",
+                    isClere = if (entity.isClere == true) "True" else "False",
+                    trascType = entity.trascType ?: "",
+                    gstRate = entity.gstRate?.toString() ?: "0.00",
+                    amt = entity.amt?.toString() ?: "0.00",
+                    igst = entity.igst?.toString() ?: "0.00"
+                )
+            }
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error mapping ledger entities")
+            emptyList()
         }
     }
 
-    // Calculate totals
-    val totalDr = filteredEntries.filter { !it.isSpecialRow }.sumOf { it.dr }
-    val totalCr = filteredEntries.filter { !it.isSpecialRow }.sumOf { it.cr }
-    val balance = totalDr - totalCr
+    // Optimized filtering with error handling
+    val filteredEntries = remember(entryTypeFilter, dateFromSearch, dateToSearch, narrationSearch, allEntries) {
+        try {
+            if (allEntries.isEmpty()) {
+                emptyList()
+            } else {
+                allEntries.filter { entry ->
+                    try {
+                        // Entry Type Filter
+                        val entryTypeMatch = when (entryTypeFilter) {
+                            "All Types" -> true
+                            else -> entry.entryType.equals(entryTypeFilter, ignoreCase = true)
+                        }
+
+                        // Date Range Filter (simplified for now)
+                        val dateMatch = true // TODO: Implement date filtering
+
+                        // Narration Search Filter
+                        val narrationMatch = if (narrationSearch.isBlank()) true else
+                            entry.narration.contains(narrationSearch, ignoreCase = true)
+
+                        entryTypeMatch && dateMatch && narrationMatch
+                    } catch (e: Exception) {
+                        timber.log.Timber.e(e, "Error filtering entry: ${entry.entryNo}")
+                        false
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error during filtering")
+            emptyList()
+        }
+    }
+
+    // Calculate totals from string values
+    val totalDr = remember(filteredEntries) {
+        filteredEntries.sumOf { it.dr.toDoubleOrNull() ?: 0.0 }
+    }
+    val totalCr = remember(filteredEntries) {
+        filteredEntries.sumOf { it.cr.toDoubleOrNull() ?: 0.0 }
+    }
+    val totalAmt = remember(filteredEntries) {
+        filteredEntries.sumOf { it.amt.toDoubleOrNull() ?: 0.0 }
+    }
 
     Column(
         modifier = Modifier

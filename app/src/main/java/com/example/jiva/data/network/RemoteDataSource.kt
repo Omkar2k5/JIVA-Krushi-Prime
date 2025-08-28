@@ -2,6 +2,8 @@ package com.example.jiva.data.network
 
 import com.example.jiva.data.database.entities.*
 import com.example.jiva.data.api.models.SyncDataResponse
+import com.example.jiva.data.api.models.LedgerRequest
+import com.example.jiva.data.api.models.LedgerResponse
 import timber.log.Timber
 import java.io.IOException
 

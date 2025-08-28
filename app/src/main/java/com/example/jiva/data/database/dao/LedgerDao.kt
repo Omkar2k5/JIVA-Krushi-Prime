@@ -59,6 +59,12 @@ interface LedgerDao {
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLedgerEntries(ledgerEntries: List<LedgerEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(ledgerEntries: List<LedgerEntity>)
+
+    @Query("DELETE FROM tb_ledger WHERE YearString = :yearString")
+    suspend fun deleteByYear(yearString: String)
     
     @Update
     suspend fun updateLedgerEntry(ledgerEntry: LedgerEntity)

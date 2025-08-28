@@ -10,6 +10,8 @@ import com.example.jiva.data.api.models.OutstandingRequest
 import com.example.jiva.data.api.models.OutstandingResponse
 import com.example.jiva.data.api.models.StockRequest
 import com.example.jiva.data.api.models.StockResponse
+import com.example.jiva.data.api.models.LedgerRequest
+import com.example.jiva.data.api.models.LedgerResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
