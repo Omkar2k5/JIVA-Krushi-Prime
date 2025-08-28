@@ -84,13 +84,45 @@ object DataMapper {
     // Convert ExpiryEntity to ExpiryEntry for Expiry Report Screen
     fun ExpiryEntity.toExpiryEntry(): ExpiryEntry {
         return ExpiryEntry(
-            itemId = this.itemId.toString(),
-            itemName = this.itemName,
+            itemId = this.itemId?.toString() ?: "",
+            itemName = this.itemName ?: "",
             itemType = this.itemType ?: "",
-            batchNumber = this.batchNo ?: "",
-            expiryDate = this.expiryDate ?: "",
-            qty = this.qty.toInt(),
-            daysToExpiry = this.daysLeft?.toLong() ?: 0L
+            batchNo = this.batchNo ?: "",
+            expiryDate = this.expiryDate?.let { dateFormat.format(it) } ?: "",
+            qty = this.qty?.toString() ?: "0",
+            daysLeft = this.daysLeft?.toString() ?: "0"
+        )
+    }
+
+    // Convert PriceDataEntity to PriceListEntry for PriceList Report Screen
+    fun PriceDataEntity.toPriceListEntry(): PriceListEntry {
+        return PriceListEntry(
+            itemId = this.itemId,
+            itemName = this.itemName,
+            mrp = this.mrp.toString(),
+            creditSaleRate = this.creditSaleRate.toString(),
+            cashSaleRate = this.cashSaleRate.toString(),
+            wholesaleRate = this.wholesaleRate.toString(),
+            avgPurchaseRate = this.avgPurchaseRate.toString()
+        )
+    }
+
+    // Convert SalePurchaseEntity to SalePurchaseEntry for SalePurchase Report Screen
+    fun SalePurchaseEntity.toSalePurchaseEntry(): SalePurchaseEntry {
+        return SalePurchaseEntry(
+            trDate = this.trDate?.let { dateFormat.format(it) } ?: "",
+            partyName = this.partyName ?: "",
+            gstin = this.gstin ?: "",
+            trType = this.trType ?: "",
+            refNo = this.refNo ?: "",
+            itemName = this.itemName ?: "",
+            hsn = this.hsn ?: "",
+            category = this.category ?: "",
+            qty = this.qty?.toString() ?: "0",
+            unit = this.unit ?: "",
+            rate = this.rate?.toString() ?: "0.00",
+            amount = this.amount?.toString() ?: "0.00",
+            discount = this.discount?.toString() ?: "0.00"
         )
     }
     
