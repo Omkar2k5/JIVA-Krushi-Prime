@@ -65,14 +65,17 @@ fun SimpleStockReportScreen() {
                     StockEntry(
                         itemId = entity.itemId ?: "",
                         itemName = entity.itemName ?: "",
-                        openingStock = entity.opening ?: "",
-                        inQty = entity.inWard ?: "",
-                        outQty = entity.outWard ?: "",
+                        opening = entity.opening ?: "",
+                        inWard = entity.inWard ?: "",
+                        outWard = entity.outWard ?: "",
                         closingStock = entity.closingStock ?: "",
                         avgRate = entity.avgRate ?: "",
                         valuation = entity.valuation ?: "",
                         itemType = entity.itemType ?: "",
-                        companyName = entity.company ?: ""
+                        company = entity.company ?: "",
+                        cgst = entity.cgst ?: "",
+                        sgst = entity.sgst ?: "",
+                        igst = entity.igst ?: ""
                     )
                 } catch (e: Exception) {
                     timber.log.Timber.e(e, "Error mapping entity")
@@ -302,9 +305,9 @@ fun SimpleStockReportScreen() {
                                         color = JivaColors.Green
                                     )
                                 }
-                                if (item.companyName.isNotBlank()) {
+                                if (item.company.isNotBlank()) {
                                     Text(
-                                        text = "Company: ${item.companyName}",
+                                        text = "Company: ${item.company}",
                                         fontSize = 10.sp,
                                         color = JivaColors.DarkGray.copy(alpha = 0.8f)
                                     )

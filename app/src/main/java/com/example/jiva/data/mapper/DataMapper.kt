@@ -34,14 +34,17 @@ object DataMapper {
         return StockEntry(
             itemId = this.itemId,
             itemName = this.itemName,
-            openingStock = this.opening,
-            inQty = this.inWard,
-            outQty = this.outWard,
+            opening = this.opening,
+            inWard = this.inWard,
+            outWard = this.outWard,
             closingStock = this.closingStock,
             avgRate = this.avgRate,
             valuation = this.valuation,
             itemType = this.itemType,
-            companyName = this.company
+            company = this.company,
+            cgst = this.cgst,
+            sgst = this.sgst,
+            igst = this.igst
         )
     }
     

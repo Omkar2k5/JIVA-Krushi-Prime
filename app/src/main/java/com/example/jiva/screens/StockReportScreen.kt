@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -87,9 +88,6 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
         factory = StockReportViewModel.Factory(application.database)
     )
 
-    // Observe UI state
-    val uiState by viewModel.uiState.collectAsState()
-
     // High-performance loading states
     var isScreenLoading by remember { mutableStateOf(true) }
     var isRefreshing by remember { mutableStateOf(false) }
@@ -107,11 +105,9 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
     // Selection state for PDF
     var selectedEntries by remember { mutableStateOf(setOf<String>()) }
     var selectAll by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
 
     // Get current year and user ID
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
-    val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
     // Handle initial screen loading with progress tracking
     LaunchedEffect(Unit) {
@@ -333,7 +329,7 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
                     verticalArrangement = Arrangement.Center
                 ) {
                     CircularProgressIndicator(
-                        progress = dataLoadingProgress / 100f,
+                        progress = { dataLoadingProgress / 100f },
                         modifier = Modifier.size(64.dp),
                         color = JivaColors.DeepBlue,
                         strokeWidth = 6.dp
@@ -491,7 +487,7 @@ private fun StockFilterSection(
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isStockDropdownExpanded) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .menuAnchor(),
+                        .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = JivaColors.DeepBlue,
                         unfocusedBorderColor = JivaColors.DarkGray

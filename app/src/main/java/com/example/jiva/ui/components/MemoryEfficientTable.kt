@@ -202,10 +202,10 @@ private fun MemoryEfficientTableRow(
         ) {
             DataCell(entry.itemId, 60.dp)
             DataCell(entry.itemName, 120.dp)
-            DataCell(entry.openingStock, 70.dp)
+            DataCell(entry.opening, 70.dp)
             DataCell(entry.closingStock, 70.dp)
             DataCell("₹${entry.valuation}", 80.dp)
-            DataCell(entry.companyName, 100.dp)
+            DataCell(entry.company, 100.dp)
         }
     }
 }
