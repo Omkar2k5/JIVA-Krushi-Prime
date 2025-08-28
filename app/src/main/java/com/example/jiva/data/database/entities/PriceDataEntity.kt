@@ -19,7 +19,7 @@ data class PriceDataEntity(
     val id: Int = 0,
 
     @ColumnInfo(name = "CmpCode")
-    val cmpCode: Int,
+    val cmpCode: Int = 0,
 
     @ColumnInfo(name = "ItemID")
     val itemId: String,
@@ -43,10 +43,14 @@ data class PriceDataEntity(
     @Contextual
     val wholesaleRate: BigDecimal = BigDecimal.ZERO,
 
+    @ColumnInfo(name = "MaxPurchaseRate")
+    @Contextual
+    val maxPurchaseRate: BigDecimal = BigDecimal.ZERO,
+
     @ColumnInfo(name = "AvgPurchaseRate")
     @Contextual
     val avgPurchaseRate: BigDecimal = BigDecimal.ZERO,
 
     @ColumnInfo(name = "YearString")
-    val yearString: String
+    val yearString: String = ""
 )

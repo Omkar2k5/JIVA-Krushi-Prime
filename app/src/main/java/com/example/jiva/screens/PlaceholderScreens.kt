@@ -95,7 +95,7 @@ fun OutstandingReportScreen(onBackClick: () -> Unit = {}) {
 
 @Composable
 fun LedgerScreen(onBackClick: () -> Unit = {}) {
-    LedgerReportScreenImpl(onBackClick = onBackClick)
+    LedgerReportScreen(onBackClick = onBackClick)
 }
 
  

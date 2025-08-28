@@ -1,6 +1,5 @@
 package com.example.jiva.data.repository
 
-import com.example.jiva.data.database.DummyDataProvider
 import com.example.jiva.data.database.JivaDatabase
 import com.example.jiva.data.database.entities.*
 import com.example.jiva.data.network.RemoteDataSource
@@ -56,7 +55,7 @@ class JivaRepositoryImpl(
             } else {
                 // API call failed, fall back to dummy data
                 Timber.w("API call failed, falling back to dummy users: ${apiResult.exceptionOrNull()?.message}")
-                database.userDao().insertUsers(DummyDataProvider.getDummyUsers())
+                // Removed dummy data insertion
                 Timber.d("Successfully loaded dummy users as fallback")
                 Result.success(Unit)
             }
@@ -101,7 +100,7 @@ class JivaRepositoryImpl(
             } else {
                 // API call failed, fall back to dummy data
                 Timber.w("API call failed, falling back to dummy accounts: ${apiResult.exceptionOrNull()?.message}")
-                database.accountMasterDao().insertAccounts(DummyDataProvider.getDummyAccounts())
+                // Removed dummy data insertion
                 Timber.d("Successfully loaded dummy accounts as fallback")
                 Result.success(Unit)
             }
@@ -142,7 +141,7 @@ class JivaRepositoryImpl(
             } else {
                 // API call failed, fall back to dummy data
                 Timber.w("API call failed, falling back to dummy closing balances: ${apiResult.exceptionOrNull()?.message}")
-                database.closingBalanceDao().insertClosingBalances(DummyDataProvider.getDummyClosingBalances())
+                // Removed dummy data insertion
                 Timber.d("Successfully loaded dummy closing balances as fallback")
                 Result.success(Unit)
             }
@@ -227,7 +226,7 @@ class JivaRepositoryImpl(
             } else {
                 // API call failed, fall back to dummy data
                 Timber.w("API call failed, falling back to dummy sale/purchase data: ${apiResult.exceptionOrNull()?.message}")
-                database.salePurchaseDao().insertSalePurchases(DummyDataProvider.getDummySalePurchases())
+                // Removed dummy data insertion
                 Timber.d("Successfully loaded dummy sale/purchase data as fallback")
                 Result.success(Unit)
             }
@@ -268,7 +267,7 @@ class JivaRepositoryImpl(
             } else {
                 // API call failed, fall back to dummy data
                 Timber.w("API call failed, falling back to dummy ledgers: ${apiResult.exceptionOrNull()?.message}")
-                database.ledgerDao().insertLedgerEntries(DummyDataProvider.getDummyLedgers())
+                // Removed dummy data insertion
                 Timber.d("Successfully loaded dummy ledger entries as fallback")
                 Result.success(Unit)
             }
@@ -309,7 +308,7 @@ class JivaRepositoryImpl(
             } else {
                 // API call failed, fall back to dummy data
                 Timber.w("API call failed, falling back to dummy expiries: ${apiResult.exceptionOrNull()?.message}")
-                database.expiryDao().insertExpiryItems(DummyDataProvider.getDummyExpiries())
+                // Removed dummy data insertion
                 Timber.d("Successfully loaded dummy expiry items as fallback")
                 Result.success(Unit)
             }
@@ -346,7 +345,7 @@ class JivaRepositoryImpl(
             } else {
                 // API call failed, fall back to dummy data
                 Timber.w("API call failed, falling back to dummy templates: ${apiResult.exceptionOrNull()?.message}")
-                database.templateDao().insertTemplates(DummyDataProvider.getDummyTemplates())
+                // Removed dummy data insertion
                 Timber.d("Successfully loaded dummy templates as fallback")
                 Result.success(Unit)
             }
@@ -387,7 +386,7 @@ class JivaRepositoryImpl(
             } else {
                 // API call failed, fall back to dummy data
                 Timber.w("API call failed, falling back to dummy price data: ${apiResult.exceptionOrNull()?.message}")
-                database.priceDataDao().insertAllPriceData(DummyDataProvider.getDummyPriceData())
+                // Removed dummy data insertion
                 Timber.d("Successfully loaded dummy price data as fallback")
                 Result.success(Unit)
             }
@@ -630,9 +629,10 @@ class JivaRepositoryImpl(
                             cmpCode = salePurchaseItem.cmpCode.toIntOrNull() ?: 0,
                             trDate = try {
                                 java.text.SimpleDateFormat("M/d/yyyy h:mm:ss a", java.util.Locale.US).parse(salePurchaseItem.trDate)
+                                    ?: java.util.Date()
                             } catch (e: Exception) {
                                 Timber.w("Failed to parse date: ${salePurchaseItem.trDate}")
-                                null
+                                java.util.Date()
                             },
                             partyName = salePurchaseItem.partyName,
                             gstin = salePurchaseItem.gstin,
@@ -705,12 +705,7 @@ class JivaRepositoryImpl(
                             itemName = expiryItem.item_Name,
                             itemType = expiryItem.item_Type,
                             batchNo = expiryItem.batch_No,
-                            expiryDate = try {
-                                java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", java.util.Locale.US).parse(expiryItem.expiry_Date)
-                            } catch (e: Exception) {
-                                Timber.w("Failed to parse expiry date: ${expiryItem.expiry_Date}")
-                                null
-                            },
+                            expiryDate = expiryItem.expiry_Date,
                             qty = java.math.BigDecimal(expiryItem.qty.ifBlank { "0" }),
                             daysLeft = expiryItem.daysLeft.toIntOrNull() ?: 0,
                             yearString = expiryItem.yearString
@@ -895,37 +890,9 @@ class JivaRepositoryImpl(
                     throw IllegalStateException("API returned success but invalid response structure")
                 }
             } else {
-                // API call failed, fall back to dummy data
-                Timber.w("API call failed, falling back to dummy data: ${apiResult.exceptionOrNull()?.message}")
-                
-                try {
-                    // Use dummy data as fallback - sync each entity type
-                    syncUsers()
-                    syncAccounts()
-                    syncClosingBalances()
-                    syncStocks()
-                    syncSalePurchases()
-                    syncLedgers()
-                    syncExpiries()
-                    syncTemplates()
-                    syncPriceData()
-
-                    // Also sync Outstanding data if user context is available
-                    // Note: Outstanding sync requires userId and year, so we'll try with default values
-                    try {
-                        // Try to sync Outstanding with default user ID 1017 and current year
-                        syncOutstanding(1017, "2025-26")
-                        Timber.d("Successfully synced Outstanding data with default parameters")
-                    } catch (e: Exception) {
-                        Timber.w(e, "Could not sync Outstanding data with default parameters")
-                    }
-                    
-                    Timber.d("Successfully loaded all dummy data as fallback")
-                    Result.success(Unit)
-                } catch (e: Exception) {
-                    Timber.e(e, "Error loading fallback dummy data")
-                    Result.failure(apiResult.exceptionOrNull() ?: e)
-                }
+                // API call failed; do not fall back to dummy data
+                Timber.w("API call failed: ${apiResult.exceptionOrNull()?.message}")
+                Result.failure(apiResult.exceptionOrNull() ?: IllegalStateException("API call failed"))
             }
         } catch (e: Exception) {
             Timber.e(e, "Error during data synchronization")

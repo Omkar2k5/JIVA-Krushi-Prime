@@ -2,7 +2,6 @@ package com.example.jiva
 
 import android.app.Application
 import androidx.multidex.MultiDexApplication
-import com.example.jiva.data.database.DummyDataProvider
 import com.example.jiva.data.database.JivaDatabase
 import com.example.jiva.data.network.RemoteDataSource
 import com.example.jiva.data.repository.JivaRepository

@@ -70,14 +70,21 @@ object DataMapper {
     // Convert LedgerEntity to LedgerEntry for Ledger Report Screen
     fun LedgerEntity.toLedgerEntry(): LedgerEntry {
         return LedgerEntry(
-            entryDate = this.entryDate?.let { dateFormat.format(it) } ?: "",
-            entryType = this.entryType ?: "",
             entryNo = this.entryNo?.toString() ?: "",
-            particular = this.narration ?: "",
-            dr = this.dr.toDouble(),
-            cr = this.cr.toDouble(),
             manualNo = this.manualNo ?: "",
-            details = "Account: ${this.acId ?: ""}"
+            srNo = this.srNo?.toString() ?: "",
+            entryType = this.entryType ?: "",
+            entryDate = this.entryDate?.let { dateFormat.format(it) } ?: "",
+            refNo = this.refNo ?: "",
+            acId = this.acId?.toString() ?: "",
+            dr = this.dr?.toString() ?: "0.00",
+            cr = this.cr?.toString() ?: "0.00",
+            narration = this.narration ?: "",
+            isClere = if (this.isClere == true) "True" else "False",
+            trascType = this.trascType ?: "",
+            gstRate = this.gstRate?.toString() ?: "0.00",
+            amt = this.amt?.toString() ?: "0.00",
+            igst = this.igst?.toString() ?: "0.00"
         )
     }
     
