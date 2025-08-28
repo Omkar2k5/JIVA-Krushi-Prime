@@ -1,6 +1,6 @@
 package com.example.jiva.screens
 
-import androidx.compose.foundation.Image
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.horizontalScroll
@@ -8,63 +8,110 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.jiva.JivaApplication
 import com.example.jiva.JivaColors
-import com.example.jiva.R
 import com.example.jiva.components.ResponsiveReportHeader
-import com.example.jiva.utils.PDFGenerator
-import androidx.compose.ui.platform.LocalContext
+import com.example.jiva.viewmodel.LedgerReportViewModel
 import kotlinx.coroutines.launch
+import android.widget.Toast
 import java.text.SimpleDateFormat
 import java.util.*
 
 
 
-// Data model for Ledger Report entries
+/**
+ * Ledger Entry data class - Complete with all API fields
+ */
 data class LedgerEntry(
-    val entryDate: String,
-    val entryType: String,
     val entryNo: String,
-    val particular: String,
-    val dr: Double,
-    val cr: Double,
     val manualNo: String,
-    val details: String,
-    val isSpecialRow: Boolean = false // For Opening Balance, Total, Closing Balance
+    val srNo: String,
+    val entryType: String,
+    val entryDate: String,
+    val refNo: String,
+    val acId: String,
+    val dr: String,
+    val cr: String,
+    val narration: String,
+    val isClere: String,
+    val trascType: String,
+    val gstRate: String,
+    val amt: String,
+    val igst: String
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LedgerReportScreenImpl(onBackClick: () -> Unit = {}) {
+fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // Get the application instance to access the repository
+    val application = context.applicationContext as JivaApplication
+
+    // Create the ViewModel with the repository
+    val viewModel: LedgerReportViewModel = viewModel(
+        factory = LedgerReportViewModel.Factory(application.database)
+    )
+
+    // High-performance loading states
+    var isScreenLoading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    var loadingProgress by remember { mutableStateOf(0) }
+    var loadingMessage by remember { mutableStateOf("") }
+    var dataLoadingProgress by remember { mutableStateOf(0f) }
+
     // State management
-    var fromDate by remember { mutableStateOf("01/04/2025") }
-    var toDate by remember { mutableStateOf("31/03/2026") }
-    var showItemDetails by remember { mutableStateOf(false) }
-    var accountNumber by remember { mutableStateOf("") }
-    var accountName by remember { mutableStateOf("") }
-    
-    // Date picker states
-    var showFromDatePicker by remember { mutableStateOf(false) }
-    var showToDatePicker by remember { mutableStateOf(false) }
+    var entryTypeFilter by remember { mutableStateOf("All Types") }
+    var dateFromSearch by remember { mutableStateOf("") }
+    var dateToSearch by remember { mutableStateOf("") }
+    var narrationSearch by remember { mutableStateOf("") }
+    var isEntryTypeDropdownExpanded by remember { mutableStateOf(false) }
+
+    // Get current year and user ID
+    val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
+
+    // Handle initial screen loading with progress tracking
+    LaunchedEffect(Unit) {
+        isScreenLoading = true
+        loadingMessage = "Initializing Ledger data..."
+
+        // Simulate progressive loading for better UX
+        for (i in 0..100 step 10) {
+            loadingProgress = i
+            dataLoadingProgress = i.toFloat()
+            loadingMessage = when {
+                i < 30 -> "Loading Ledger data..."
+                i < 70 -> "Processing ${i}% complete..."
+                i < 100 -> "Finalizing data..."
+                else -> "Complete!"
+            }
+            kotlinx.coroutines.delay(50) // Smooth progress animation
+        }
+
+        isScreenLoading = false
+    }
+
+    // Re-read userId after potential initialization
+    val finalUserId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
     // Dummy data with multiple accounts for search testing
     val allEntries = remember {

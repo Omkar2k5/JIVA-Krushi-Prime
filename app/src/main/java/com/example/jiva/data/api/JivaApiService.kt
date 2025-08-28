@@ -122,6 +122,13 @@ interface JivaApiService {
     @POST("api/JivaBusiness/Stock")
     suspend fun getStock(@Body request: StockRequest): StockResponse
 
+    /**
+     * POST /api/JivaBusiness/ledger
+     */
+    @Headers("Content-Type: application/json")
+    @POST("api/JivaBusiness/ledger")
+    suspend fun getLedger(@Body request: LedgerRequest): LedgerResponse
+
     // Additional filtered endpoints for better performance
     
     @GET("api/accounts")

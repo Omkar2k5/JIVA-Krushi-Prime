@@ -534,6 +534,81 @@ class JivaRepositoryImpl(
         }
     }
 
+    override suspend fun syncLedger(userId: Int, yearString: String): Result<Unit> {
+        return try {
+            Timber.d("🚀 Starting Ledger API call for userId: $userId, yearString: $yearString")
+            val apiResult = remoteDataSource.getLedger(userId, yearString)
+
+            Timber.d("📡 Ledger API call completed. Success: ${apiResult.isSuccess}")
+
+            if (apiResult.isSuccess) {
+                val body = apiResult.getOrNull()
+                Timber.d("API response body: isSuccess=${body?.isSuccess}, message=${body?.message}, data size=${body?.data?.size}")
+
+                if (body?.isSuccess == true) {
+                    val items = body.data.orEmpty()
+                    Timber.d("📦 Processing ${items.size} ledger items from API")
+
+                    // Map API model -> Room entity
+                    val entities = items.map { ledgerItem ->
+                        LedgerEntity(
+                            cmpCode = ledgerItem.cmpCode.toIntOrNull() ?: 0,
+                            entryNo = ledgerItem.entryNo.toIntOrNull() ?: 0,
+                            manualNo = ledgerItem.manualNo,
+                            srNo = ledgerItem.srNO.toIntOrNull() ?: 0,
+                            entryType = ledgerItem.entryType,
+                            entryDate = try {
+                                java.text.SimpleDateFormat("M/d/yyyy h:mm:ss a", java.util.Locale.US).parse(ledgerItem.entryDate)
+                            } catch (e: Exception) {
+                                Timber.w("Failed to parse date: ${ledgerItem.entryDate}")
+                                null
+                            },
+                            refNo = ledgerItem.refNo,
+                            acId = ledgerItem.ac_ID.toIntOrNull() ?: 0,
+                            dr = java.math.BigDecimal(ledgerItem.dr.ifBlank { "0" }),
+                            cr = java.math.BigDecimal(ledgerItem.cr.ifBlank { "0" }),
+                            narration = ledgerItem.narration,
+                            isClere = ledgerItem.isClere.equals("True", ignoreCase = true),
+                            trascType = ledgerItem.trascType,
+                            gstRate = java.math.BigDecimal(ledgerItem.gstRate.ifBlank { "0" }),
+                            amt = java.math.BigDecimal(ledgerItem.amt.ifBlank { "0" }),
+                            igst = java.math.BigDecimal(ledgerItem.igst.ifBlank { "0" }),
+                            yearString = ledgerItem.yearString
+                        )
+                    }
+
+                    // Clear existing data for this year and insert new data in chunks for performance
+                    Timber.d("🗑️ Clearing existing ledger data for year: $yearString")
+                    database.ledgerDao().deleteByYear(yearString)
+
+                    // Insert in chunks for better performance with large datasets
+                    val chunkSize = 1000
+                    var index = 0
+                    while (index < entities.size) {
+                        val end = minOf(index + chunkSize, entities.size)
+                        database.ledgerDao().insertAll(entities.subList(index, end))
+                        index = end
+                    }
+
+                    Timber.d("✅ Successfully inserted ${entities.size} ledger rows for $yearString")
+                    Result.success(Unit)
+                } else {
+                    val errorMsg = "API returned isSuccess=false: ${body?.message}"
+                    Timber.e(errorMsg)
+                    Result.failure(IllegalStateException(errorMsg))
+                }
+            } else {
+                val exception = apiResult.exceptionOrNull()
+                val errorMsg = "Ledger API call failed: ${exception?.message}"
+                Timber.e(exception, errorMsg)
+                Result.failure(exception ?: IllegalStateException(errorMsg))
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error syncing ledger data")
+            Result.failure(e)
+        }
+    }
+
     // Sync all data
     override suspend fun syncAllData(): Result<Unit> {
         return try {

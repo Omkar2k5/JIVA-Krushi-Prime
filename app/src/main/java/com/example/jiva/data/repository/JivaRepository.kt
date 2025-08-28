@@ -78,6 +78,9 @@ interface JivaRepository {
     fun getStockFlow(year: String): Flow<List<com.example.jiva.data.database.entities.StockEntity>>
     suspend fun syncStock(userId: Int, yearString: String): Result<Unit>
 
+    // Ledger operations
+    suspend fun syncLedger(userId: Int, yearString: String): Result<Unit>
+
     // Sync all data from server
     suspend fun syncAllData(): Result<Unit>
 }

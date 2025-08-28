@@ -122,6 +122,22 @@ class RemoteDataSource {
             Result.failure(e)
         }
     }
+
+    suspend fun getLedger(userId: Int, yearString: String): Result<com.example.jiva.data.api.models.LedgerResponse> {
+        return try {
+            Timber.d("Making Ledger API call with userId: $userId, yearString: $yearString")
+            val request = com.example.jiva.data.api.models.LedgerRequest(userID = userId, yearString = yearString)
+            Timber.d("Request body: $request")
+
+            val response = apiService.getLedger(request)
+            Timber.d("API response received: isSuccess=${response.isSuccess}, message=${response.message}, data size=${response.data?.size}")
+
+            Result.success(response)
+        } catch (e: Exception) {
+            Timber.e(e, "Ledger API call failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
     
     /**
      * Get all data in a single call (for initial sync)
