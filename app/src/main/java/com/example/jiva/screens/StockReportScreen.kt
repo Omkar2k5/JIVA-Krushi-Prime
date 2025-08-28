@@ -17,15 +17,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.IntSize
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
@@ -34,13 +36,26 @@ import com.example.jiva.JivaApplication
 import com.example.jiva.JivaColors
 import com.example.jiva.components.ResponsiveReportHeader
 import com.example.jiva.viewmodel.StockReportViewModel
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.graphics.*
+import android.graphics.pdf.PdfDocument
+import android.os.Environment
+import android.widget.Toast
+import androidx.core.content.FileProvider
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import com.example.jiva.utils.PDFGenerator
-import com.example.jiva.utils.LowEndDeviceOptimizer
-import com.example.jiva.ui.components.MemoryEfficientStockTable
-import com.example.jiva.ui.components.EmergencyStockTable
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.*
 
-// Data model for Stock Report entries - All String for faster retrieval
+/**
+ * Stock Entry data class - Simple and stable
+ */
 data class StockEntry(
     val itemId: String,
     val itemName: String,
@@ -51,20 +66,12 @@ data class StockEntry(
     val avgRate: String,
     val valuation: String,
     val itemType: String,
-    val companyName: String,
-    val cgst: String,
-    val sgst: String,
-    val igst: String // Added IGST field
+    val companyName: String
 )
-
-@Composable
-fun StockReportScreen(onBackClick: () -> Unit = {}) {
-    StockReportScreenImpl(onBackClick = onBackClick)
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
+fun StockReportScreen(onBackClick: () -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -76,6 +83,7 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
         factory = StockReportViewModel.Factory(application.database)
     )
 
+    // Observe UI state
     val uiState by viewModel.uiState.collectAsState()
 
     // High-performance loading states
@@ -85,88 +93,41 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     var loadingMessage by remember { mutableStateOf("") }
     var dataLoadingProgress by remember { mutableStateOf(0f) }
 
-    // Low-end device optimization with error handling
-    val optimalSettings = remember {
-        try {
-            LowEndDeviceOptimizer.getOptimalSettings()
-        } catch (e: Exception) {
-            timber.log.Timber.e(e, "Error getting optimal settings")
-            LowEndDeviceOptimizer.OptimalSettings(
-                pageSize = 25,
-                maxVisibleItems = 50,
-                filterChunkSize = 15,
-                enableVirtualScrolling = true,
-                enableProgressiveLoading = true,
-                message = "Default settings applied due to error"
-            )
-        }
-    }
-    var isEmergencyMode by remember { mutableStateOf(false) }
-
-    // Input state management (for UI inputs)
-    var stockOfInput by remember { mutableStateOf("All Items") }
-    var viewAllInput by remember { mutableStateOf(false) }
-    var itemCodeSearch by remember { mutableStateOf("") }
+    // State management
+    var stockOf by remember { mutableStateOf("All Items") }
+    var viewAll by remember { mutableStateOf(false) }
     var itemNameSearch by remember { mutableStateOf("") }
     var companySearch by remember { mutableStateOf("") }
     var isStockDropdownExpanded by remember { mutableStateOf(false) }
-    var isItemTypeDropdownExpanded by remember { mutableStateOf(false) }
 
-    // Additional UI state variables
-    var selectedItemType by remember { mutableStateOf("All Items") }
-
-    // Applied filters state (only updated when SHOW button is clicked)
-    var appliedStockOf by remember { mutableStateOf("All Items") }
-    var appliedViewAll by remember { mutableStateOf(false) }
-    var appliedItemCodeSearch by remember { mutableStateOf("") }
-    var appliedItemNameSearch by remember { mutableStateOf("") }
-    var appliedCompanySearch by remember { mutableStateOf("") }
-    // Additional local states used in input fields
-    var brandName by remember { mutableStateOf("") }
-    var itemName by remember { mutableStateOf("") }
-    var itemDescription by remember { mutableStateOf("") }
-    var packagingSize by remember { mutableStateOf("") }
-    var exempted by remember { mutableStateOf(false) }
-
-    // WhatsApp messaging state
+    // Selection state for PDF
     var selectedEntries by remember { mutableStateOf(setOf<String>()) }
     var selectAll by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
 
-    // WhatsApp template message
-    val whatsappTemplate = "Hello Kurshi Prime"
-
-    // Sync + observe Stock table
+    // Get current year and user ID
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
     val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
-    // Handle initial screen loading with progress tracking and safety
+    // Handle initial screen loading with progress tracking
     LaunchedEffect(Unit) {
-        try {
-            isScreenLoading = true
-            loadingMessage = "Initializing Stock data..."
+        isScreenLoading = true
+        loadingMessage = "Initializing Stock data..."
 
-            // Simulate progressive loading for better UX
-            for (i in 0..100 step 10) {
-                loadingProgress = i
-                dataLoadingProgress = i.toFloat()
-                loadingMessage = when {
-                    i < 30 -> "Loading Stock data..."
-                    i < 70 -> "Processing ${i}% complete..."
-                    i < 100 -> "Finalizing data..."
-                    else -> "Complete!"
-                }
-                kotlinx.coroutines.delay(50) // Smooth progress animation
+        // Simulate progressive loading for better UX
+        for (i in 0..100 step 10) {
+            loadingProgress = i
+            dataLoadingProgress = i.toFloat()
+            loadingMessage = when {
+                i < 30 -> "Loading Stock data..."
+                i < 70 -> "Processing ${i}% complete..."
+                i < 100 -> "Finalizing data..."
+                else -> "Complete!"
             }
-
-            // Small delay to ensure everything is ready
-            kotlinx.coroutines.delay(200)
-            isScreenLoading = false
-
-        } catch (e: Exception) {
-            timber.log.Timber.e(e, "Error during loading animation")
-            isScreenLoading = false
+            kotlinx.coroutines.delay(50) // Smooth progress animation
         }
+
+        isScreenLoading = false
     }
 
     // Note: Data loading is now handled automatically by AppDataLoader at app startup
@@ -175,142 +136,25 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     // Re-read userId after potential initialization
     val finalUserId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
-    // Debug data loading with multiple approaches
-    var debugInfo by remember { mutableStateOf("Initializing...") }
-
-    // Primary data loading with error handling
+    // Optimized data loading - only from Room DB for better performance
     val stockEntities by viewModel.observeStock(year).collectAsState(initial = emptyList())
 
-    // Alternative direct database loading for debugging
-    var directDbEntities by remember { mutableStateOf<List<com.example.jiva.data.database.entities.StockEntity>>(emptyList()) }
-
-    // Test data for debugging (when no real data is available)
-    var useTestData by remember { mutableStateOf(false) }
-    val testStockEntries = remember {
-        listOf(
-            StockEntry(
-                itemId = "TEST001",
-                itemName = "Test Item 1",
-                openingStock = "100",
-                inQty = "50",
-                outQty = "30",
-                closingStock = "120",
-                avgRate = "10.50",
-                valuation = "1260.00",
-                itemType = "General",
-                companyName = "Test Company",
-                cgst = "9",
-                sgst = "9",
-                igst = "18"
-            ),
-            StockEntry(
-                itemId = "TEST002",
-                itemName = "Test Item 2",
-                openingStock = "200",
-                inQty = "75",
-                outQty = "50",
-                closingStock = "225",
-                avgRate = "15.00",
-                valuation = "3375.00",
-                itemType = "Pesticides",
-                companyName = "Test Company 2",
-                cgst = "9",
-                sgst = "9",
-                igst = "18"
-            )
-        )
-    }
-
-    // Debug data loading
-    LaunchedEffect(year) {
+    // Use only Stock DB data for better performance and stability
+    val allEntries = remember(stockEntities) {
         try {
-            timber.log.Timber.d("🔍 Debug: Starting data loading for year: $year")
-            debugInfo = "Loading from ViewModel..."
-
-            // Try direct database access as fallback
-            kotlinx.coroutines.delay(1000) // Wait for ViewModel
-
-            if (stockEntities.isEmpty()) {
-                timber.log.Timber.w("⚠️ ViewModel returned empty data, trying direct DB access")
-                debugInfo = "ViewModel empty, trying direct DB..."
-
-                try {
-                    val dbData = application.database.stockDao().getAllSync(year)
-                    directDbEntities = dbData
-                    timber.log.Timber.d("📊 Direct DB query returned ${dbData.size} entities")
-                    debugInfo = "Direct DB: ${dbData.size} entities found"
-
-                    // If database is also empty, try to populate with sample data
-                    if (dbData.isEmpty()) {
-                        timber.log.Timber.w("🔍 Database is empty, checking if we should populate sample data")
-                        debugInfo = "Database empty - no stock data available"
-
-                        // Check if this is the first time loading
-                        timber.log.Timber.i("💡 No stock data found in database for year: $year")
-                        debugInfo = "No stock data available for year: $year"
-                    }
-                } catch (e: Exception) {
-                    timber.log.Timber.e(e, "❌ Direct DB access failed")
-                    debugInfo = "Direct DB error: ${e.message}"
-                }
-            } else {
-                timber.log.Timber.d("✅ ViewModel returned ${stockEntities.size} entities")
-                debugInfo = "ViewModel: ${stockEntities.size} entities loaded"
-            }
-
-        } catch (e: Exception) {
-            timber.log.Timber.e(e, "❌ Error in debug data loading")
-            debugInfo = "Debug error: ${e.message}"
-        }
-    }
-
-    // High-performance data mapping with fallback sources
-    val allStockEntries = remember(stockEntities, directDbEntities, useTestData) {
-        try {
-            // Use test data if enabled, otherwise use real data sources
-            if (useTestData) {
-                timber.log.Timber.d("🧪 Using test data: ${testStockEntries.size} entries")
-                return@remember testStockEntries
-            }
-
-            // Use ViewModel data if available, otherwise use direct DB data
-            val sourceEntities = if (stockEntities.isNotEmpty()) {
-                timber.log.Timber.d("📊 Using ViewModel data: ${stockEntities.size} entities")
-                stockEntities
-            } else if (directDbEntities.isNotEmpty()) {
-                timber.log.Timber.d("📊 Using direct DB data: ${directDbEntities.size} entities")
-                directDbEntities
-            } else {
-                timber.log.Timber.w("⚠️ No data available from any source for year: $year")
-                emptyList()
-            }
-
-            if (sourceEntities.isEmpty()) {
-                emptyList()
-            } else {
-                timber.log.Timber.d("🔄 Mapping ${sourceEntities.size} stock entities")
-                sourceEntities.mapNotNull { entity ->
-                    try {
-                        StockEntry(
-                            itemId = entity.itemId ?: "",
-                            itemName = entity.itemName ?: "",
-                            openingStock = entity.opening ?: "",
-                            inQty = entity.inWard ?: "",
-                            outQty = entity.outWard ?: "",
-                            closingStock = entity.closingStock ?: "",
-                            avgRate = entity.avgRate ?: "",
-                            valuation = entity.valuation ?: "",
-                            itemType = entity.itemType ?: "",
-                            companyName = entity.company ?: "",
-                            cgst = entity.cgst ?: "",
-                            sgst = entity.sgst ?: "",
-                            igst = entity.igst ?: ""
-                        )
-                    } catch (e: Exception) {
-                        timber.log.Timber.e(e, "Error mapping entity: ${entity.itemId}")
-                        null
-                    }
-                }
+            stockEntities.map { entity ->
+                StockEntry(
+                    itemId = entity.itemId ?: "",
+                    itemName = entity.itemName ?: "",
+                    openingStock = entity.opening ?: "",
+                    inQty = entity.inWard ?: "",
+                    outQty = entity.outWard ?: "",
+                    closingStock = entity.closingStock ?: "",
+                    avgRate = entity.avgRate ?: "",
+                    valuation = entity.valuation ?: "",
+                    itemType = entity.itemType ?: "",
+                    companyName = entity.company ?: ""
+                )
             }
         } catch (e: Exception) {
             timber.log.Timber.e(e, "Error mapping stock entities")
@@ -318,65 +162,16 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
         }
     }
 
-    // Item type options
-    val itemTypeOptions = listOf("All", "General", "Pesticides", "Fertilizers", "PGR", "Seeds")
-
-    // Memory-efficient filtering with pagination for low-end devices
-    val filterPredicate: (StockEntry) -> Boolean = remember(appliedStockOf, appliedViewAll, appliedItemCodeSearch, appliedItemNameSearch, appliedCompanySearch) {
-        { entry ->
-            try {
-                // Item Type Filter (using correct database field)
-                val stockTypeMatch = when (appliedStockOf) {
-                    "All Items" -> true
-                    "Pesticides" -> entry.itemType.equals("Pesticides", ignoreCase = true)
-                    "Fertilizers" -> entry.itemType.equals("Fertilizers", ignoreCase = true)
-                    "Seeds" -> entry.itemType.equals("Seeds", ignoreCase = true)
-                    "PGR" -> entry.itemType.equals("PGR", ignoreCase = true)
-                    "General" -> entry.itemType.equals("General", ignoreCase = true)
-                    else -> true
-                }
-
-                // Stock Status Filter (viewAll toggle)
-                val stockStatusMatch = if (appliedViewAll) {
-                    true // Show all items
-                } else {
-                    // Show only items with stock (closing stock > 0)
-                    val closingStock = entry.closingStock.toDoubleOrNull() ?: 0.0
-                    closingStock > 0
-                }
-
-                // Item Code (Item ID) Search Filter
-                val itemCodeMatch = if (appliedItemCodeSearch.isBlank()) true else
-                    entry.itemId.contains(appliedItemCodeSearch, ignoreCase = true)
-
-                // Item Name Search Filter
-                val nameMatch = if (appliedItemNameSearch.isBlank()) true else
-                    entry.itemName.contains(appliedItemNameSearch, ignoreCase = true)
-
-                // Company Search Filter
-                val companyMatch = if (appliedCompanySearch.isBlank()) true else
-                    entry.companyName.contains(appliedCompanySearch, ignoreCase = true)
-
-                // All filters must match
-                stockTypeMatch && stockStatusMatch && itemCodeMatch && nameMatch && companyMatch
-
-            } catch (e: Exception) {
-                timber.log.Timber.e(e, "Error filtering entry: ${entry.itemId}")
-                false
-            }
-        }
-    }
-
-    // Simple filtered data approach (more stable)
-    val filteredEntries = remember(appliedStockOf, appliedViewAll, appliedItemCodeSearch, appliedItemNameSearch, appliedCompanySearch, allStockEntries) {
+    // Optimized filtering with error handling
+    val filteredEntries = remember(stockOf, viewAll, itemNameSearch, companySearch, allEntries) {
         try {
-            if (allStockEntries.isEmpty()) {
+            if (allEntries.isEmpty()) {
                 emptyList()
             } else {
-                val filtered = allStockEntries.filter { entry ->
+                allEntries.filter { entry ->
                     try {
-                        // Apply all filters
-                        val stockTypeMatch = when (appliedStockOf) {
+                        // Stock Type Filter
+                        val stockTypeMatch = when (stockOf) {
                             "All Items" -> true
                             "Pesticides" -> entry.itemType.equals("Pesticides", ignoreCase = true)
                             "Fertilizers" -> entry.itemType.equals("Fertilizers", ignoreCase = true)
@@ -386,35 +181,27 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
                             else -> true
                         }
 
-                        val stockStatusMatch = if (appliedViewAll) {
+                        // Stock Status Filter
+                        val stockStatusMatch = if (viewAll) {
                             true
                         } else {
                             val closingStock = entry.closingStock.toDoubleOrNull() ?: 0.0
                             closingStock > 0
                         }
 
-                        val itemCodeMatch = if (appliedItemCodeSearch.isBlank()) true else
-                            entry.itemId.contains(appliedItemCodeSearch, ignoreCase = true)
+                        // Item Name Search Filter
+                        val nameMatch = if (itemNameSearch.isBlank()) true else
+                            entry.itemName.contains(itemNameSearch, ignoreCase = true)
 
-                        val nameMatch = if (appliedItemNameSearch.isBlank()) true else
-                            entry.itemName.contains(appliedItemNameSearch, ignoreCase = true)
+                        // Company Search Filter
+                        val companyMatch = if (companySearch.isBlank()) true else
+                            entry.companyName.contains(companySearch, ignoreCase = true)
 
-                        val companyMatch = if (appliedCompanySearch.isBlank()) true else
-                            entry.companyName.contains(appliedCompanySearch, ignoreCase = true)
-
-                        stockTypeMatch && stockStatusMatch && itemCodeMatch && nameMatch && companyMatch
+                        stockTypeMatch && stockStatusMatch && nameMatch && companyMatch
                     } catch (e: Exception) {
-                        timber.log.Timber.e(e, "Error filtering entry")
+                        timber.log.Timber.e(e, "Error filtering entry: ${entry.itemId}")
                         false
                     }
-                }
-
-                // Limit results for performance on low-end devices
-                if (filtered.size > 500 && optimalSettings.enableVirtualScrolling) {
-                    timber.log.Timber.w("Large dataset detected, limiting to 500 items")
-                    filtered.take(500)
-                } else {
-                    filtered
                 }
             }
         } catch (e: Exception) {
@@ -437,38 +224,7 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
         selectAll = filteredEntries.isNotEmpty() && selectedEntries.containsAll(filteredEntries.map { it.itemId })
     }
 
-    // Memory monitoring and emergency mode detection
-    LaunchedEffect(allStockEntries.size) {
-        try {
-            com.example.jiva.utils.LowEndDeviceOptimizer.optimizeForLowEndDevice()
-
-            // Enable emergency mode for very large datasets on low-end devices
-            if (allStockEntries.size > 500 && optimalSettings.enableVirtualScrolling) {
-                isEmergencyMode = true
-                timber.log.Timber.w("📱 Emergency mode enabled for ${allStockEntries.size} items")
-            }
-        } catch (e: Exception) {
-            timber.log.Timber.e(e, "Error during memory optimization")
-            isEmergencyMode = true
-        }
-    }
-
-    // Emergency memory cleanup on memory pressure
-    LaunchedEffect(filteredEntries.size) {
-        try {
-            if (filteredEntries.size > 1000) {
-                LowEndDeviceOptimizer.emergencyMemoryCleanup()
-            }
-        } catch (e: OutOfMemoryError) {
-            timber.log.Timber.e("🚨 OutOfMemoryError detected - enabling emergency mode")
-            isEmergencyMode = true
-            LowEndDeviceOptimizer.emergencyMemoryCleanup()
-        } catch (e: Exception) {
-            timber.log.Timber.e(e, "Error during emergency cleanup")
-        }
-    }
-
-    // Calculate totals from filtered data
+    // Calculate totals from string values
     val totalOpeningStock = remember(filteredEntries) {
         filteredEntries.sumOf { it.openingStock.toDoubleOrNull() ?: 0.0 }
     }
@@ -493,424 +249,56 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(JivaColors.LightGray)
+        modifier = Modifier.fillMaxSize()
     ) {
-        // Responsive Header with Safe Refresh Button
-        // Note: Refresh button provides visual feedback but doesn't call server APIs
-        // to prevent crashes. Server data refresh should be done from Home screen.
+        // Responsive Header with Refresh Button
         ResponsiveReportHeader(
             title = "Stock Report",
-            subtitle = "Inventory management and stock analysis",
             onBackClick = onBackClick,
-            actions = {
-                IconButton(
-                    onClick = {
-                        // Ultra-safe refresh implementation - no API calls
-                        scope.launch {
-                            try {
-                                timber.log.Timber.d("🔄 Starting ultra-safe refresh for Stock Report")
-                                isRefreshing = true
-
-                                // Show refresh animation for user feedback
-                                kotlinx.coroutines.delay(800)
-
-                                // Just reset the screen state - no dangerous API calls
-                                timber.log.Timber.d("✅ Ultra-safe refresh completed - screen refreshed")
-
-                                // Show user feedback
-                                timber.log.Timber.i("📱 Stock Report refreshed successfully")
-
-                                // Note: For server data refresh, users should use the Home screen
-                                // refresh button which is designed to handle server operations safely
-                                isRefreshing = false
-
-                            } catch (e: Exception) {
-                                timber.log.Timber.e(e, "❌ Error during ultra-safe refresh")
-                                isRefreshing = false
-                            }
-                        }
-                    },
-                    enabled = !isRefreshing && !isScreenLoading,
-                    modifier = Modifier
-                        .background(
-                            JivaColors.White.copy(alpha = 0.2f),
-                            RoundedCornerShape(8.dp)
-                        )
-                ) {
-                    if (isRefreshing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = JivaColors.White,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh Stock Data",
-                            tint = JivaColors.White
-                        )
+            onRefreshClick = {
+                isRefreshing = true
+                scope.launch {
+                    try {
+                        timber.log.Timber.d("🔄 Safe refresh for Stock Report")
+                        kotlinx.coroutines.delay(800) // Show refresh animation
+                        isRefreshing = false
+                    } catch (e: Exception) {
+                        timber.log.Timber.e(e, "Error during refresh")
+                        isRefreshing = false
                     }
                 }
-            }
+            },
+            isRefreshing = isRefreshing
         )
 
-        // High-performance loading screen with progress and device optimization info
-        if (isScreenLoading) {
+        // High-performance loading screen with progress
+        if (isScreenLoading || allEntries.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.padding(32.dp)
+                    verticalArrangement = Arrangement.Center
                 ) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(48.dp),
+                        progress = dataLoadingProgress / 100f,
+                        modifier = Modifier.size(64.dp),
                         color = JivaColors.DeepBlue,
-                        strokeWidth = 4.dp
+                        strokeWidth = 6.dp
                     )
-
+                    Spacer(modifier = Modifier.height(24.dp))
                     Text(
-                        text = "Loading Stock Report...",
+                        text = loadingMessage,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium,
                         color = JivaColors.DeepBlue
                     )
-
-                    if (loadingProgress > 0) {
-                        LinearProgressIndicator(
-                            progress = dataLoadingProgress / 100f,
-                            modifier = Modifier.fillMaxWidth(),
-                            color = JivaColors.DeepBlue,
-                            trackColor = JivaColors.LightGray
-                        )
-
-                        Text(
-                            text = loadingMessage,
-                            fontSize = 12.sp,
-                            color = JivaColors.DarkGray,
-                            textAlign = TextAlign.Center
-                        )
-
-                        Text(
-                            text = "${loadingProgress}% Complete",
-                            fontSize = 10.sp,
-                            color = JivaColors.DarkGray
-                        )
-
-                        if (optimalSettings.enableVirtualScrolling) {
-                            Text(
-                                text = "📱 ${optimalSettings.message}",
-                                fontSize = 9.sp,
-                                color = JivaColors.Orange,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                }
-            }
-        } else if (allStockEntries.isEmpty()) {
-            // Empty data fallback
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Warning,
-                    contentDescription = "No Data",
-                    modifier = Modifier.size(64.dp),
-                    tint = JivaColors.Orange
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "No Stock Data Available",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = JivaColors.DeepBlue
-                )
-                Text(
-                    text = "No stock data found for year $year",
-                    fontSize = 14.sp,
-                    color = JivaColors.DarkGray,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Debug: $debugInfo",
-                    fontSize = 12.sp,
-                    color = JivaColors.Orange,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = "ViewModel entities: ${stockEntities.size}",
-                    fontSize = 10.sp,
-                    color = JivaColors.DarkGray,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = "Direct DB entities: ${directDbEntities.size}",
-                    fontSize = 10.sp,
-                    color = JivaColors.DarkGray,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(24.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = {
-                            // Safe refresh for empty data state
-                            scope.launch {
-                                try {
-                                    timber.log.Timber.d("🔄 Refreshing from empty state")
-                                    isScreenLoading = true
-                                    debugInfo = "Refreshing..."
-                                    kotlinx.coroutines.delay(1000) // Show loading
-                                    isScreenLoading = false
-                                } catch (e: Exception) {
-                                    timber.log.Timber.e(e, "Error refreshing from empty state")
-                                    isScreenLoading = false
-                                    debugInfo = "Refresh error: ${e.message}"
-                                }
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = JivaColors.DeepBlue)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh"
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Refresh")
-                    }
-
-                    Button(
-                        onClick = {
-                            // Manual data loading and insertion for debugging
-                            scope.launch {
-                                try {
-                                    timber.log.Timber.d("🔧 Manual data loading and insertion")
-                                    debugInfo = "Manual loading..."
-
-                                    // First try to load existing data
-                                    val dbData = application.database.stockDao().getAllSync(year)
-
-                                    if (dbData.isEmpty()) {
-                                        timber.log.Timber.d("💾 No data found, inserting sample data")
-                                        debugInfo = "Inserting sample data..."
-
-                                        // Insert sample data for testing
-                                        val sampleEntities = listOf(
-                                            com.example.jiva.data.database.entities.StockEntity(
-                                                cmpCode = 1,
-                                                itemId = "SAMPLE001",
-                                                itemName = "Sample Item 1",
-                                                opening = "100",
-                                                inWard = "50",
-                                                outWard = "30",
-                                                closingStock = "120",
-                                                avgRate = "10.50",
-                                                valuation = "1260.00",
-                                                itemType = "General",
-                                                company = "Sample Company",
-                                                cgst = "9",
-                                                sgst = "9",
-                                                igst = "18",
-                                                yearString = year
-                                            ),
-                                            com.example.jiva.data.database.entities.StockEntity(
-                                                cmpCode = 1,
-                                                itemId = "SAMPLE002",
-                                                itemName = "Sample Item 2",
-                                                opening = "200",
-                                                inWard = "75",
-                                                outWard = "50",
-                                                closingStock = "225",
-                                                avgRate = "15.00",
-                                                valuation = "3375.00",
-                                                itemType = "Pesticides",
-                                                company = "Sample Company 2",
-                                                cgst = "9",
-                                                sgst = "9",
-                                                igst = "18",
-                                                yearString = year
-                                            )
-                                        )
-
-                                        application.database.stockDao().insertAll(sampleEntities)
-                                        timber.log.Timber.d("✅ Sample data inserted")
-
-                                        // Reload data
-                                        val newData = application.database.stockDao().getAllSync(year)
-                                        directDbEntities = newData
-                                        debugInfo = "Sample data inserted: ${newData.size} entities"
-                                    } else {
-                                        directDbEntities = dbData
-                                        debugInfo = "Manual: Found ${dbData.size} entities"
-                                        timber.log.Timber.d("🔧 Manual loading found ${dbData.size} entities")
-                                    }
-
-                                } catch (e: Exception) {
-                                    timber.log.Timber.e(e, "Error in manual loading/insertion")
-                                    debugInfo = "Manual error: ${e.message}"
-                                }
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = JivaColors.Orange)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Build,
-                            contentDescription = "Manual Load"
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Sample")
-                    }
-
-                    Button(
-                        onClick = {
-                            useTestData = !useTestData
-                            debugInfo = if (useTestData) "Test data enabled" else "Test data disabled"
-                            timber.log.Timber.d("🧪 Test data toggled: $useTestData")
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (useTestData) JivaColors.Green else JivaColors.Purple
-                        )
-                    ) {
-                        Icon(
-                            imageVector = if (useTestData) Icons.Default.CheckCircle else Icons.Default.Science,
-                            contentDescription = "Test Data"
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(if (useTestData) "Real" else "Test")
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Safe server data loading button
-                if (finalUserId != null) {
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                try {
-                                    timber.log.Timber.d("🌐 Attempting SAFE server data loading")
-                                    debugInfo = "Preparing safe server call..."
-                                    isScreenLoading = true
-
-                                    // Ultra-safe server loading with multiple protections
-                                    val result = withTimeoutOrNull(10000) { // 10 second timeout
-                                        try {
-                                            // Use a safer approach - just try to trigger background sync
-                                            timber.log.Timber.d("🔒 Using safe background sync approach")
-                                            debugInfo = "Safe server sync in progress..."
-
-                                            // Simulate server loading for now to prevent crashes
-                                            kotlinx.coroutines.delay(2000)
-
-                                            // Check if any data exists in database after delay
-                                            val existingData = application.database.stockDao().getAllSync(year)
-
-                                            if (existingData.isNotEmpty()) {
-                                                timber.log.Timber.d("✅ Found existing data: ${existingData.size} entries")
-                                                directDbEntities = existingData
-                                                debugInfo = "Found existing data: ${existingData.size} entities"
-                                                true
-                                            } else {
-                                                timber.log.Timber.w("⚠️ No data found after safe sync")
-                                                debugInfo = "No data available - try refreshing from Home screen"
-                                                false
-                                            }
-
-                                        } catch (e: Exception) {
-                                            timber.log.Timber.e(e, "Error in safe server sync")
-                                            debugInfo = "Safe sync error: ${e.message}"
-                                            false
-                                        }
-                                    }
-
-                                    if (result == null) {
-                                        timber.log.Timber.w("⏰ Server call timed out safely")
-                                        debugInfo = "Server call timed out - please try from Home screen"
-                                    } else if (result) {
-                                        timber.log.Timber.d("✅ Safe server loading completed")
-                                        debugInfo = "Safe server loading completed"
-                                    } else {
-                                        timber.log.Timber.w("⚠️ Safe server loading found no data")
-                                        debugInfo = "No server data available"
-                                    }
-
-                                    isScreenLoading = false
-
-                                } catch (e: Exception) {
-                                    timber.log.Timber.e(e, "Error in ultra-safe server loading")
-                                    debugInfo = "Ultra-safe loading error: ${e.message}"
-                                    isScreenLoading = false
-                                }
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = JivaColors.Green),
-                        enabled = !isScreenLoading
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CloudDownload,
-                            contentDescription = "Safe Server Load"
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Safe Server Load")
-                    }
-                } else {
                     Text(
-                        text = "User ID not available - cannot load from server",
-                        fontSize = 12.sp,
-                        color = JivaColors.Orange,
-                        textAlign = TextAlign.Center
+                        text = "${loadingProgress}% Complete",
+                        fontSize = 10.sp,
+                        color = JivaColors.DarkGray
                     )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Guidance for proper server refresh
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = JivaColors.LightBlue.copy(alpha = 0.1f))
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Info",
-                            tint = JivaColors.DeepBlue,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "💡 For reliable server data refresh:",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = JivaColors.DeepBlue,
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
-                            text = "1. Go to Home screen\n2. Use the main refresh button\n3. Return to Stock Report",
-                            fontSize = 11.sp,
-                            color = JivaColors.DarkGray,
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
-                            text = "This prevents crashes and ensures data integrity",
-                            fontSize = 10.sp,
-                            color = JivaColors.DarkGray.copy(alpha = 0.8f),
-                            textAlign = TextAlign.Center
-                        )
-                    }
                 }
             }
         } else {
@@ -918,552 +306,341 @@ fun StockReportScreenImpl(onBackClick: () -> Unit = {}) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                userScrollEnabled = true
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-            // Filter Controls Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Stock Filter Options",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = JivaColors.DeepBlue
-                            )
-
-                            // Active filters indicator (based on applied filters)
-                            val activeFilters = mutableListOf<String>()
-                            if (appliedStockOf != "All Items") activeFilters.add("Type: $appliedStockOf")
-                            if (!appliedViewAll) activeFilters.add("In Stock Only")
-                            if (appliedItemCodeSearch.isNotBlank()) activeFilters.add("Code: $appliedItemCodeSearch")
-                            if (appliedItemNameSearch.isNotBlank()) activeFilters.add("Name: $appliedItemNameSearch")
-                            if (appliedCompanySearch.isNotBlank()) activeFilters.add("Company: $appliedCompanySearch")
-
-                            if (activeFilters.isNotEmpty()) {
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = JivaColors.Green.copy(alpha = 0.1f)),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Text(
-                                        text = "${activeFilters.size} filter(s) active",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = JivaColors.Green,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
-                        }
-
-                        // First row: Item Code, Brand Name, Item Name
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Item Code",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                                OutlinedTextField(
-                                    value = itemCodeSearch,
-                                    onValueChange = { itemCodeSearch = it },
-                                    placeholder = { Text("Search by item code...") },
-                                    trailingIcon = {
-                                        IconButton(onClick = { itemCodeSearch = "" }) {
-                                            Icon(
-                                                imageVector = if (itemCodeSearch.isNotEmpty()) Icons.Default.Clear else Icons.Default.Search,
-                                                contentDescription = if (itemCodeSearch.isNotEmpty()) "Clear" else "Search"
-                                            )
-                                        }
-                                    },
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = Color.Black,
-                                        unfocusedTextColor = Color.Black,
-                                        cursorColor = JivaColors.DeepBlue
-                                    ),
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(8.dp),
-                                    singleLine = true
-                                )
-                            }
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Company",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                                OutlinedTextField(
-                                    value = companySearch,
-                                    onValueChange = { companySearch = it },
-                                    placeholder = { Text("Enter company name") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(8.dp),
-                                    singleLine = true
-                                )
-                            }
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Item Name",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                                OutlinedTextField(
-                                    value = itemNameSearch,
-                                    onValueChange = { itemNameSearch = it },
-                                    placeholder = { Text("Enter item name") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(8.dp),
-                                    singleLine = true
-                                )
-                            }
-                        }
-
-                        // Second row: Item Description, Item Type
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Item Description",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                                OutlinedTextField(
-                                    value = itemDescription,
-                                    onValueChange = { itemDescription = it },
-                                    placeholder = { Text("Enter item description") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(8.dp),
-                                    singleLine = true
-                                )
-                            }
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Item Type",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                                ExposedDropdownMenuBox(
-                                    expanded = isItemTypeDropdownExpanded,
-                                    onExpandedChange = { isItemTypeDropdownExpanded = it }
-                                ) {
-                                    OutlinedTextField(
-                                        value = stockOfInput,
-                                        onValueChange = {},
-                                        readOnly = true,
-                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isItemTypeDropdownExpanded) },
-                                        modifier = Modifier
-                                            .menuAnchor()
-                                            .fillMaxWidth(),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    ExposedDropdownMenu(
-                                        expanded = isItemTypeDropdownExpanded,
-                                        onDismissRequest = { isItemTypeDropdownExpanded = false }
-                                    ) {
-                                        itemTypeOptions.forEach { option ->
-                                            DropdownMenuItem(
-                                                text = { Text(option) },
-                                                onClick = {
-                                                    stockOfInput = option
-                                                    isItemTypeDropdownExpanded = false
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // View All toggle
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "Show all items (including zero stock)",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = JivaColors.DeepBlue
-                            )
-                            Switch(
-                                checked = viewAllInput,
-                                onCheckedChange = { viewAllInput = it },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = JivaColors.White,
-                                    checkedTrackColor = JivaColors.Green,
-                                    uncheckedThumbColor = JivaColors.White,
-                                    uncheckedTrackColor = JivaColors.DarkGray
-                                )
-                            )
-                        }
-
-
-
-                        // Action Buttons
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Button(
-                                onClick = {
-                                    // Apply filters by updating applied filter states
-                                    appliedStockOf = stockOfInput
-                                    appliedViewAll = viewAllInput
-                                    appliedItemCodeSearch = itemCodeSearch
-                                    appliedItemNameSearch = itemNameSearch
-                                    appliedCompanySearch = companySearch
-
-                                    timber.log.Timber.d("🔍 Filters applied: stockOf=$appliedStockOf, viewAll=$appliedViewAll, itemCode='$appliedItemCodeSearch', itemName='$appliedItemNameSearch', company='$appliedCompanySearch'")
-                                    timber.log.Timber.d("📊 Filtered results: ${filteredEntries.size} items out of ${allStockEntries.size} total")
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = JivaColors.Green
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = "Show",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "SHOW (${filteredEntries.size})",
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-
-                            // Clear Filters Button
-                            Button(
-                                onClick = {
-                                    // Reset all input fields and applied filters to default values
-                                    stockOfInput = "All Items"
-                                    viewAllInput = true
-                                    itemCodeSearch = ""
-                                    itemNameSearch = ""
-                                    companySearch = ""
-
-                                    // Also reset applied filters
-                                    appliedStockOf = "All Items"
-                                    appliedViewAll = true
-                                    appliedItemCodeSearch = ""
-                                    appliedItemNameSearch = ""
-                                    appliedCompanySearch = ""
-
-                                    timber.log.Timber.d("🧹 All filters cleared - showing all ${allStockEntries.size} items")
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = JivaColors.Orange
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Clear,
-                                    contentDescription = "Clear",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "CLEAR",
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        val columns = listOf(
-                                            PDFGenerator.TableColumn("Item ID", 80f) { (it as StockEntry).itemId },
-                                            PDFGenerator.TableColumn("Item Name", 150f) { (it as StockEntry).itemName },
-                                            PDFGenerator.TableColumn("Opening", 80f) { "${(it as StockEntry).openingStock.toInt()}" },
-                                            PDFGenerator.TableColumn("In Qty", 80f) { "${(it as StockEntry).inQty.toInt()}" },
-                                            PDFGenerator.TableColumn("Out Qty", 80f) { "${(it as StockEntry).outQty.toInt()}" },
-                                            PDFGenerator.TableColumn("Closing", 80f) { "${(it as StockEntry).closingStock.toInt()}" },
-                                            PDFGenerator.TableColumn("Valuation", 100f) { "₹${String.format("%.2f", (it as StockEntry).valuation)}" }
-                                        )
-
-                                        val totalRow = mapOf(
-                                            "Item ID" to "TOTAL",
-                                            "Item Name" to "",
-                                            "Opening" to "${totalOpeningStock.toInt()}",
-                                            "In Qty" to "${totalInQty.toInt()}",
-                                            "Out Qty" to "${totalOutQty.toInt()}",
-                                            "Closing" to "${totalClosingStock.toInt()}",
-                                            "Valuation" to "₹${String.format("%.2f", totalValuation)}"
-                                        )
-
-                                        val config = PDFGenerator.PDFConfig(
-                                            title = "Stock Report",
-                                            fileName = "Stock_Report",
-                                            columns = columns,
-                                            data = filteredEntries,
-                                            totalRow = totalRow
-                                        )
-
-                                        PDFGenerator.generateAndSharePDF(context, config)
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF25D366) // WhatsApp green
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Share,
-                                    contentDescription = "Share",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "SHARE",
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                    }
+                // Filter Section
+                item {
+                    StockFilterSection(
+                        stockOf = stockOf,
+                        onStockOfChange = { stockOf = it },
+                        viewAll = viewAll,
+                        onViewAllChange = { viewAll = it },
+                        itemNameSearch = itemNameSearch,
+                        onItemNameSearchChange = { itemNameSearch = it },
+                        companySearch = companySearch,
+                        onCompanySearchChange = { companySearch = it },
+                        isStockDropdownExpanded = isStockDropdownExpanded,
+                        onStockDropdownExpandedChange = { isStockDropdownExpanded = it },
+                        filteredCount = filteredEntries.size,
+                        totalCount = allEntries.size
+                    )
                 }
-            }
 
-            // Summary Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = JivaColors.Teal
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "Stock Summary",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = JivaColors.White
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column {
-                                Text(
-                                    text = "Showing: ${filteredEntries.size} of ${allStockEntries.size} items",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.White
-                                )
-                                if (filteredEntries.size < allStockEntries.size) {
-                                    Text(
-                                        text = "Filters applied",
-                                        fontSize = 10.sp,
-                                        color = JivaColors.White.copy(alpha = 0.8f)
-                                    )
-                                }
-                            }
-                            Text(
-                                text = "Total Valuation: ₹${String.format("%.2f", totalValuation)}",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = JivaColors.White
-                            )
-                        }
-                    }
+                // Summary Section
+                item {
+                    StockSummarySection(
+                        totalEntries = filteredEntries.size,
+                        totalOpeningStock = totalOpeningStock,
+                        totalInQty = totalInQty,
+                        totalOutQty = totalOutQty,
+                        totalClosingStock = totalClosingStock,
+                        totalValuation = totalValuation
+                    )
                 }
-            }
 
-            // Data Table Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Text(
-                            text = "Stock Report Data",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = JivaColors.DeepBlue,
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        )
-
-                        // Horizontally scrollable table
-                        val tableScrollState = rememberScrollState()
-
-                        // Simple table for stability
-                        SimpleStockTable(
-                            entries = if (isEmergencyMode) filteredEntries.take(20) else filteredEntries.take(200),
-                            isEmergencyMode = isEmergencyMode,
-                            totalEntries = filteredEntries.size
-                        )
-                    }
+                // Table Section
+                item {
+                    StockTableSection(
+                        entries = filteredEntries,
+                        selectedEntries = selectedEntries,
+                        onEntrySelectionChange = { entryId, isSelected ->
+                            selectedEntries = if (isSelected) {
+                                selectedEntries + entryId
+                            } else {
+                                selectedEntries - entryId
+                            }
+                        },
+                        selectAll = selectAll,
+                        onSelectAllChange = { selectAll = it },
+                        onGeneratePDF = { selectedData ->
+                            scope.launch {
+                                generateStockPDF(context, selectedData)
+                            }
+                        }
+                    )
                 }
             }
         }
-        } // Close the else block for loading screen
     }
 }
 
-/**
- * Simple Stock Table - Stable and crash-resistant
- */
 @Composable
-private fun SimpleStockTable(
-    entries: List<StockEntry>,
-    isEmergencyMode: Boolean,
-    totalEntries: Int
+private fun StockFilterSection(
+    stockOf: String,
+    onStockOfChange: (String) -> Unit,
+    viewAll: Boolean,
+    onViewAllChange: (Boolean) -> Unit,
+    itemNameSearch: String,
+    onItemNameSearchChange: (String) -> Unit,
+    companySearch: String,
+    onCompanySearchChange: (String) -> Unit,
+    isStockDropdownExpanded: Boolean,
+    onStockDropdownExpandedChange: (Boolean) -> Unit,
+    filteredCount: Int,
+    totalCount: Int
 ) {
-    Column {
-        // Summary card
-        if (isEmergencyMode) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = JivaColors.Orange.copy(alpha = 0.1f))
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Stock Filter Options",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = JivaColors.DeepBlue
+            )
+
+            // Stock Type Dropdown
+            ExposedDropdownMenuBox(
+                expanded = isStockDropdownExpanded,
+                onExpandedChange = onStockDropdownExpandedChange
             ) {
-                Text(
-                    text = "⚠️ Emergency mode: Showing ${entries.size} of $totalEntries items",
-                    modifier = Modifier.padding(12.dp),
-                    fontSize = 12.sp,
-                    color = JivaColors.Orange,
-                    fontWeight = FontWeight.Medium
+                OutlinedTextField(
+                    value = stockOf,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Stock Type") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isStockDropdownExpanded) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = JivaColors.DeepBlue,
+                        unfocusedBorderColor = JivaColors.DarkGray
+                    )
+                )
+                ExposedDropdownMenu(
+                    expanded = isStockDropdownExpanded,
+                    onDismissRequest = { onStockDropdownExpandedChange(false) }
+                ) {
+                    listOf("All Items", "Pesticides", "Fertilizers", "Seeds", "PGR", "General").forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option) },
+                            onClick = {
+                                onStockOfChange(option)
+                                onStockDropdownExpandedChange(false)
+                            }
+                        )
+                    }
+                }
+            }
+
+            // Search Fields
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedTextField(
+                    value = itemNameSearch,
+                    onValueChange = onItemNameSearchChange,
+                    label = { Text("Item Name") },
+                    placeholder = { Text("Search by item name...") },
+                    modifier = Modifier.weight(1f),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = JivaColors.DeepBlue,
+                        unfocusedBorderColor = JivaColors.DarkGray
+                    )
+                )
+                OutlinedTextField(
+                    value = companySearch,
+                    onValueChange = onCompanySearchChange,
+                    label = { Text("Company") },
+                    placeholder = { Text("Search by company...") },
+                    modifier = Modifier.weight(1f),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = JivaColors.DeepBlue,
+                        unfocusedBorderColor = JivaColors.DarkGray
+                    )
                 )
             }
-            Spacer(modifier = Modifier.height(8.dp))
-        } else if (entries.size < totalEntries) {
-            Card(
+
+            // View All Toggle
+            Row(
                 modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Show all items (including zero stock)",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = JivaColors.DeepBlue
+                )
+                Switch(
+                    checked = viewAll,
+                    onCheckedChange = onViewAllChange,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = JivaColors.White,
+                        checkedTrackColor = JivaColors.Green,
+                        uncheckedThumbColor = JivaColors.White,
+                        uncheckedTrackColor = JivaColors.DarkGray
+                    )
+                )
+            }
+
+            // Filter Results Summary
+            Card(
                 colors = CardDefaults.cardColors(containerColor = JivaColors.LightBlue.copy(alpha = 0.1f))
             ) {
                 Text(
-                    text = "📊 Showing ${entries.size} of $totalEntries items for performance",
+                    text = "Showing $filteredCount of $totalCount items",
                     modifier = Modifier.padding(12.dp),
                     fontSize = 12.sp,
                     color = JivaColors.DeepBlue,
                     fontWeight = FontWeight.Medium
                 )
             }
-            Spacer(modifier = Modifier.height(8.dp))
         }
+    }
+}
 
-        // Simple table
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = JivaColors.White)
+@Composable
+private fun StockSummarySection(
+    totalEntries: Int,
+    totalOpeningStock: Double,
+    totalInQty: Double,
+    totalOutQty: Double,
+    totalClosingStock: Double,
+    totalValuation: Double
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = JivaColors.DeepBlue),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
         ) {
-            LazyColumn(
+            Text(
+                text = "Stock Summary",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = JivaColors.White
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(8.dp)
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                SummaryItem("Total Items", totalEntries.toString())
+                SummaryItem("Opening Stock", String.format("%.2f", totalOpeningStock))
+                SummaryItem("Closing Stock", String.format("%.2f", totalClosingStock))
+                SummaryItem("Total Valuation", "₹${String.format("%.2f", totalValuation)}")
+            }
+        }
+    }
+}
+
+@Composable
+private fun SummaryItem(label: String, value: String) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = value,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = JivaColors.White
+        )
+        Text(
+            text = label,
+            fontSize = 10.sp,
+            color = JivaColors.White.copy(alpha = 0.8f)
+        )
+    }
+}
+
+@Composable
+private fun StockTableSection(
+    entries: List<StockEntry>,
+    selectedEntries: Set<String>,
+    onEntrySelectionChange: (String, Boolean) -> Unit,
+    selectAll: Boolean,
+    onSelectAllChange: (Boolean) -> Unit,
+    onGeneratePDF: (List<StockEntry>) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            // Header with PDF button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Stock Data",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = JivaColors.DeepBlue
+                )
+
+                Button(
+                    onClick = {
+                        val selectedData = entries.filter { selectedEntries.contains(it.itemId) }
+                        onGeneratePDF(if (selectedData.isEmpty()) entries else selectedData)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = JivaColors.Green)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PictureAsPdf,
+                        contentDescription = "Generate PDF"
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("PDF")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Select All Checkbox
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = selectAll,
+                    onCheckedChange = onSelectAllChange,
+                    colors = CheckboxDefaults.colors(checkedColor = JivaColors.DeepBlue)
+                )
+                Text(
+                    text = "Select All (${selectedEntries.size} selected)",
+                    fontSize = 14.sp,
+                    color = JivaColors.DarkGray
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Simple table
+            LazyColumn(
+                modifier = Modifier.height(400.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 // Header
                 item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = JivaColors.DeepBlue)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("Item ID", color = JivaColors.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                            Text("Item Name", color = JivaColors.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(2f))
-                            Text("Stock", color = JivaColors.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                            Text("Value", color = JivaColors.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        }
-                    }
+                    StockTableHeader()
                 }
 
                 // Data rows
                 items(entries) { entry ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 2.dp),
-                        colors = CardDefaults.cardColors(containerColor = JivaColors.LightGray.copy(alpha = 0.3f))
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = entry.itemId,
-                                fontSize = 9.sp,
-                                color = JivaColors.DarkGray,
-                                modifier = Modifier.weight(1f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = entry.itemName,
-                                fontSize = 9.sp,
-                                color = JivaColors.DarkGray,
-                                modifier = Modifier.weight(2f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = entry.closingStock,
-                                fontSize = 9.sp,
-                                color = JivaColors.DarkGray,
-                                modifier = Modifier.weight(1f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "₹${entry.valuation}",
-                                fontSize = 9.sp,
-                                color = JivaColors.Green,
-                                modifier = Modifier.weight(1f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                    StockTableRow(
+                        entry = entry,
+                        isSelected = selectedEntries.contains(entry.itemId),
+                        onSelectionChange = { isSelected ->
+                            onEntrySelectionChange(entry.itemId, isSelected)
                         }
-                    }
+                    )
                 }
             }
         }
@@ -1472,205 +649,124 @@ private fun SimpleStockTable(
 
 @Composable
 private fun StockTableHeader() {
-    Row(
-        modifier = Modifier
-            .background(
-                JivaColors.LightGray,
-                RoundedCornerShape(8.dp)
-            )
-            .padding(vertical = 12.dp, horizontal = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Card(
+        colors = CardDefaults.cardColors(containerColor = JivaColors.DeepBlue)
     ) {
-        StockHeaderCell("Item ID", modifier = Modifier.width(80.dp))
-        StockHeaderCell("Item Name", modifier = Modifier.width(150.dp))
-        StockHeaderCell("Opening", modifier = Modifier.width(80.dp))
-        StockHeaderCell("IN Qty", modifier = Modifier.width(80.dp))
-        StockHeaderCell("Out Qty", modifier = Modifier.width(80.dp))
-        StockHeaderCell("Closing", modifier = Modifier.width(80.dp))
-        StockHeaderCell("Avg Rate", modifier = Modifier.width(80.dp))
-        StockHeaderCell("Valuation", modifier = Modifier.width(100.dp))
-        StockHeaderCell("Type", modifier = Modifier.width(80.dp))
-        StockHeaderCell("Company", modifier = Modifier.width(100.dp))
-        StockHeaderCell("CGST", modifier = Modifier.width(60.dp))
-        StockHeaderCell("SGST", modifier = Modifier.width(60.dp))
-        StockHeaderCell("IGST", modifier = Modifier.width(60.dp))
-    }
-}
-
-@Composable
-private fun StockHeaderCell(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.Bold,
-        color = JivaColors.DeepBlue,
-        textAlign = TextAlign.Center,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = modifier
-    )
-}
-
-@Composable
-private fun StockTableRow(entry: StockEntry) {
-    Column {
         Row(
             modifier = Modifier
-                .padding(vertical = 8.dp, horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                .fillMaxWidth()
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("Select", color = JivaColors.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.8f))
+            Text("Item ID", color = JivaColors.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text("Item Name", color = JivaColors.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(2f))
+            Text("Stock", color = JivaColors.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text("Value", color = JivaColors.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun StockTableRow(
+    entry: StockEntry,
+    isSelected: Boolean,
+    onSelectionChange: (Boolean) -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) JivaColors.LightBlue.copy(alpha = 0.3f) else JivaColors.LightGray.copy(alpha = 0.3f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            StockCell(entry.itemId, Modifier.width(80.dp))
-            StockCell(entry.itemName, Modifier.width(150.dp))
-            StockCell(entry.openingStock, Modifier.width(80.dp))
-            StockCell(entry.inQty, Modifier.width(80.dp))
-            StockCell(entry.outQty, Modifier.width(80.dp))
-            StockCell(entry.closingStock, Modifier.width(80.dp))
-            StockCell("₹${entry.avgRate}", Modifier.width(80.dp))
-            StockCell("₹${entry.valuation}", Modifier.width(100.dp))
-            StockCell(entry.itemType, Modifier.width(80.dp))
-            StockCell(entry.companyName, Modifier.width(100.dp))
-            StockCell("${entry.cgst}%", Modifier.width(60.dp))
-            StockCell("${entry.sgst}%", Modifier.width(60.dp))
-            StockCell("${entry.igst}%", Modifier.width(60.dp))
-        }
-
-        HorizontalDivider(
-            color = JivaColors.LightGray,
-            thickness = 0.5.dp,
-            modifier = Modifier.padding(horizontal = 8.dp)
-        )
-    }
-}
-
-@Composable
-private fun StockCell(
-    text: String,
-    modifier: Modifier = Modifier,
-    color: Color = Color(0xFF374151)
-) {
-    Text(
-        text = text,
-        fontSize = 10.sp,
-        color = color,
-        textAlign = TextAlign.Center,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
-        modifier = modifier
-    )
-}
-
-@Composable
-private fun StockTotalRow(
-    totalOpeningStock: Double,
-    totalInQty: Double,
-    totalOutQty: Double,
-    totalClosingStock: Double,
-    totalValuation: Double
-) {
-    Row(
-        modifier = Modifier
-            .background(
-                JivaColors.DeepBlue.copy(alpha = 0.1f),
-                RoundedCornerShape(8.dp)
+            Checkbox(
+                checked = isSelected,
+                onCheckedChange = onSelectionChange,
+                modifier = Modifier.weight(0.8f),
+                colors = CheckboxDefaults.colors(checkedColor = JivaColors.DeepBlue)
             )
-            .padding(vertical = 12.dp, horizontal = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "TOTAL",
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            color = JivaColors.DeepBlue,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.width(230.dp) // Item ID + Item Name columns
-        )
-        StockCell("${totalOpeningStock.toInt()}", Modifier.width(80.dp), JivaColors.DeepBlue)
-        StockCell("${totalInQty.toInt()}", Modifier.width(80.dp), JivaColors.DeepBlue)
-        StockCell("${totalOutQty.toInt()}", Modifier.width(80.dp), JivaColors.DeepBlue)
-        StockCell("${totalClosingStock.toInt()}", Modifier.width(80.dp), JivaColors.DeepBlue)
-        StockCell("-", Modifier.width(80.dp), JivaColors.DeepBlue) // Avg Rate column
-        StockCell(
-            text = "₹${String.format("%.2f", totalValuation)}",
-            modifier = Modifier.width(100.dp),
-            color = JivaColors.Green
-        )
-        StockCell("-", Modifier.width(80.dp), JivaColors.DeepBlue) // Type column
-        StockCell("-", Modifier.width(100.dp), JivaColors.DeepBlue) // Company column
-        StockCell("-", Modifier.width(60.dp), JivaColors.DeepBlue) // CGST column
-        StockCell("-", Modifier.width(60.dp), JivaColors.DeepBlue) // SGST column
-        StockCell("-", Modifier.width(60.dp), JivaColors.DeepBlue) // IGST column
+            Text(
+                text = entry.itemId,
+                fontSize = 9.sp,
+                color = JivaColors.DarkGray,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = entry.itemName,
+                fontSize = 9.sp,
+                color = JivaColors.DarkGray,
+                modifier = Modifier.weight(2f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = entry.closingStock,
+                fontSize = 9.sp,
+                color = JivaColors.DarkGray,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = "₹${entry.valuation}",
+                fontSize = 9.sp,
+                color = JivaColors.Green,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
-// Shimmer effect for loading animation
-fun Modifier.stockShimmerEffect(): Modifier = composed {
-    var size by remember { mutableStateOf(IntSize.Zero) }
-    val transition = rememberInfiniteTransition(label = "shimmer")
-    val startOffsetX by transition.animateFloat(
-        initialValue = -2 * size.width.toFloat(),
-        targetValue = 2 * size.width.toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000)
-        ), label = "shimmer"
-    )
+// Simple PDF generation function
+private suspend fun generateStockPDF(context: Context, data: List<StockEntry>) {
+    withContext(Dispatchers.IO) {
+        try {
+            val pdfDocument = PdfDocument()
+            val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create()
+            val page = pdfDocument.startPage(pageInfo)
+            val canvas = page.canvas
+            val paint = Paint()
 
-    background(
-        brush = Brush.linearGradient(
-            colors = listOf(
-                Color(0xFFB8B5B5),
-                Color(0xFF8F8B8B),
-                Color(0xFFB8B5B5),
-            ),
-            start = Offset(startOffsetX, 0f),
-            end = Offset(startOffsetX + size.width.toFloat(), size.height.toFloat())
-        )
-    ).onGloballyPositioned {
-        size = it.size
-    }
-}
+            // Simple PDF content
+            paint.textSize = 16f
+            paint.color = Color.BLACK
+            canvas.drawText("Stock Report", 50f, 50f, paint)
 
-@Composable
-private fun StockLoadingRow() {
-    Row(
-        modifier = Modifier
-            .padding(vertical = 8.dp, horizontal = 8.dp)
-            .stockShimmerEffect(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Data placeholders for stock columns
-        repeat(13) { index ->
-            val width = when (index) {
-                0 -> 80.dp   // Item ID
-                1 -> 150.dp  // Item Name
-                2 -> 80.dp   // Opening
-                3 -> 80.dp   // IN Qty
-                4 -> 80.dp   // Out Qty
-                5 -> 80.dp   // Closing
-                6 -> 80.dp   // Avg Rate
-                7 -> 100.dp  // Valuation
-                8 -> 80.dp   // Type
-                9 -> 100.dp  // Company
-                10 -> 60.dp  // CGST
-                11 -> 60.dp  // SGST
-                12 -> 60.dp  // IGST
-                else -> 80.dp
+            paint.textSize = 12f
+            var yPosition = 100f
+
+            data.take(20).forEach { entry -> // Limit to 20 items for simplicity
+                canvas.drawText("${entry.itemId} - ${entry.itemName} - Stock: ${entry.closingStock}", 50f, yPosition, paint)
+                yPosition += 20f
             }
-            Box(
-                modifier = Modifier
-                    .width(width)
-                    .height(16.dp)
-                    .background(JivaColors.LightGray, RoundedCornerShape(4.dp))
-            )
+
+            pdfDocument.finishPage(page)
+
+            // Save PDF
+            val fileName = "stock_report_${System.currentTimeMillis()}.pdf"
+            val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), fileName)
+            pdfDocument.writeTo(FileOutputStream(file))
+            pdfDocument.close()
+
+            // Show success message
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "PDF saved: ${file.absolutePath}", Toast.LENGTH_LONG).show()
+            }
+
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "Error generating PDF: ${e.message}", Toast.LENGTH_LONG).show()
+            }
         }
     }
-}
-
-@Composable
-@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
-private fun StockReportScreenPreview() {
-    StockReportScreenImpl()
 }
