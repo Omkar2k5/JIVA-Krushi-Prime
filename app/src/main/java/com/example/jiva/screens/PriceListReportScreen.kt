@@ -611,7 +611,7 @@ fun PriceListReportScreen(onBackClick: () -> Unit = {}) {
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "SHARE PDF",
+                                    text = "SHARE REPORT",
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
@@ -929,7 +929,7 @@ private fun PriceListTotalRow(
 }
 
 /**
- * Generate PDF for PriceList Report
+ * Generate CSV for PriceList Report (Simple alternative to PDF)
  */
 private suspend fun generatePriceListReportPDF(
     entries: List<PriceListEntry>,
@@ -940,98 +940,47 @@ private suspend fun generatePriceListReportPDF(
 ): ByteArray {
     return withContext(Dispatchers.IO) {
         try {
-            val outputStream = java.io.ByteArrayOutputStream()
-            val writer = com.itextpdf.kernel.pdf.PdfWriter(outputStream)
-            val pdfDoc = com.itextpdf.kernel.pdf.PdfDocument(writer)
-            val document = com.itextpdf.layout.Document(pdfDoc)
+            val csvContent = buildString {
+                // Title and metadata
+                appendLine("Price List Report")
+                appendLine("Generated on: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}")
+                appendLine()
 
-            // Title
-            document.add(
-                com.itextpdf.layout.element.Paragraph("Price List Report")
-                    .setFontSize(20f)
-                    .setBold()
-                    .setTextAlignment(com.itextpdf.layout.properties.TextAlignment.CENTER)
-            )
+                // Summary
+                appendLine("SUMMARY")
+                appendLine("Total Items,${entries.size}")
+                appendLine("Average MRP,₹${String.format("%.2f", avgMrp)}")
+                appendLine("Average Credit Rate,₹${String.format("%.2f", avgCreditRate)}")
+                appendLine("Average Cash Rate,₹${String.format("%.2f", avgCashRate)}")
+                appendLine("Average Purchase Rate,₹${String.format("%.2f", avgPurchaseRate)}")
+                appendLine()
 
-            // Date
-            document.add(
-                com.itextpdf.layout.element.Paragraph("Generated on: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}")
-                    .setFontSize(12f)
-                    .setTextAlignment(com.itextpdf.layout.properties.TextAlignment.CENTER)
-            )
+                // Headers
+                appendLine("Item ID,Item Name,MRP,Credit Rate,Cash Rate,Wholesale Rate,Purchase Rate")
 
-            // Summary
-            document.add(
-                com.itextpdf.layout.element.Paragraph("\nSummary:")
-                    .setFontSize(14f)
-                    .setBold()
-            )
-            document.add(
-                com.itextpdf.layout.element.Paragraph("Total Items: ${entries.size}")
-                    .setFontSize(12f)
-            )
-            document.add(
-                com.itextpdf.layout.element.Paragraph("Average MRP: ₹${String.format("%.2f", avgMrp)}")
-                    .setFontSize(12f)
-            )
-            document.add(
-                com.itextpdf.layout.element.Paragraph("Average Credit Rate: ₹${String.format("%.2f", avgCreditRate)}")
-                    .setFontSize(12f)
-            )
-            document.add(
-                com.itextpdf.layout.element.Paragraph("Average Cash Rate: ₹${String.format("%.2f", avgCashRate)}")
-                    .setFontSize(12f)
-            )
-            document.add(
-                com.itextpdf.layout.element.Paragraph("Average Purchase Rate: ₹${String.format("%.2f", avgPurchaseRate)}")
-                    .setFontSize(12f)
-            )
-
-            // Table
-            val table = com.itextpdf.layout.element.Table(floatArrayOf(1f, 3f, 1.5f, 1.5f, 1.5f, 1.5f, 1.5f))
-                .setWidth(com.itextpdf.layout.properties.UnitValue.createPercentValue(100f))
-
-            // Headers
-            val headers = listOf("Item ID", "Item Name", "MRP", "Credit Rate", "Cash Rate", "Wholesale Rate", "Purchase Rate")
-            headers.forEach { header ->
-                table.addHeaderCell(
-                    com.itextpdf.layout.element.Cell()
-                        .add(com.itextpdf.layout.element.Paragraph(header).setBold())
-                        .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
-                )
+                // Data rows
+                entries.forEach { entry ->
+                    appendLine("${entry.itemId},${entry.itemName},₹${entry.mrp},₹${entry.creditSaleRate},₹${entry.cashSaleRate},₹${entry.wholesaleRate},₹${entry.avgPurchaseRate}")
+                }
             }
 
-            // Data rows
-            entries.forEach { entry ->
-                table.addCell(entry.itemId)
-                table.addCell(entry.itemName)
-                table.addCell("₹${entry.mrp}")
-                table.addCell("₹${entry.creditSaleRate}")
-                table.addCell("₹${entry.cashSaleRate}")
-                table.addCell("₹${entry.wholesaleRate}")
-                table.addCell("₹${entry.avgPurchaseRate}")
-            }
-
-            document.add(com.itextpdf.layout.element.Paragraph("\nDetailed Price List:").setFontSize(14f).setBold())
-            document.add(table)
-
-            document.close()
-            outputStream.toByteArray()
+            csvContent.toByteArray(Charsets.UTF_8)
         } catch (e: Exception) {
-            timber.log.Timber.e(e, "Error generating PDF")
+            timber.log.Timber.e(e, "Error generating CSV")
             throw e
         }
     }
 }
 
 /**
- * Share PDF file
+ * Share CSV file
  */
-private fun sharePDF(context: android.content.Context, pdfData: ByteArray, fileName: String) {
+private fun sharePDF(context: android.content.Context, csvData: ByteArray, fileName: String) {
     try {
-        // Create a temporary file
-        val file = java.io.File(context.cacheDir, fileName)
-        file.writeBytes(pdfData)
+        // Create a temporary file with CSV extension
+        val csvFileName = fileName.replace(".pdf", ".csv")
+        val file = java.io.File(context.cacheDir, csvFileName)
+        file.writeBytes(csvData)
 
         // Create URI for the file
         val uri = androidx.core.content.FileProvider.getUriForFile(
@@ -1043,16 +992,16 @@ private fun sharePDF(context: android.content.Context, pdfData: ByteArray, fileN
         // Create share intent
         val shareIntent = android.content.Intent().apply {
             action = android.content.Intent.ACTION_SEND
-            type = "application/pdf"
+            type = "text/csv"
             putExtra(android.content.Intent.EXTRA_STREAM, uri)
             putExtra(android.content.Intent.EXTRA_SUBJECT, "Price List Report")
-            putExtra(android.content.Intent.EXTRA_TEXT, "Please find the attached Price List Report.")
+            putExtra(android.content.Intent.EXTRA_TEXT, "Please find the attached Price List Report in CSV format.")
             addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
 
         context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Price List Report"))
     } catch (e: Exception) {
-        timber.log.Timber.e(e, "Error sharing PDF")
-        android.widget.Toast.makeText(context, "Error sharing PDF: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+        timber.log.Timber.e(e, "Error sharing CSV")
+        android.widget.Toast.makeText(context, "Error sharing report: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
     }
 }
