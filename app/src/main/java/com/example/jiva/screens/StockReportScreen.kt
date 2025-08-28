@@ -55,19 +55,22 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * Stock Entry data class - Simple and stable
+ * Stock Entry data class - Complete with all API fields
  */
 data class StockEntry(
     val itemId: String,
     val itemName: String,
-    val openingStock: String,
-    val inQty: String,
-    val outQty: String,
+    val opening: String,
+    val inWard: String,
+    val outWard: String,
     val closingStock: String,
     val avgRate: String,
     val valuation: String,
     val itemType: String,
-    val companyName: String
+    val company: String,
+    val cgst: String,
+    val sgst: String,
+    val igst: String
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -147,14 +150,17 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
                 StockEntry(
                     itemId = entity.itemId ?: "",
                     itemName = entity.itemName ?: "",
-                    openingStock = entity.opening ?: "",
-                    inQty = entity.inWard ?: "",
-                    outQty = entity.outWard ?: "",
-                    closingStock = entity.closingStock ?: "",
-                    avgRate = entity.avgRate ?: "",
-                    valuation = entity.valuation ?: "",
+                    opening = entity.opening ?: "0.000",
+                    inWard = entity.inWard ?: "0.000",
+                    outWard = entity.outWard ?: "0.000",
+                    closingStock = entity.closingStock ?: "0.000",
+                    avgRate = entity.avgRate ?: "0.00",
+                    valuation = entity.valuation ?: "0.00",
                     itemType = entity.itemType ?: "",
-                    companyName = entity.company ?: ""
+                    company = entity.company ?: "",
+                    cgst = entity.cgst ?: "0.00",
+                    sgst = entity.sgst ?: "0.00",
+                    igst = entity.igst ?: "0.00"
                 )
             }
         } catch (e: Exception) {
@@ -196,7 +202,7 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
 
                         // Company Search Filter
                         val companyMatch = if (companySearch.isBlank()) true else
-                            entry.companyName.contains(companySearch, ignoreCase = true)
+                            entry.company.contains(companySearch, ignoreCase = true)
 
                         stockTypeMatch && stockStatusMatch && nameMatch && companyMatch
                     } catch (e: Exception) {
@@ -227,13 +233,13 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
 
     // Calculate totals from string values
     val totalOpeningStock = remember(filteredEntries) {
-        filteredEntries.sumOf { it.openingStock.toDoubleOrNull() ?: 0.0 }
+        filteredEntries.sumOf { it.opening.toDoubleOrNull() ?: 0.0 }
     }
-    val totalInQty = remember(filteredEntries) {
-        filteredEntries.sumOf { it.inQty.toDoubleOrNull() ?: 0.0 }
+    val totalInWard = remember(filteredEntries) {
+        filteredEntries.sumOf { it.inWard.toDoubleOrNull() ?: 0.0 }
     }
-    val totalOutQty = remember(filteredEntries) {
-        filteredEntries.sumOf { it.outQty.toDoubleOrNull() ?: 0.0 }
+    val totalOutWard = remember(filteredEntries) {
+        filteredEntries.sumOf { it.outWard.toDoubleOrNull() ?: 0.0 }
     }
     val totalClosingStock = remember(filteredEntries) {
         filteredEntries.sumOf { it.closingStock.toDoubleOrNull() ?: 0.0 }
@@ -407,8 +413,8 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
                     StockSummarySection(
                         totalEntries = filteredEntries.size,
                         totalOpeningStock = totalOpeningStock,
-                        totalInQty = totalInQty,
-                        totalOutQty = totalOutQty,
+                        totalInWard = totalInWard,
+                        totalOutWard = totalOutWard,
                         totalClosingStock = totalClosingStock,
                         totalValuation = totalValuation
                     )
@@ -580,8 +586,8 @@ private fun StockFilterSection(
 private fun StockSummarySection(
     totalEntries: Int,
     totalOpeningStock: Double,
-    totalInQty: Double,
-    totalOutQty: Double,
+    totalInWard: Double,
+    totalOutWard: Double,
     totalClosingStock: Double,
     totalValuation: Double
 ) {
@@ -607,8 +613,16 @@ private fun StockSummarySection(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 SummaryItem("Total Items", totalEntries.toString())
-                SummaryItem("Opening Stock", String.format("%.2f", totalOpeningStock))
-                SummaryItem("Closing Stock", String.format("%.2f", totalClosingStock))
+                SummaryItem("Opening", String.format("%.2f", totalOpeningStock))
+                SummaryItem("InWard", String.format("%.2f", totalInWard))
+                SummaryItem("OutWard", String.format("%.2f", totalOutWard))
+                SummaryItem("Closing", String.format("%.2f", totalClosingStock))
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
                 SummaryItem("Total Valuation", "₹${String.format("%.2f", totalValuation)}")
             }
         }
@@ -734,14 +748,23 @@ private fun StockTableHeader() {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+                .horizontalScroll(rememberScrollState())
+                .padding(8.dp)
         ) {
-            Text("Select", color = JivaColors.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.8f))
-            Text("Item ID", color = JivaColors.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            Text("Item Name", color = JivaColors.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(2f))
-            Text("Stock", color = JivaColors.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            Text("Value", color = JivaColors.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text("☑", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(30.dp))
+            Text("Item ID", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
+            Text("Item Name", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(120.dp))
+            Text("Opening", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
+            Text("InWard", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
+            Text("OutWard", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
+            Text("Closing", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
+            Text("Avg Rate", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(70.dp))
+            Text("Valuation", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(80.dp))
+            Text("Type", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(80.dp))
+            Text("Company", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(80.dp))
+            Text("CGST", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(50.dp))
+            Text("SGST", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(50.dp))
+            Text("IGST", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(50.dp))
         }
     }
 }
@@ -760,45 +783,119 @@ private fun StockTableRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
                 .padding(8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Checkbox(
                 checked = isSelected,
                 onCheckedChange = onSelectionChange,
-                modifier = Modifier.weight(0.8f),
+                modifier = Modifier.width(30.dp),
                 colors = CheckboxDefaults.colors(checkedColor = JivaColors.DeepBlue)
             )
             Text(
                 text = entry.itemId,
-                fontSize = 9.sp,
+                fontSize = 7.sp,
                 color = JivaColors.DarkGray,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.width(60.dp),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = entry.itemName,
-                fontSize = 9.sp,
+                fontSize = 7.sp,
                 color = JivaColors.DarkGray,
-                modifier = Modifier.weight(2f),
+                modifier = Modifier.width(120.dp),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = entry.opening,
+                fontSize = 7.sp,
+                color = JivaColors.DarkGray,
+                modifier = Modifier.width(60.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = entry.inWard,
+                fontSize = 7.sp,
+                color = JivaColors.Green,
+                modifier = Modifier.width(60.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = entry.outWard,
+                fontSize = 7.sp,
+                color = JivaColors.Orange,
+                modifier = Modifier.width(60.dp),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = entry.closingStock,
-                fontSize = 9.sp,
+                fontSize = 7.sp,
+                color = JivaColors.DeepBlue,
+                modifier = Modifier.width(60.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "₹${entry.avgRate}",
+                fontSize = 7.sp,
                 color = JivaColors.DarkGray,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.width(70.dp),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = "₹${entry.valuation}",
-                fontSize = 9.sp,
+                fontSize = 7.sp,
                 color = JivaColors.Green,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.width(80.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = entry.itemType,
+                fontSize = 7.sp,
+                color = JivaColors.Purple,
+                modifier = Modifier.width(80.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = entry.company,
+                fontSize = 7.sp,
+                color = JivaColors.DarkGray,
+                modifier = Modifier.width(80.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = "${entry.cgst}%",
+                fontSize = 7.sp,
+                color = JivaColors.DarkGray,
+                modifier = Modifier.width(50.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = "${entry.sgst}%",
+                fontSize = 7.sp,
+                color = JivaColors.DarkGray,
+                modifier = Modifier.width(50.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = "${entry.igst}%",
+                fontSize = 7.sp,
+                color = JivaColors.DarkGray,
+                modifier = Modifier.width(50.dp),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -824,9 +921,20 @@ private suspend fun generateStockPDF(context: Context, data: List<StockEntry>) {
             paint.textSize = 12f
             var yPosition = 100f
 
-            data.take(20).forEach { entry -> // Limit to 20 items for simplicity
-                canvas.drawText("${entry.itemId} - ${entry.itemName} - Stock: ${entry.closingStock}", 50f, yPosition, paint)
-                yPosition += 20f
+            data.take(15).forEach { entry -> // Limit to 15 items for better formatting
+                val line1 = "ID: ${entry.itemId} | ${entry.itemName}"
+                val line2 = "Opening: ${entry.opening} | InWard: ${entry.inWard} | OutWard: ${entry.outWard} | Closing: ${entry.closingStock}"
+                val line3 = "Rate: ₹${entry.avgRate} | Value: ₹${entry.valuation} | Type: ${entry.itemType} | Company: ${entry.company}"
+                val line4 = "CGST: ${entry.cgst}% | SGST: ${entry.sgst}% | IGST: ${entry.igst}%"
+
+                canvas.drawText(line1, 50f, yPosition, paint)
+                yPosition += 15f
+                canvas.drawText(line2, 50f, yPosition, paint)
+                yPosition += 15f
+                canvas.drawText(line3, 50f, yPosition, paint)
+                yPosition += 15f
+                canvas.drawText(line4, 50f, yPosition, paint)
+                yPosition += 25f // Extra space between entries
             }
 
             pdfDocument.finishPage(page)
