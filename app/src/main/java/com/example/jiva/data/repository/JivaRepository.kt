@@ -87,6 +87,9 @@ interface JivaRepository {
     // Expiry operations
     suspend fun syncExpiry(userId: Int, yearString: String): Result<Unit>
 
+    // PriceList operations
+    suspend fun syncPriceList(userId: Int, yearString: String): Result<Unit>
+
     // Sync all data from server
     suspend fun syncAllData(): Result<Unit>
 }

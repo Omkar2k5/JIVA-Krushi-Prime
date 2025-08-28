@@ -749,6 +749,68 @@ class JivaRepositoryImpl(
         }
     }
 
+    override suspend fun syncPriceList(userId: Int, yearString: String): Result<Unit> {
+        return try {
+            Timber.d("🚀 Starting PriceList API call for userId: $userId, yearString: $yearString")
+            val apiResult = remoteDataSource.getPriceList(userId, yearString)
+
+            Timber.d("📡 PriceList API call completed. Success: ${apiResult.isSuccess}")
+
+            if (apiResult.isSuccess) {
+                val body = apiResult.getOrNull()
+                Timber.d("API response body: isSuccess=${body?.isSuccess}, message=${body?.message}, data size=${body?.data?.size}")
+
+                if (body?.isSuccess == true) {
+                    val items = body.data.orEmpty()
+                    Timber.d("📦 Processing ${items.size} price list items from API")
+
+                    // Map API model -> Room entity
+                    val entities = items.map { priceListItem ->
+                        PriceDataEntity(
+                            cmpCode = priceListItem.cmpCode.toIntOrNull() ?: 0,
+                            itemId = priceListItem.itemID,
+                            itemName = priceListItem.itemName,
+                            mrp = java.math.BigDecimal(priceListItem.mrp.ifBlank { "0" }),
+                            creditSaleRate = java.math.BigDecimal(priceListItem.credit_Sale_Rate.ifBlank { "0" }),
+                            cashSaleRate = java.math.BigDecimal(priceListItem.cash_Sale_Rate.ifBlank { "0" }),
+                            wholesaleRate = java.math.BigDecimal(priceListItem.wholeSale_Rate.ifBlank { "0" }),
+                            avgPurchaseRate = java.math.BigDecimal(priceListItem.avg_Purchase_Rate.ifBlank { "0" }),
+                            yearString = priceListItem.yearString
+                        )
+                    }
+
+                    // Clear existing data for this year and insert new data in chunks for performance
+                    Timber.d("🗑️ Clearing existing price list data for year: $yearString")
+                    database.priceDataDao().deleteByYear(yearString)
+
+                    // Insert in chunks for better performance with large datasets
+                    val chunkSize = 1000
+                    var index = 0
+                    while (index < entities.size) {
+                        val end = minOf(index + chunkSize, entities.size)
+                        database.priceDataDao().insertAll(entities.subList(index, end))
+                        index = end
+                    }
+
+                    Timber.d("✅ Successfully inserted ${entities.size} price list rows for $yearString")
+                    Result.success(Unit)
+                } else {
+                    val errorMsg = "API returned isSuccess=false: ${body?.message}"
+                    Timber.e(errorMsg)
+                    Result.failure(IllegalStateException(errorMsg))
+                }
+            } else {
+                val exception = apiResult.exceptionOrNull()
+                val errorMsg = "PriceList API call failed: ${exception?.message}"
+                Timber.e(exception, errorMsg)
+                Result.failure(exception ?: IllegalStateException(errorMsg))
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error syncing price list data")
+            Result.failure(e)
+        }
+    }
+
     // Sync all data
     override suspend fun syncAllData(): Result<Unit> {
         return try {

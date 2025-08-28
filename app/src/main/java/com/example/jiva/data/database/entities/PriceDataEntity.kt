@@ -8,36 +8,45 @@ import kotlinx.serialization.Serializable
 import java.math.BigDecimal
 
 /**
- * Room entity for price screen data
- * Used for price management functionality
+ * Room entity for price list data
+ * Maps to the API response structure for price list items
  */
-@Entity(tableName = "price_data")
+@Entity(tableName = "tb_pricelist")
 @Serializable
 data class PriceDataEntity(
-    @PrimaryKey
-    @ColumnInfo(name = "itemId")
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "id")
+    val id: Int = 0,
+
+    @ColumnInfo(name = "CmpCode")
+    val cmpCode: Int,
+
+    @ColumnInfo(name = "ItemID")
     val itemId: String,
-    
-    @ColumnInfo(name = "itemName")
+
+    @ColumnInfo(name = "ItemName")
     val itemName: String,
-    
-    @ColumnInfo(name = "mrp")
+
+    @ColumnInfo(name = "MRP")
     @Contextual
     val mrp: BigDecimal = BigDecimal.ZERO,
-    
-    @ColumnInfo(name = "creditSaleRate")
+
+    @ColumnInfo(name = "CreditSaleRate")
     @Contextual
     val creditSaleRate: BigDecimal = BigDecimal.ZERO,
-    
-    @ColumnInfo(name = "cashSaleRate")
+
+    @ColumnInfo(name = "CashSaleRate")
     @Contextual
     val cashSaleRate: BigDecimal = BigDecimal.ZERO,
-    
-    @ColumnInfo(name = "wholesaleRate")
+
+    @ColumnInfo(name = "WholesaleRate")
     @Contextual
     val wholesaleRate: BigDecimal = BigDecimal.ZERO,
-    
-    @ColumnInfo(name = "maxPurchaseRate")
+
+    @ColumnInfo(name = "AvgPurchaseRate")
     @Contextual
-    val maxPurchaseRate: BigDecimal = BigDecimal.ZERO
+    val avgPurchaseRate: BigDecimal = BigDecimal.ZERO,
+
+    @ColumnInfo(name = "YearString")
+    val yearString: String
 )
