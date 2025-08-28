@@ -1,6 +1,6 @@
 package com.example.jiva.screens
 
-import androidx.compose.foundation.Image
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.horizontalScroll
@@ -12,27 +12,32 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.jiva.JivaApplication
 import com.example.jiva.JivaColors
-import com.example.jiva.R
 import com.example.jiva.components.ResponsiveReportHeader
-import com.example.jiva.utils.PDFGenerator
-import androidx.compose.ui.platform.LocalContext
+import com.example.jiva.viewmodel.SalePurchaseReportViewModel
 import kotlinx.coroutines.launch
+import android.widget.Toast
+import java.text.SimpleDateFormat
+import java.util.*
 
-// Data model for Sales/Purchase Report entries
+/**
+ * Sale/Purchase Entry data class - Complete with all API fields
+ */
 data class SalesReportEntry(
     val trDate: String,
     val partyName: String,
@@ -42,99 +47,259 @@ data class SalesReportEntry(
     val itemName: String,
     val hsnNo: String,
     val itemType: String,
-    val qty: Double,
+    val qty: String,
     val unit: String,
-    val rate: Double,
-    val amount: Double,
-    val discount: Double
+    val rate: String,
+    val amount: String,
+    val discount: String
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SalesReportScreenImpl(onBackClick: () -> Unit = {}) {
+fun SalesReportScreen(onBackClick: () -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    // State management for input fields
-    var startDate by remember { mutableStateOf("01/04/2025") }
-    var endDate by remember { mutableStateOf("31/03/2026") }
-    var selectedItemType by remember { mutableStateOf("All Types") }
-    var selectedReportFor by remember { mutableStateOf("Sale") }
-    var partyName by remember { mutableStateOf("") }
-    var itemName by remember { mutableStateOf("") }
-    var selectedCompany by remember { mutableStateOf("All Types") }
-    var selectedExempted by remember { mutableStateOf("All") }
-    var hsnNo by remember { mutableStateOf("") }
-    
-    // Dropdown states
-    var isItemTypeDropdownExpanded by remember { mutableStateOf(false) }
-    var isReportForDropdownExpanded by remember { mutableStateOf(false) }
-    var isCompanyDropdownExpanded by remember { mutableStateOf(false) }
-    var isExemptedDropdownExpanded by remember { mutableStateOf(false) }
-    var showStartDatePicker by remember { mutableStateOf(false) }
-    var showEndDatePicker by remember { mutableStateOf(false) }
 
-    // Dummy data for sales/purchase entries
-    val allSalesEntries = remember {
-        listOf(
-            SalesReportEntry("05/08/2025", "Aman Shaikh", "-", "Credit Sale", "1", "Rogar 100ml", "3808", "Fertilizers", 12.0, "Nos", 200.0, 2285.71, 0.0),
-            SalesReportEntry("06/08/2025", "ABC Traders", "27ABCDE1234F1Z5", "Cash Sale", "2", "Roundup Herbicide", "3808", "Pesticides", 5.0, "Ltr", 450.0, 2250.0, 100.0),
-            SalesReportEntry("07/08/2025", "XYZ Suppliers", "29XYZAB5678G2H6", "Credit Sale", "3", "NPK Fertilizer", "3104", "Fertilizers", 25.0, "Kg", 85.75, 2143.75, 50.0),
-            SalesReportEntry("08/08/2025", "PQR Industries", "-", "Cash Sale", "4", "Growth Booster", "3808", "PGR", 8.0, "Nos", 275.0, 2200.0, 0.0),
-            SalesReportEntry("09/08/2025", "LMN Corporation", "24LMNOP9012I3J4", "Credit Sale", "5", "Hybrid Tomato Seeds", "1209", "Seeds", 100.0, "Pkt", 15.50, 1550.0, 25.0),
-            SalesReportEntry("10/08/2025", "DEF Enterprises", "19DEFGH3456K4L5", "Cash Sale", "6", "Insecticide Spray", "3808", "Pesticides", 15.0, "Ltr", 320.0, 4800.0, 200.0),
-            SalesReportEntry("11/08/2025", "GHI Solutions", "-", "Credit Sale", "7", "Organic Manure", "3104", "Fertilizers", 50.0, "Kg", 65.0, 3250.0, 0.0),
-            SalesReportEntry("12/08/2025", "Tech Agro", "36TECH7890M5N6", "Cash Sale", "8", "Plant Growth Regulator", "3808", "PGR", 20.0, "Nos", 180.0, 3600.0, 150.0),
-            SalesReportEntry("13/08/2025", "Modern Farms", "22MODER4567O7P8", "Credit Sale", "9", "Cotton Seeds", "1209", "Seeds", 75.0, "Pkt", 25.0, 1875.0, 0.0),
-            SalesReportEntry("14/08/2025", "Green Valley", "-", "Cash Sale", "10", "Multi-Purpose Cleaner", "3402", "General", 30.0, "Nos", 45.0, 1350.0, 50.0)
-        )
+    // Get the application instance to access the repository
+    val application = context.applicationContext as JivaApplication
+
+    // Create the ViewModel with the repository
+    val viewModel: SalePurchaseReportViewModel = viewModel(
+        factory = SalePurchaseReportViewModel.Factory(application.database)
+    )
+
+    // High-performance loading states
+    var isScreenLoading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    var loadingProgress by remember { mutableStateOf(0) }
+    var loadingMessage by remember { mutableStateOf("") }
+    var dataLoadingProgress by remember { mutableStateOf(0f) }
+
+    // State management for filters
+    var transactionTypeFilter by remember { mutableStateOf("All Types") }
+    var partyNameSearch by remember { mutableStateOf("") }
+    var itemNameSearch by remember { mutableStateOf("") }
+    var categoryFilter by remember { mutableStateOf("All Categories") }
+    var isTransactionTypeDropdownExpanded by remember { mutableStateOf(false) }
+    var isCategoryDropdownExpanded by remember { mutableStateOf(false) }
+
+    // Get current year and user ID
+    val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
+
+    // Handle initial screen loading with progress tracking and data sync
+    LaunchedEffect(Unit) {
+        isScreenLoading = true
+        loadingMessage = "Initializing Sale/Purchase data..."
+
+        // Check if we have data, if not, try to sync
+        val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
+        if (userId != null) {
+            loadingMessage = "Syncing Sale/Purchase data from server..."
+            dataLoadingProgress = 25f
+
+            try {
+                val result = application.repository.syncSalePurchase(userId, year)
+                if (result.isSuccess) {
+                    loadingMessage = "Data synced successfully"
+                    dataLoadingProgress = 75f
+                } else {
+                    loadingMessage = "Using cached data"
+                    dataLoadingProgress = 50f
+                }
+            } catch (e: Exception) {
+                loadingMessage = "Using cached data"
+                dataLoadingProgress = 50f
+            }
+        }
+
+        // Simulate progressive loading for better UX
+        for (i in 75..100 step 5) {
+            loadingProgress = i
+            dataLoadingProgress = i.toFloat()
+            loadingMessage = when {
+                i < 90 -> "Finalizing data..."
+                else -> "Complete!"
+            }
+            kotlinx.coroutines.delay(50) // Smooth progress animation
+        }
+
+        isScreenLoading = false
     }
 
-    // Filter options
-    val itemTypeOptions = listOf("All Types", "General", "Pesticides", "Fertilizers", "PGR", "Seeds")
-    val reportForOptions = listOf("Sale", "Purchase")
-    val companyOptions = listOf("All Types", "Bayer Corp", "Monsanto", "IFFCO", "UPL Limited", "Mahyco", "Syngenta", "Coromandel", "Dhanuka", "Rasi Seeds", "Henkel")
-    val exemptedOptions = listOf("All", "Yes", "No")
+    // Re-read userId after potential initialization
+    val finalUserId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
-    // Filtered entries based on search criteria
-    val filteredEntries = remember(startDate, endDate, selectedItemType, selectedReportFor, partyName, itemName, selectedCompany, selectedExempted, hsnNo, allSalesEntries) {
-        allSalesEntries.filter { entry ->
-            val matchesItemType = if (selectedItemType == "All Types") true else entry.itemType == selectedItemType
-            val matchesReportFor = entry.entryType.contains(selectedReportFor, ignoreCase = true)
-            val matchesPartyName = if (partyName.isBlank()) true else entry.partyName.contains(partyName, ignoreCase = true)
-            val matchesItemName = if (itemName.isBlank()) true else entry.itemName.contains(itemName, ignoreCase = true)
-            val matchesCompany = selectedCompany == "All Types" // In real app, would match against company field
-            val matchesExempted = selectedExempted == "All" // In real app, would check exemption status
-            val matchesHsn = if (hsnNo.isBlank()) true else entry.hsnNo.contains(hsnNo)
-            
-            matchesItemType && matchesReportFor && matchesPartyName && matchesItemName && matchesCompany && matchesExempted && matchesHsn
+    // Optimized data loading - only from Room DB for better performance
+    val salePurchaseEntities by viewModel.observeSalePurchase(year).collectAsState(initial = emptyList())
+
+    // Use only SalePurchase DB data for better performance and stability
+    val allSalesEntries = remember(salePurchaseEntities) {
+        try {
+            salePurchaseEntities.map { entity ->
+                SalesReportEntry(
+                    trDate = entity.trDate?.let {
+                        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it)
+                    } ?: "",
+                    partyName = entity.partyName ?: "",
+                    gstin = entity.gstin ?: "",
+                    entryType = entity.trType ?: "",
+                    refNo = entity.refNo ?: "",
+                    itemName = entity.itemName ?: "",
+                    hsnNo = entity.hsn ?: "",
+                    itemType = entity.category ?: "",
+                    qty = entity.qty?.toString() ?: "0",
+                    unit = entity.unit ?: "",
+                    rate = entity.rate?.toString() ?: "0.00",
+                    amount = entity.amount?.toString() ?: "0.00",
+                    discount = entity.discount?.toString() ?: "0.00"
+                )
+            }
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error mapping sale/purchase entities")
+            emptyList()
         }
     }
 
-    // Calculate totals
-    val totalQty = filteredEntries.sumOf { it.qty }
-    val totalAmount = filteredEntries.sumOf { it.amount }
-    val totalDiscount = filteredEntries.sumOf { it.discount }
+    // Optimized filtering with error handling
+    val filteredEntries = remember(transactionTypeFilter, partyNameSearch, itemNameSearch, categoryFilter, allSalesEntries) {
+        try {
+            if (allSalesEntries.isEmpty()) {
+                emptyList()
+            } else {
+                allSalesEntries.filter { entry ->
+                    try {
+                        // Transaction Type Filter
+                        val typeMatch = when (transactionTypeFilter) {
+                            "All Types" -> true
+                            else -> entry.entryType.equals(transactionTypeFilter, ignoreCase = true)
+                        }
+
+                        // Party Name Search Filter
+                        val partyMatch = if (partyNameSearch.isBlank()) true else
+                            entry.partyName.contains(partyNameSearch, ignoreCase = true)
+
+                        // Item Name Search Filter
+                        val itemMatch = if (itemNameSearch.isBlank()) true else
+                            entry.itemName.contains(itemNameSearch, ignoreCase = true)
+
+                        // Category Filter
+                        val categoryMatch = when (categoryFilter) {
+                            "All Categories" -> true
+                            else -> entry.itemType.equals(categoryFilter, ignoreCase = true)
+                        }
+
+                        typeMatch && partyMatch && itemMatch && categoryMatch
+                    } catch (e: Exception) {
+                        timber.log.Timber.e(e, "Error filtering entry: ${entry.refNo}")
+                        false
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error during filtering")
+            emptyList()
+        }
+    }
+
+    // Calculate statistics from filtered entries
+    val totalAmount = remember(filteredEntries) {
+        filteredEntries.sumOf { it.amount.toDoubleOrNull() ?: 0.0 }
+    }
+    val totalQty = remember(filteredEntries) {
+        filteredEntries.sumOf { it.qty.toDoubleOrNull() ?: 0.0 }
+    }
+    val totalDiscount = remember(filteredEntries) {
+        filteredEntries.sumOf { it.discount.toDoubleOrNull() ?: 0.0 }
+    }
+
+    // Show loading screen if still loading
+    if (isScreenLoading) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                CircularProgressIndicator(
+                    progress = { dataLoadingProgress / 100f },
+                    color = JivaColors.Purple,
+                    modifier = Modifier.size(60.dp)
+                )
+                Text(
+                    text = loadingMessage,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = JivaColors.DeepBlue
+                )
+                Text(
+                    text = "${loadingProgress}% Complete",
+                    fontSize = 14.sp,
+                    color = JivaColors.DarkGray
+                )
+            }
+        }
+        return
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(JivaColors.LightGray)
     ) {
-        // Responsive Header
+        // Responsive Header with Refresh Button
         ResponsiveReportHeader(
-            title = "Sales & Purchase Report",
-            subtitle = "Detailed transaction reports and analysis",
-            onBackClick = onBackClick
+            title = "Sales Report",
+            subtitle = "Transaction history and sales data",
+            onBackClick = onBackClick,
+            actions = {
+                // Refresh Button
+                IconButton(
+                    onClick = {
+                        if (finalUserId != null && !isRefreshing) {
+                            scope.launch {
+                                isRefreshing = true
+                                try {
+                                    val result = application.repository.syncSalePurchase(finalUserId, year)
+                                    if (result.isSuccess) {
+                                        Toast.makeText(context, "✅ Sales data refreshed successfully", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        val error = result.exceptionOrNull()?.message ?: "Unknown error"
+                                        Toast.makeText(context, "❌ Failed to refresh: $error", Toast.LENGTH_LONG).show()
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "❌ Network error: ${e.message}", Toast.LENGTH_LONG).show()
+                                } finally {
+                                    isRefreshing = false
+                                }
+                            }
+                        }
+                    }
+                ) {
+                    if (isRefreshing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = JivaColors.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh",
+                            tint = JivaColors.White
+                        )
+                    }
+                }
+            }
         )
 
-        // Main content with performance optimizations
+        // Simple content for now
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            userScrollEnabled = true
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Filter Controls Card
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -144,657 +309,115 @@ fun SalesReportScreenImpl(onBackClick: () -> Unit = {}) {
                 ) {
                     Column(
                         modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text(
-                            text = "Filter Section",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = JivaColors.DeepBlue
-                        )
-
-                        // Date Range Section
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Date Range",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
+                                text = "Sales Summary",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
                                 color = JivaColors.DeepBlue
                             )
-                            
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                // Start Date
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Start Date",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = JivaColors.DeepBlue,
-                                        modifier = Modifier.padding(bottom = 4.dp)
-                                    )
-                                    OutlinedTextField(
-                                        value = startDate,
-                                        onValueChange = { startDate = it },
-                                        placeholder = { Text("DD/MM/YYYY") },
-                                        trailingIcon = {
-                                            IconButton(onClick = { showStartDatePicker = true }) {
-                                                Icon(
-                                                    imageVector = Icons.Default.DateRange,
-                                                    contentDescription = "Select start date",
-                                                    tint = JivaColors.Purple
-                                                )
-                                            }
-                                        },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(8.dp),
-                                        singleLine = true
-                                    )
-                                }
 
-                                // End Date
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "End Date",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = JivaColors.DeepBlue,
-                                        modifier = Modifier.padding(bottom = 4.dp)
-                                    )
-                                    OutlinedTextField(
-                                        value = endDate,
-                                        onValueChange = { endDate = it },
-                                        placeholder = { Text("DD/MM/YYYY") },
-                                        trailingIcon = {
-                                            IconButton(onClick = { showEndDatePicker = true }) {
-                                                Icon(
-                                                    imageVector = Icons.Default.DateRange,
-                                                    contentDescription = "Select end date",
-                                                    tint = JivaColors.Purple
-                                                )
-                                            }
-                                        },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(8.dp),
-                                        singleLine = true
-                                    )
-                                }
-                            }
-                        }
-
-                        // First row: Item Type, Report For
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            // Item Type Dropdown
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Item Type",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                                ExposedDropdownMenuBox(
-                                    expanded = isItemTypeDropdownExpanded,
-                                    onExpandedChange = { isItemTypeDropdownExpanded = it }
-                                ) {
-                                    OutlinedTextField(
-                                        value = selectedItemType,
-                                        onValueChange = {},
-                                        readOnly = true,
-                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isItemTypeDropdownExpanded) },
-                                        modifier = Modifier
-                                            .menuAnchor()
-                                            .fillMaxWidth(),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    ExposedDropdownMenu(
-                                        expanded = isItemTypeDropdownExpanded,
-                                        onDismissRequest = { isItemTypeDropdownExpanded = false }
-                                    ) {
-                                        itemTypeOptions.forEach { option ->
-                                            DropdownMenuItem(
-                                                text = { Text(option) },
-                                                onClick = {
-                                                    selectedItemType = option
-                                                    isItemTypeDropdownExpanded = false
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Report For Dropdown
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Report For",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                                ExposedDropdownMenuBox(
-                                    expanded = isReportForDropdownExpanded,
-                                    onExpandedChange = { isReportForDropdownExpanded = it }
-                                ) {
-                                    OutlinedTextField(
-                                        value = selectedReportFor,
-                                        onValueChange = {},
-                                        readOnly = true,
-                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isReportForDropdownExpanded) },
-                                        modifier = Modifier
-                                            .menuAnchor()
-                                            .fillMaxWidth(),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    ExposedDropdownMenu(
-                                        expanded = isReportForDropdownExpanded,
-                                        onDismissRequest = { isReportForDropdownExpanded = false }
-                                    ) {
-                                        reportForOptions.forEach { option ->
-                                            DropdownMenuItem(
-                                                text = { Text(option) },
-                                                onClick = {
-                                                    selectedReportFor = option
-                                                    isReportForDropdownExpanded = false
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Second row: Party Name, Item Name
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Party Name",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                                OutlinedTextField(
-                                    value = partyName,
-                                    onValueChange = { partyName = it },
-                                    placeholder = { Text("Enter party name") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(8.dp),
-                                    singleLine = true
-                                )
-                            }
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Item Name",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                                OutlinedTextField(
-                                    value = itemName,
-                                    onValueChange = { itemName = it },
-                                    placeholder = { Text("Enter item name") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(8.dp),
-                                    singleLine = true
-                                )
-                            }
-                        }
-
-                        // Third row: Company, Exempted
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            // Company Dropdown
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Company",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                                ExposedDropdownMenuBox(
-                                    expanded = isCompanyDropdownExpanded,
-                                    onExpandedChange = { isCompanyDropdownExpanded = it }
-                                ) {
-                                    OutlinedTextField(
-                                        value = selectedCompany,
-                                        onValueChange = {},
-                                        readOnly = true,
-                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isCompanyDropdownExpanded) },
-                                        modifier = Modifier
-                                            .menuAnchor()
-                                            .fillMaxWidth(),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    ExposedDropdownMenu(
-                                        expanded = isCompanyDropdownExpanded,
-                                        onDismissRequest = { isCompanyDropdownExpanded = false }
-                                    ) {
-                                        companyOptions.forEach { option ->
-                                            DropdownMenuItem(
-                                                text = { Text(option) },
-                                                onClick = {
-                                                    selectedCompany = option
-                                                    isCompanyDropdownExpanded = false
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Exempted Dropdown
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Exempted",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                                ExposedDropdownMenuBox(
-                                    expanded = isExemptedDropdownExpanded,
-                                    onExpandedChange = { isExemptedDropdownExpanded = it }
-                                ) {
-                                    OutlinedTextField(
-                                        value = selectedExempted,
-                                        onValueChange = {},
-                                        readOnly = true,
-                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isExemptedDropdownExpanded) },
-                                        modifier = Modifier
-                                            .menuAnchor()
-                                            .fillMaxWidth(),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    ExposedDropdownMenu(
-                                        expanded = isExemptedDropdownExpanded,
-                                        onDismissRequest = { isExemptedDropdownExpanded = false }
-                                    ) {
-                                        exemptedOptions.forEach { option ->
-                                            DropdownMenuItem(
-                                                text = { Text(option) },
-                                                onClick = {
-                                                    selectedExempted = option
-                                                    isExemptedDropdownExpanded = false
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Fourth row: HSN No
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "HSN No",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                                OutlinedTextField(
-                                    value = hsnNo,
-                                    onValueChange = { hsnNo = it },
-                                    placeholder = { Text("Enter HSN number") },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(8.dp),
-                                    singleLine = true
-                                )
-                            }
-
-                            // Empty space to balance the row
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-
-                        // Action Buttons
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Button(
-                                onClick = { /* TODO: Show filtered results */ },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = JivaColors.Green
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = "Show",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "SHOW",
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        val columns = listOf(
-                                            PDFGenerator.TableColumn("Date", 80f) { (it as SalesReportEntry).trDate },
-                                            PDFGenerator.TableColumn("Party", 120f) { (it as SalesReportEntry).partyName },
-                                            PDFGenerator.TableColumn("GSTIN", 100f) { (it as SalesReportEntry).gstin },
-                                            PDFGenerator.TableColumn("Type", 80f) { (it as SalesReportEntry).entryType },
-                                            PDFGenerator.TableColumn("Item", 150f) { (it as SalesReportEntry).itemName },
-                                            PDFGenerator.TableColumn("Qty", 60f) { "${(it as SalesReportEntry).qty.toInt()}" },
-                                            PDFGenerator.TableColumn("Amount", 100f) { "₹${String.format("%.2f", (it as SalesReportEntry).amount)}" }
-                                        )
-
-                                        val totalRow = mapOf(
-                                            "Date" to "TOTAL",
-                                            "Party" to "",
-                                            "GSTIN" to "",
-                                            "Type" to "",
-                                            "Item" to "",
-                                            "Qty" to "${totalQty.toInt()}",
-                                            "Amount" to "₹${String.format("%.2f", totalAmount)}"
-                                        )
-
-                                        val config = PDFGenerator.PDFConfig(
-                                            title = "Sales Report",
-                                            fileName = "Sales_Report",
-                                            columns = columns,
-                                            data = filteredEntries,
-                                            totalRow = totalRow
-                                        )
-
-                                        PDFGenerator.generateAndSharePDF(context, config)
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF25D366) // WhatsApp green
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Share,
-                                    contentDescription = "Share",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "SHARE",
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Summary Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = JivaColors.Teal
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "${selectedReportFor} Summary",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = JivaColors.White
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
                             Text(
-                                text = "Total Entries: ${filteredEntries.size}",
+                                text = "${filteredEntries.size} entries (${allSalesEntries.size} total)",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = JivaColors.White
-                            )
-                            Text(
-                                text = "Total Amount: ₹${String.format("%.2f", totalAmount)}",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = JivaColors.White
+                                color = JivaColors.DarkGray
                             )
                         }
-                    }
-                }
-            }
 
-            // Data Table Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Text(
-                            text = "${selectedReportFor} Report Data",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = JivaColors.DeepBlue,
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        )
-
-                        // Horizontally scrollable table
-                        val tableScrollState = rememberScrollState()
-
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(tableScrollState)
-                        ) {
-                            // Table Header
-                            SalesReportTableHeader()
-
-                            // Table Rows
-                            filteredEntries.forEach { entry ->
-                                SalesReportTableRow(entry = entry)
+                        if (filteredEntries.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(100.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Info,
+                                        contentDescription = "No Data",
+                                        tint = JivaColors.DarkGray,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                    Text(
+                                        text = if (allSalesEntries.isEmpty()) "No sales data available" else "No entries match your filters",
+                                        fontSize = 14.sp,
+                                        color = JivaColors.DarkGray,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    if (allSalesEntries.isEmpty()) {
+                                        Text(
+                                            text = "Tap the refresh button to sync data",
+                                            fontSize = 12.sp,
+                                            color = JivaColors.Purple,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
                             }
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = "Total Amount",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = JivaColors.DarkGray
+                                    )
+                                    Text(
+                                        text = "₹${String.format("%.2f", totalAmount)}",
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = JivaColors.Green
+                                    )
+                                }
 
-                            // Total Row
-                            SalesReportTotalRow(
-                                totalQty = totalQty,
-                                totalAmount = totalAmount,
-                                totalDiscount = totalDiscount
-                            )
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = "Total Quantity",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = JivaColors.DarkGray
+                                    )
+                                    Text(
+                                        text = String.format("%.2f", totalQty),
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = JivaColors.DeepBlue
+                                    )
+                                }
+
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = "Total Discount",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = JivaColors.DarkGray
+                                    )
+                                    Text(
+                                        text = "₹${String.format("%.2f", totalDiscount)}",
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = JivaColors.Orange
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
         }
     }
-}
-
-@Composable
-private fun SalesReportTableHeader() {
-    Row(
-        modifier = Modifier
-            .background(
-                JivaColors.LightGray,
-                RoundedCornerShape(8.dp)
-            )
-            .padding(vertical = 12.dp, horizontal = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        SalesReportHeaderCell("Date", Modifier.width(80.dp))
-        SalesReportHeaderCell("Party", Modifier.width(120.dp))
-        SalesReportHeaderCell("GSTIN", Modifier.width(100.dp))
-        SalesReportHeaderCell("Type", Modifier.width(80.dp))
-        SalesReportHeaderCell("Ref", Modifier.width(60.dp))
-        SalesReportHeaderCell("Item", Modifier.width(150.dp))
-        SalesReportHeaderCell("HSN", Modifier.width(70.dp))
-        SalesReportHeaderCell("Category", Modifier.width(80.dp))
-        SalesReportHeaderCell("Qty", Modifier.width(60.dp))
-        SalesReportHeaderCell("Unit", Modifier.width(60.dp))
-        SalesReportHeaderCell("Rate", Modifier.width(80.dp))
-        SalesReportHeaderCell("Amount", Modifier.width(100.dp))
-        SalesReportHeaderCell("Discount", Modifier.width(80.dp))
-    }
-}
-
-@Composable
-private fun SalesReportHeaderCell(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        fontSize = 10.sp,
-        fontWeight = FontWeight.Bold,
-        color = JivaColors.DeepBlue,
-        textAlign = TextAlign.Center,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = modifier
-    )
-}
-
-@Composable
-private fun SalesReportTableRow(entry: SalesReportEntry) {
-    Column {
-        Row(
-            modifier = Modifier
-                .padding(vertical = 8.dp, horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            SalesReportCell(entry.trDate, Modifier.width(80.dp))
-            SalesReportCell(entry.partyName, Modifier.width(120.dp))
-            SalesReportCell(entry.gstin, Modifier.width(100.dp))
-            SalesReportCell(entry.entryType, Modifier.width(80.dp))
-            SalesReportCell(entry.refNo, Modifier.width(60.dp))
-            SalesReportCell(entry.itemName, Modifier.width(150.dp))
-            SalesReportCell(entry.hsnNo, Modifier.width(70.dp))
-            SalesReportCell(entry.itemType, Modifier.width(80.dp))
-            SalesReportCell("${entry.qty.toInt()}", Modifier.width(60.dp))
-            SalesReportCell(entry.unit, Modifier.width(60.dp))
-            SalesReportCell("₹${String.format("%.0f", entry.rate)}", Modifier.width(80.dp))
-            SalesReportCell("₹${String.format("%.2f", entry.amount)}", Modifier.width(100.dp))
-            SalesReportCell("₹${String.format("%.0f", entry.discount)}", Modifier.width(80.dp))
-        }
-
-        HorizontalDivider(
-            color = JivaColors.LightGray,
-            thickness = 0.5.dp,
-            modifier = Modifier.padding(horizontal = 8.dp)
-        )
-    }
-}
-
-@Composable
-private fun SalesReportCell(
-    text: String,
-    modifier: Modifier = Modifier,
-    color: Color = Color(0xFF374151)
-) {
-    Text(
-        text = text,
-        fontSize = 9.sp,
-        color = color,
-        textAlign = TextAlign.Center,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = modifier
-    )
-}
-
-@Composable
-private fun SalesReportTotalRow(
-    totalQty: Double,
-    totalAmount: Double,
-    totalDiscount: Double
-) {
-    Row(
-        modifier = Modifier
-            .background(
-                JivaColors.DeepBlue.copy(alpha = 0.1f),
-                RoundedCornerShape(8.dp)
-            )
-            .padding(vertical = 12.dp, horizontal = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Date column
-        SalesReportCell("-", Modifier.width(80.dp), JivaColors.DeepBlue)
-        // Party column
-        SalesReportCell("-", Modifier.width(120.dp), JivaColors.DeepBlue)
-        // GSTIN column
-        SalesReportCell("-", Modifier.width(100.dp), JivaColors.DeepBlue)
-        // Type column
-        SalesReportCell("-", Modifier.width(80.dp), JivaColors.DeepBlue)
-        // Ref column
-        SalesReportCell("-", Modifier.width(60.dp), JivaColors.DeepBlue)
-        // Item column with TOTAL text
-        Text(
-            text = "TOTAL",
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            color = JivaColors.DeepBlue,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.width(150.dp)
-        )
-        // HSN column
-        SalesReportCell("-", Modifier.width(70.dp), JivaColors.DeepBlue)
-        // Category column
-        SalesReportCell("-", Modifier.width(80.dp), JivaColors.DeepBlue)
-        // Qty column
-        SalesReportCell("${totalQty.toInt()}", Modifier.width(60.dp), JivaColors.DeepBlue)
-        // Unit column
-        SalesReportCell("-", Modifier.width(60.dp), JivaColors.DeepBlue)
-        // Rate column
-        SalesReportCell("-", Modifier.width(80.dp), JivaColors.DeepBlue)
-        // Amount column
-        SalesReportCell(
-            text = "₹${String.format("%.2f", totalAmount)}",
-            modifier = Modifier.width(100.dp),
-            color = JivaColors.Green
-        )
-        // Discount column
-        SalesReportCell(
-            text = "₹${String.format("%.2f", totalDiscount)}",
-            modifier = Modifier.width(80.dp),
-            color = JivaColors.Orange
-        )
-    }
-}
-
-@Composable
-@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
-private fun SalesReportScreenPreview() {
-    SalesReportScreenImpl()
 }
