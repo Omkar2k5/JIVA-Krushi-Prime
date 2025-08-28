@@ -14,6 +14,8 @@ import com.example.jiva.data.api.models.LedgerRequest
 import com.example.jiva.data.api.models.LedgerResponse
 import com.example.jiva.data.api.models.SalePurchaseRequest
 import com.example.jiva.data.api.models.SalePurchaseResponse
+import com.example.jiva.data.api.models.ExpiryRequest
+import com.example.jiva.data.api.models.ExpiryResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -139,6 +141,13 @@ interface JivaApiService {
     @Headers("Content-Type: application/json")
     @POST("api/JivaBusiness/SalePurchase")
     suspend fun getSalePurchase(@Body request: SalePurchaseRequest): SalePurchaseResponse
+
+    /**
+     * POST /api/JivaBusiness/Expiry
+     */
+    @Headers("Content-Type: application/json")
+    @POST("api/JivaBusiness/Expiry")
+    suspend fun getExpiry(@Body request: ExpiryRequest): ExpiryResponse
 
     // Additional filtered endpoints for better performance
     

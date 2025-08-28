@@ -682,6 +682,73 @@ class JivaRepositoryImpl(
         }
     }
 
+    override suspend fun syncExpiry(userId: Int, yearString: String): Result<Unit> {
+        return try {
+            Timber.d("🚀 Starting Expiry API call for userId: $userId, yearString: $yearString")
+            val apiResult = remoteDataSource.getExpiry(userId, yearString)
+
+            Timber.d("📡 Expiry API call completed. Success: ${apiResult.isSuccess}")
+
+            if (apiResult.isSuccess) {
+                val body = apiResult.getOrNull()
+                Timber.d("API response body: isSuccess=${body?.isSuccess}, message=${body?.message}, data size=${body?.data?.size}")
+
+                if (body?.isSuccess == true) {
+                    val items = body.data.orEmpty()
+                    Timber.d("📦 Processing ${items.size} expiry items from API")
+
+                    // Map API model -> Room entity
+                    val entities = items.map { expiryItem ->
+                        ExpiryEntity(
+                            cmpCode = expiryItem.cmpCode.toIntOrNull() ?: 0,
+                            itemId = expiryItem.item_ID.toIntOrNull() ?: 0,
+                            itemName = expiryItem.item_Name,
+                            itemType = expiryItem.item_Type,
+                            batchNo = expiryItem.batch_No,
+                            expiryDate = try {
+                                java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", java.util.Locale.US).parse(expiryItem.expiry_Date)
+                            } catch (e: Exception) {
+                                Timber.w("Failed to parse expiry date: ${expiryItem.expiry_Date}")
+                                null
+                            },
+                            qty = java.math.BigDecimal(expiryItem.qty.ifBlank { "0" }),
+                            daysLeft = expiryItem.daysLeft.toIntOrNull() ?: 0,
+                            yearString = expiryItem.yearString
+                        )
+                    }
+
+                    // Clear existing data for this year and insert new data in chunks for performance
+                    Timber.d("🗑️ Clearing existing expiry data for year: $yearString")
+                    database.expiryDao().deleteByYear(yearString)
+
+                    // Insert in chunks for better performance with large datasets
+                    val chunkSize = 1000
+                    var index = 0
+                    while (index < entities.size) {
+                        val end = minOf(index + chunkSize, entities.size)
+                        database.expiryDao().insertAll(entities.subList(index, end))
+                        index = end
+                    }
+
+                    Timber.d("✅ Successfully inserted ${entities.size} expiry rows for $yearString")
+                    Result.success(Unit)
+                } else {
+                    val errorMsg = "API returned isSuccess=false: ${body?.message}"
+                    Timber.e(errorMsg)
+                    Result.failure(IllegalStateException(errorMsg))
+                }
+            } else {
+                val exception = apiResult.exceptionOrNull()
+                val errorMsg = "Expiry API call failed: ${exception?.message}"
+                Timber.e(exception, errorMsg)
+                Result.failure(exception ?: IllegalStateException(errorMsg))
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error syncing expiry data")
+            Result.failure(e)
+        }
+    }
+
     // Sync all data
     override suspend fun syncAllData(): Result<Unit> {
         return try {

@@ -6,6 +6,8 @@ import com.example.jiva.data.api.models.LedgerRequest
 import com.example.jiva.data.api.models.LedgerResponse
 import com.example.jiva.data.api.models.SalePurchaseRequest
 import com.example.jiva.data.api.models.SalePurchaseResponse
+import com.example.jiva.data.api.models.ExpiryRequest
+import com.example.jiva.data.api.models.ExpiryResponse
 import timber.log.Timber
 import java.io.IOException
 
@@ -155,6 +157,22 @@ class RemoteDataSource {
             Result.success(response)
         } catch (e: Exception) {
             Timber.e(e, "SalePurchase API call failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getExpiry(userId: Int, yearString: String): Result<com.example.jiva.data.api.models.ExpiryResponse> {
+        return try {
+            Timber.d("Making Expiry API call with userId: $userId, yearString: $yearString")
+            val request = com.example.jiva.data.api.models.ExpiryRequest(userID = userId, yearString = yearString)
+            Timber.d("Request body: $request")
+
+            val response = apiService.getExpiry(request)
+            Timber.d("API response received: isSuccess=${response.isSuccess}, message=${response.message}, data size=${response.data?.size}")
+
+            Result.success(response)
+        } catch (e: Exception) {
+            Timber.e(e, "Expiry API call failed: ${e.message}")
             Result.failure(e)
         }
     }

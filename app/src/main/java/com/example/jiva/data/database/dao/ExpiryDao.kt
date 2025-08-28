@@ -54,16 +54,25 @@ interface ExpiryDao {
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertExpiryItems(expiryItems: List<ExpiryEntity>)
-    
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(expiryItems: List<ExpiryEntity>)
+
+    @Query("DELETE FROM tb_expiry WHERE YearString = :yearString")
+    suspend fun deleteByYear(yearString: String)
+
+    @Query("SELECT * FROM tb_expiry WHERE YearString = :yearString ORDER BY DaysLeft ASC")
+    fun getByYear(yearString: String): Flow<List<ExpiryEntity>>
+
     @Update
     suspend fun updateExpiryItem(expiryItem: ExpiryEntity)
-    
+
     @Delete
     suspend fun deleteExpiryItem(expiryItem: ExpiryEntity)
-    
+
     @Query("DELETE FROM tb_expiry WHERE SrNo = :srNo")
     suspend fun deleteExpiryItemBySrNo(srNo: Int)
-    
+
     @Query("DELETE FROM tb_expiry")
     suspend fun deleteAllExpiryItems()
 }
