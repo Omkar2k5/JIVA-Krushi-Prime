@@ -408,6 +408,7 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
                 item {
                     StockTableSection(
                         entries = filteredEntries,
+                        totalValuation = totalValuation,
                         onGeneratePDF = { data ->
                             scope.launch {
                                 generateAndShareStockPDF(context, data)
@@ -625,6 +626,7 @@ private fun SummaryItem(label: String, value: String) {
 @Composable
 private fun StockTableSection(
     entries: List<StockEntry>,
+    totalValuation: Double,
     onGeneratePDF: (List<StockEntry>) -> Unit
 ) {
     Card(
