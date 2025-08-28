@@ -249,30 +249,74 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
     }
 
     Column(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .background(JivaColors.LightGray)
     ) {
         // Responsive Header with Refresh Button
         ResponsiveReportHeader(
             title = "Stock Report",
+            subtitle = "Manage stock inventory and valuation",
             onBackClick = onBackClick,
-            onRefreshClick = {
-                isRefreshing = true
-                scope.launch {
-                    try {
-                        timber.log.Timber.d("🔄 Safe refresh for Stock Report")
-                        kotlinx.coroutines.delay(800) // Show refresh animation
-                        isRefreshing = false
-                    } catch (e: Exception) {
-                        timber.log.Timber.e(e, "Error during refresh")
-                        isRefreshing = false
+            actions = {
+                IconButton(
+                    onClick = {
+                        if (finalUserId != null) {
+                            isRefreshing = true
+                            scope.launch {
+                                try {
+                                    timber.log.Timber.d("🔄 Starting Stock API refresh for userId: $finalUserId, year: $year")
+
+                                    // Use ApiDataManager to handle API → Permanent Storage (same as Outstanding Report)
+                                    val result = com.example.jiva.utils.ApiDataManager.refreshStockData(
+                                        context = context,
+                                        repository = application.repository,
+                                        database = application.database,
+                                        userId = finalUserId,
+                                        year = year
+                                    )
+
+                                    if (result.isSuccess) {
+                                        timber.log.Timber.d("✅ Stock data refreshed successfully")
+                                        Toast.makeText(context, "Stock data refreshed successfully", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        timber.log.Timber.e("❌ Stock data refresh failed: ${result.exceptionOrNull()?.message}")
+                                        Toast.makeText(context, "Failed to refresh stock data", Toast.LENGTH_SHORT).show()
+                                    }
+
+                                    kotlinx.coroutines.delay(1000) // Show loading for at least 1 second
+                                    isRefreshing = false
+                                } catch (e: Exception) {
+                                    timber.log.Timber.e(e, "Error during stock refresh")
+                                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    isRefreshing = false
+                                }
+                            }
+                        } else {
+                            Toast.makeText(context, "User ID not available", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    enabled = !isRefreshing
+                ) {
+                    if (isRefreshing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = JivaColors.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh Stock Data",
+                            tint = JivaColors.White
+                        )
                     }
                 }
-            },
-            isRefreshing = isRefreshing
+            }
         )
 
         // High-performance loading screen with progress
-        if (isScreenLoading || allEntries.isEmpty()) {
+        if (isScreenLoading) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -298,6 +342,37 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
                         text = "${loadingProgress}% Complete",
                         fontSize = 10.sp,
                         color = JivaColors.DarkGray
+                    )
+                }
+            }
+        } else if (allEntries.isEmpty()) {
+            // Empty state
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Inventory,
+                        contentDescription = "No Stock Data",
+                        modifier = Modifier.size(64.dp),
+                        tint = JivaColors.DarkGray
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "No stock data available",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = JivaColors.DarkGray
+                    )
+                    Text(
+                        text = "Tap the refresh button to load data from server",
+                        fontSize = 14.sp,
+                        color = JivaColors.DarkGray,
+                        textAlign = TextAlign.Center
                     )
                 }
             }
@@ -381,6 +456,7 @@ private fun StockFilterSection(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = JivaColors.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
@@ -510,6 +586,7 @@ private fun StockSummarySection(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = JivaColors.DeepBlue),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
@@ -567,6 +644,7 @@ private fun StockTableSection(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = JivaColors.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
