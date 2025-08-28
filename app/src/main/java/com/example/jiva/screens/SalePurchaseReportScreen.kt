@@ -88,19 +88,38 @@ fun SalePurchaseReportScreen(onBackClick: () -> Unit = {}) {
     // Get current year and user ID
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
 
-    // Handle initial screen loading with progress tracking
+    // Handle initial screen loading with progress tracking and data sync
     LaunchedEffect(Unit) {
         isScreenLoading = true
         loadingMessage = "Initializing Sale/Purchase data..."
 
+        // Check if we have data, if not, try to sync
+        val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
+        if (userId != null) {
+            loadingMessage = "Syncing Sale/Purchase data from server..."
+            dataLoadingProgress = 25f
+
+            try {
+                val result = application.repository.syncSalePurchase(userId, year)
+                if (result.isSuccess) {
+                    loadingMessage = "Data synced successfully"
+                    dataLoadingProgress = 75f
+                } else {
+                    loadingMessage = "Using cached data"
+                    dataLoadingProgress = 50f
+                }
+            } catch (e: Exception) {
+                loadingMessage = "Using cached data"
+                dataLoadingProgress = 50f
+            }
+        }
+
         // Simulate progressive loading for better UX
-        for (i in 0..100 step 10) {
+        for (i in 75..100 step 5) {
             loadingProgress = i
             dataLoadingProgress = i.toFloat()
             loadingMessage = when {
-                i < 30 -> "Loading Sale/Purchase data..."
-                i < 70 -> "Processing ${i}% complete..."
-                i < 100 -> "Finalizing data..."
+                i < 90 -> "Finalizing data..."
                 else -> "Complete!"
             }
             kotlinx.coroutines.delay(50) // Smooth progress animation
@@ -246,12 +265,13 @@ fun SalePurchaseReportScreen(onBackClick: () -> Unit = {}) {
                                 try {
                                     val result = application.repository.syncSalePurchase(finalUserId, year)
                                     if (result.isSuccess) {
-                                        Toast.makeText(context, "Sale/Purchase data refreshed successfully", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "✅ Sale/Purchase data refreshed successfully", Toast.LENGTH_SHORT).show()
                                     } else {
-                                        Toast.makeText(context, "Failed to refresh data", Toast.LENGTH_SHORT).show()
+                                        val error = result.exceptionOrNull()?.message ?: "Unknown error"
+                                        Toast.makeText(context, "❌ Failed to refresh: $error", Toast.LENGTH_LONG).show()
                                     }
                                 } catch (e: Exception) {
-                                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "❌ Network error: ${e.message}", Toast.LENGTH_LONG).show()
                                 } finally {
                                     isRefreshing = false
                                 }
@@ -544,13 +564,27 @@ fun SalePurchaseReportScreen(onBackClick: () -> Unit = {}) {
                     Column(
                         modifier = Modifier.padding(16.dp)
                     ) {
-                        Text(
-                            text = "Sale/Purchase Transactions (${filteredEntries.size} entries)",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = JivaColors.DeepBlue,
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Sale/Purchase Transactions",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = JivaColors.DeepBlue
+                            )
+
+                            Text(
+                                text = "${filteredEntries.size} entries (${allEntries.size} total)",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = JivaColors.DarkGray
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
 
                         // Outstanding Report style table with horizontal scrolling
                         Column(
@@ -565,18 +599,55 @@ fun SalePurchaseReportScreen(onBackClick: () -> Unit = {}) {
                             LazyColumn(
                                 modifier = Modifier.fillMaxSize()
                             ) {
-                                items(filteredEntries) { entry ->
-                                    SalePurchaseTableRow(entry = entry)
-                                }
+                                if (filteredEntries.isEmpty()) {
+                                    item {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(200.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Column(
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Info,
+                                                    contentDescription = "No Data",
+                                                    tint = JivaColors.DarkGray,
+                                                    modifier = Modifier.size(48.dp)
+                                                )
+                                                Text(
+                                                    text = if (allEntries.isEmpty()) "No sale/purchase data available" else "No entries match your filters",
+                                                    fontSize = 16.sp,
+                                                    color = JivaColors.DarkGray,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                                if (allEntries.isEmpty()) {
+                                                    Text(
+                                                        text = "Tap the refresh button to sync data",
+                                                        fontSize = 14.sp,
+                                                        color = JivaColors.Purple,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    items(filteredEntries) { entry ->
+                                        SalePurchaseTableRow(entry = entry)
+                                    }
 
-                                // Total row like Outstanding Report
-                                item {
-                                    SalePurchaseTotalRow(
-                                        totalAmount = totalAmount,
-                                        totalQty = totalQty,
-                                        totalDiscount = totalDiscount,
-                                        totalEntries = filteredEntries.size
-                                    )
+                                    // Total row like Outstanding Report
+                                    item {
+                                        SalePurchaseTotalRow(
+                                            totalAmount = totalAmount,
+                                            totalQty = totalQty,
+                                            totalDiscount = totalDiscount,
+                                            totalEntries = filteredEntries.size
+                                        )
+                                    }
                                 }
                             }
                         }
