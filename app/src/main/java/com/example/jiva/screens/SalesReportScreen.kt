@@ -34,6 +34,8 @@ import kotlinx.coroutines.launch
 import android.widget.Toast
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Sale/Purchase Entry data class - Complete with all API fields
@@ -294,12 +296,13 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
             }
         )
 
-        // Simple content for now
+        // Main content with filters and table
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Filter Controls Card
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -309,7 +312,257 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
                 ) {
                     Column(
                         modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "Filter Options",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = JivaColors.DeepBlue
+                        )
+
+                        // First row: Transaction Type and Category
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // Transaction Type Filter
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Transaction Type",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = JivaColors.DeepBlue,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+
+                                ExposedDropdownMenuBox(
+                                    expanded = isTransactionTypeDropdownExpanded,
+                                    onExpandedChange = { isTransactionTypeDropdownExpanded = it }
+                                ) {
+                                    OutlinedTextField(
+                                        value = transactionTypeFilter,
+                                        onValueChange = {},
+                                        readOnly = true,
+                                        trailingIcon = {
+                                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = isTransactionTypeDropdownExpanded)
+                                        },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+
+                                    ExposedDropdownMenu(
+                                        expanded = isTransactionTypeDropdownExpanded,
+                                        onDismissRequest = { isTransactionTypeDropdownExpanded = false }
+                                    ) {
+                                        listOf("All Types", "Cash Sale", "Credit Sale", "Cash Purchase", "Credit Purchase").forEach { type ->
+                                            DropdownMenuItem(
+                                                text = { Text(type) },
+                                                onClick = {
+                                                    transactionTypeFilter = type
+                                                    isTransactionTypeDropdownExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Category Filter
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Category",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = JivaColors.DeepBlue,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+
+                                ExposedDropdownMenuBox(
+                                    expanded = isCategoryDropdownExpanded,
+                                    onExpandedChange = { isCategoryDropdownExpanded = it }
+                                ) {
+                                    OutlinedTextField(
+                                        value = categoryFilter,
+                                        onValueChange = {},
+                                        readOnly = true,
+                                        trailingIcon = {
+                                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = isCategoryDropdownExpanded)
+                                        },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+
+                                    ExposedDropdownMenu(
+                                        expanded = isCategoryDropdownExpanded,
+                                        onDismissRequest = { isCategoryDropdownExpanded = false }
+                                    ) {
+                                        listOf("All Categories", "Pesticides", "Fertilizers", "Seeds", "Tools", "Others").forEach { category ->
+                                            DropdownMenuItem(
+                                                text = { Text(category) },
+                                                onClick = {
+                                                    categoryFilter = category
+                                                    isCategoryDropdownExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Second row: Party Name and Item Name Search
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // Party Name Search
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Search Party Name",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = JivaColors.DeepBlue,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                                OutlinedTextField(
+                                    value = partyNameSearch,
+                                    onValueChange = { partyNameSearch = it },
+                                    placeholder = { Text("Search party...") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Person,
+                                            contentDescription = "Party",
+                                            tint = JivaColors.Purple
+                                        )
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp),
+                                    singleLine = true
+                                )
+                            }
+
+                            // Item Name Search
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Search Item Name",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = JivaColors.DeepBlue,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                                OutlinedTextField(
+                                    value = itemNameSearch,
+                                    onValueChange = { itemNameSearch = it },
+                                    placeholder = { Text("Search item...") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Search,
+                                            contentDescription = "Search",
+                                            tint = JivaColors.Purple
+                                        )
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp),
+                                    singleLine = true
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Summary Card
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "Total Amount",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = JivaColors.DarkGray
+                            )
+                            Text(
+                                text = "₹${String.format("%.2f", totalAmount)}",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = JivaColors.Green
+                            )
+                        }
+
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "Total Quantity",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = JivaColors.DarkGray
+                            )
+                            Text(
+                                text = String.format("%.2f", totalQty),
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = JivaColors.DeepBlue
+                            )
+                        }
+
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "Transactions",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = JivaColors.DarkGray
+                            )
+                            Text(
+                                text = "${filteredEntries.size}",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = JivaColors.Purple
+                            )
+                        }
+
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "Total Discount",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = JivaColors.DarkGray
+                            )
+                            Text(
+                                text = "₹${String.format("%.2f", totalDiscount)}",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = JivaColors.Orange
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Data Table Card
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -317,7 +570,7 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Sales Summary",
+                                text = "Sales Transactions",
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = JivaColors.DeepBlue
@@ -331,93 +584,482 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
                             )
                         }
 
-                        if (filteredEntries.isEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(100.dp),
-                                contentAlignment = Alignment.Center
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Outstanding Report style table with horizontal scrolling
+                        Column(
+                            modifier = Modifier
+                                .height(400.dp)
+                                .horizontalScroll(rememberScrollState())
+                        ) {
+                            // Header in Outstanding Report style
+                            SalesTableHeader()
+
+                            // Data rows in Outstanding Report style
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize()
                             ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Info,
-                                        contentDescription = "No Data",
-                                        tint = JivaColors.DarkGray,
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                    Text(
-                                        text = if (allSalesEntries.isEmpty()) "No sales data available" else "No entries match your filters",
-                                        fontSize = 14.sp,
-                                        color = JivaColors.DarkGray,
-                                        textAlign = TextAlign.Center
-                                    )
-                                    if (allSalesEntries.isEmpty()) {
-                                        Text(
-                                            text = "Tap the refresh button to sync data",
-                                            fontSize = 12.sp,
-                                            color = JivaColors.Purple,
-                                            textAlign = TextAlign.Center
+                                if (filteredEntries.isEmpty()) {
+                                    item {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(200.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Column(
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Info,
+                                                    contentDescription = "No Data",
+                                                    tint = JivaColors.DarkGray,
+                                                    modifier = Modifier.size(48.dp)
+                                                )
+                                                Text(
+                                                    text = if (allSalesEntries.isEmpty()) "No sales data available" else "No entries match your filters",
+                                                    fontSize = 16.sp,
+                                                    color = JivaColors.DarkGray,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                                if (allSalesEntries.isEmpty()) {
+                                                    Text(
+                                                        text = "Tap the refresh button to sync data",
+                                                        fontSize = 14.sp,
+                                                        color = JivaColors.Purple,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    items(filteredEntries) { entry ->
+                                        SalesTableRow(entry = entry)
+                                    }
+
+                                    // Total row like Outstanding Report
+                                    item {
+                                        SalesTotalRow(
+                                            totalAmount = totalAmount,
+                                            totalQty = totalQty,
+                                            totalDiscount = totalDiscount,
+                                            totalEntries = filteredEntries.size
                                         )
                                     }
                                 }
                             }
-                        } else {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Action Buttons
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        try {
+                                            val pdfData = generateSalesReportPDF(filteredEntries, totalAmount, totalQty, totalDiscount)
+                                            sharePDF(context, pdfData, "Sales_Report_${System.currentTimeMillis()}.pdf")
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Error generating PDF: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = JivaColors.Green
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f)
                             ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        text = "Total Amount",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = JivaColors.DarkGray
-                                    )
-                                    Text(
-                                        text = "₹${String.format("%.2f", totalAmount)}",
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = JivaColors.Green
-                                    )
-                                }
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "Share PDF",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "SHARE PDF",
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
 
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        text = "Total Quantity",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = JivaColors.DarkGray
-                                    )
-                                    Text(
-                                        text = String.format("%.2f", totalQty),
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = JivaColors.DeepBlue
-                                    )
-                                }
-
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        text = "Total Discount",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = JivaColors.DarkGray
-                                    )
-                                    Text(
-                                        text = "₹${String.format("%.2f", totalDiscount)}",
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = JivaColors.Orange
-                                    )
-                                }
+                            Button(
+                                onClick = {
+                                    // Clear all filters
+                                    transactionTypeFilter = "All Types"
+                                    partyNameSearch = ""
+                                    itemNameSearch = ""
+                                    categoryFilter = "All Categories"
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = JivaColors.Orange
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = "Clear Filters",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "CLEAR FILTERS",
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SalesTableHeader() {
+    Row(
+        modifier = Modifier
+            .background(
+                JivaColors.LightGray,
+                RoundedCornerShape(8.dp)
+            )
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SalesHeaderCell("Date", Modifier.width(100.dp))
+        SalesHeaderCell("Party", Modifier.width(150.dp))
+        SalesHeaderCell("Type", Modifier.width(100.dp))
+        SalesHeaderCell("Ref No", Modifier.width(80.dp))
+        SalesHeaderCell("Item", Modifier.width(180.dp))
+        SalesHeaderCell("HSN", Modifier.width(80.dp))
+        SalesHeaderCell("Category", Modifier.width(120.dp))
+        SalesHeaderCell("Qty", Modifier.width(80.dp))
+        SalesHeaderCell("Unit", Modifier.width(80.dp))
+        SalesHeaderCell("Rate", Modifier.width(100.dp))
+        SalesHeaderCell("Amount", Modifier.width(120.dp))
+        SalesHeaderCell("Discount", Modifier.width(100.dp))
+        SalesHeaderCell("GSTIN", Modifier.width(150.dp))
+    }
+}
+
+@Composable
+private fun SalesHeaderCell(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Bold,
+        color = JivaColors.DeepBlue,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun SalesTableRow(entry: SalesReportEntry) {
+    // Safe data processing before rendering (Outstanding Report style)
+    val safeEntry = remember(entry) {
+        try {
+            entry.copy(
+                trDate = entry.trDate.takeIf { it.isNotBlank() } ?: "",
+                partyName = entry.partyName.takeIf { it.isNotBlank() } ?: "Unknown",
+                gstin = entry.gstin.takeIf { it.isNotBlank() } ?: "",
+                entryType = entry.entryType.takeIf { it.isNotBlank() } ?: "",
+                refNo = entry.refNo.takeIf { it.isNotBlank() } ?: "",
+                itemName = entry.itemName.takeIf { it.isNotBlank() } ?: "Unknown Item",
+                hsnNo = entry.hsnNo.takeIf { it.isNotBlank() } ?: "",
+                itemType = entry.itemType.takeIf { it.isNotBlank() } ?: "",
+                qty = entry.qty.takeIf { it.isNotBlank() } ?: "0",
+                unit = entry.unit.takeIf { it.isNotBlank() } ?: "",
+                rate = entry.rate.takeIf { it.isNotBlank() } ?: "0.00",
+                amount = entry.amount.takeIf { it.isNotBlank() } ?: "0.00",
+                discount = entry.discount.takeIf { it.isNotBlank() } ?: "0.00"
+            )
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error processing entry: ${entry.refNo}")
+            SalesReportEntry("", "Error loading data", "", "", "", "", "", "", "0", "", "0.00", "0.00", "0.00")
+        }
+    }
+
+    // Safe amount parsing for color coding
+    val amountValue = remember(safeEntry.amount) {
+        try {
+            safeEntry.amount.replace(",", "").toDoubleOrNull() ?: 0.0
+        } catch (e: Exception) {
+            0.0
+        }
+    }
+
+    Column {
+        Row(
+            modifier = Modifier
+                .padding(vertical = 8.dp, horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SalesCell(safeEntry.trDate, Modifier.width(100.dp))
+            SalesCell(safeEntry.partyName, Modifier.width(150.dp), JivaColors.DeepBlue)
+            SalesCell(safeEntry.entryType, Modifier.width(100.dp), JivaColors.Purple)
+            SalesCell(safeEntry.refNo, Modifier.width(80.dp))
+            SalesCell(safeEntry.itemName, Modifier.width(180.dp), JivaColors.DarkGray)
+            SalesCell(safeEntry.hsnNo, Modifier.width(80.dp))
+            SalesCell(safeEntry.itemType, Modifier.width(120.dp), JivaColors.Orange)
+            SalesCell(safeEntry.qty, Modifier.width(80.dp), JivaColors.DeepBlue)
+            SalesCell(safeEntry.unit, Modifier.width(80.dp))
+            SalesCell("₹${safeEntry.rate}", Modifier.width(100.dp))
+            SalesCell(
+                text = "₹${safeEntry.amount}",
+                modifier = Modifier.width(120.dp),
+                color = if (amountValue >= 0) JivaColors.Green else JivaColors.Red
+            )
+            SalesCell("₹${safeEntry.discount}", Modifier.width(100.dp), JivaColors.Orange)
+            SalesCell(safeEntry.gstin, Modifier.width(150.dp))
+        }
+
+        HorizontalDivider(
+            color = JivaColors.LightGray,
+            thickness = 0.5.dp,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        )
+    }
+}
+
+@Composable
+private fun SalesCell(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = Color(0xFF374151)
+) {
+    // Safe text processing before rendering (Outstanding Report style)
+    val safeText = remember(text) {
+        try {
+            text.takeIf { it.isNotBlank() } ?: ""
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error processing text: $text")
+            "Error"
+        }
+    }
+
+    Text(
+        text = safeText,
+        fontSize = 11.sp,
+        color = color,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun SalesTotalRow(totalAmount: Double, totalQty: Double, totalDiscount: Double, totalEntries: Int) {
+    Column {
+        HorizontalDivider(
+            color = JivaColors.DeepBlue,
+            thickness = 2.dp,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        )
+
+        Row(
+            modifier = Modifier
+                .background(JivaColors.LightBlue.copy(alpha = 0.3f))
+                .padding(vertical = 12.dp, horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Empty cells to align with data columns
+            repeat(7) {
+                Box(modifier = Modifier.width(80.dp))
+            }
+
+            // Total quantity cell
+            Text(
+                text = "Total: ${String.format("%.2f", totalQty)}",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = JivaColors.DeepBlue,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(80.dp)
+            )
+
+            // Empty unit cell
+            Box(modifier = Modifier.width(80.dp))
+
+            // Empty rate cell
+            Box(modifier = Modifier.width(100.dp))
+
+            // Total amount cell
+            Text(
+                text = "Total: ₹${String.format("%.2f", totalAmount)}",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = JivaColors.Green,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(120.dp)
+            )
+
+            // Total discount cell
+            Text(
+                text = "Total: ₹${String.format("%.2f", totalDiscount)}",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = JivaColors.Orange,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(100.dp)
+            )
+
+            // Total entries cell
+            Text(
+                text = "$totalEntries entries",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = JivaColors.DeepBlue,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(150.dp)
+            )
+        }
+    }
+}
+
+/**
+ * Generate PDF for Sales Report
+ */
+private suspend fun generateSalesReportPDF(
+    entries: List<SalesReportEntry>,
+    totalAmount: Double,
+    totalQty: Double,
+    totalDiscount: Double
+): ByteArray {
+    return withContext(Dispatchers.IO) {
+        try {
+            val document = com.itextpdf.kernel.pdf.PdfDocument(
+                com.itextpdf.kernel.pdf.PdfWriter(java.io.ByteArrayOutputStream().also { outputStream ->
+                    val doc = com.itextpdf.layout.Document(
+                        com.itextpdf.kernel.pdf.PdfDocument(
+                            com.itextpdf.kernel.pdf.PdfWriter(outputStream)
+                        )
+                    )
+
+                    // Title
+                    doc.add(
+                        com.itextpdf.layout.element.Paragraph("Sales Report")
+                            .setFontSize(20f)
+                            .setBold()
+                            .setTextAlignment(com.itextpdf.layout.properties.TextAlignment.CENTER)
+                    )
+
+                    // Date
+                    doc.add(
+                        com.itextpdf.layout.element.Paragraph("Generated on: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}")
+                            .setFontSize(12f)
+                            .setTextAlignment(com.itextpdf.layout.properties.TextAlignment.CENTER)
+                    )
+
+                    // Summary
+                    doc.add(
+                        com.itextpdf.layout.element.Paragraph("\nSummary:")
+                            .setFontSize(14f)
+                            .setBold()
+                    )
+                    doc.add(
+                        com.itextpdf.layout.element.Paragraph("Total Entries: ${entries.size}")
+                            .setFontSize(12f)
+                    )
+                    doc.add(
+                        com.itextpdf.layout.element.Paragraph("Total Amount: ₹${String.format("%.2f", totalAmount)}")
+                            .setFontSize(12f)
+                    )
+                    doc.add(
+                        com.itextpdf.layout.element.Paragraph("Total Quantity: ${String.format("%.2f", totalQty)}")
+                            .setFontSize(12f)
+                    )
+                    doc.add(
+                        com.itextpdf.layout.element.Paragraph("Total Discount: ₹${String.format("%.2f", totalDiscount)}")
+                            .setFontSize(12f)
+                    )
+
+                    // Table
+                    val table = com.itextpdf.layout.element.Table(floatArrayOf(1f, 2f, 1f, 1f, 2f, 1f, 1f, 1f, 1f, 1f, 1.5f, 1f))
+                        .setWidth(com.itextpdf.layout.properties.UnitValue.createPercentValue(100f))
+
+                    // Headers
+                    val headers = listOf("Date", "Party", "Type", "Ref", "Item", "HSN", "Category", "Qty", "Unit", "Rate", "Amount", "Discount")
+                    headers.forEach { header ->
+                        table.addHeaderCell(
+                            com.itextpdf.layout.element.Cell()
+                                .add(com.itextpdf.layout.element.Paragraph(header).setBold())
+                                .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
+                        )
+                    }
+
+                    // Data rows
+                    entries.forEach { entry ->
+                        table.addCell(entry.trDate)
+                        table.addCell(entry.partyName)
+                        table.addCell(entry.entryType)
+                        table.addCell(entry.refNo)
+                        table.addCell(entry.itemName)
+                        table.addCell(entry.hsnNo)
+                        table.addCell(entry.itemType)
+                        table.addCell(entry.qty)
+                        table.addCell(entry.unit)
+                        table.addCell("₹${entry.rate}")
+                        table.addCell("₹${entry.amount}")
+                        table.addCell("₹${entry.discount}")
+                    }
+
+                    doc.add(com.itextpdf.layout.element.Paragraph("\nDetailed Data:").setFontSize(14f).setBold())
+                    doc.add(table)
+
+                    doc.close()
+                    outputStream.toByteArray()
+                })
+            )
+            ByteArray(0) // Placeholder - implement actual PDF generation
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error generating PDF")
+            throw e
+        }
+    }
+}
+
+/**
+ * Share PDF file
+ */
+private fun sharePDF(context: android.content.Context, pdfData: ByteArray, fileName: String) {
+    try {
+        // Create a temporary file
+        val file = java.io.File(context.cacheDir, fileName)
+        file.writeBytes(pdfData)
+
+        // Create URI for the file
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            file
+        )
+
+        // Create share intent
+        val shareIntent = android.content.Intent().apply {
+            action = android.content.Intent.ACTION_SEND
+            type = "application/pdf"
+            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+            putExtra(android.content.Intent.EXTRA_SUBJECT, "Sales Report")
+            putExtra(android.content.Intent.EXTRA_TEXT, "Please find the attached Sales Report.")
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Sales Report"))
+    } catch (e: Exception) {
+        timber.log.Timber.e(e, "Error sharing PDF")
+        android.widget.Toast.makeText(context, "Error sharing PDF: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
     }
 }

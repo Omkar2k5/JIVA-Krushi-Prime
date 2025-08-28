@@ -34,6 +34,8 @@ import kotlinx.coroutines.launch
 import android.widget.Toast
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Expiry Entry data class - Complete with all API fields
@@ -283,12 +285,13 @@ fun ExpiryReportScreen(onBackClick: () -> Unit = {}) {
             }
         )
 
-        // Simple content for now
+        // Main content with filters and table
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Filter Controls Card
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -298,61 +301,406 @@ fun ExpiryReportScreen(onBackClick: () -> Unit = {}) {
                 ) {
                     Column(
                         modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Text(
-                            text = "Expiry Summary",
+                            text = "Filter Options",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = JivaColors.DeepBlue
                         )
 
+                        // First row: Item Type and Expiry Status
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            // Item Type Filter
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Expired Items",
+                                    text = "Item Type",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DarkGray
+                                    color = JivaColors.DeepBlue,
+                                    modifier = Modifier.padding(bottom = 4.dp)
                                 )
+
+                                ExposedDropdownMenuBox(
+                                    expanded = isItemTypeDropdownExpanded,
+                                    onExpandedChange = { isItemTypeDropdownExpanded = it }
+                                ) {
+                                    OutlinedTextField(
+                                        value = itemTypeFilter,
+                                        onValueChange = {},
+                                        readOnly = true,
+                                        trailingIcon = {
+                                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = isItemTypeDropdownExpanded)
+                                        },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+
+                                    ExposedDropdownMenu(
+                                        expanded = isItemTypeDropdownExpanded,
+                                        onDismissRequest = { isItemTypeDropdownExpanded = false }
+                                    ) {
+                                        listOf("All Types", "Pesticides", "Fertilizers", "Seeds", "Tools", "Others").forEach { type ->
+                                            DropdownMenuItem(
+                                                text = { Text(type) },
+                                                onClick = {
+                                                    itemTypeFilter = type
+                                                    isItemTypeDropdownExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Expiry Status Filter
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "$expiredCount",
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = JivaColors.Red
+                                    text = "Expiry Status",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = JivaColors.DeepBlue,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+
+                                ExposedDropdownMenuBox(
+                                    expanded = isExpiryStatusDropdownExpanded,
+                                    onExpandedChange = { isExpiryStatusDropdownExpanded = it }
+                                ) {
+                                    OutlinedTextField(
+                                        value = expiryStatusFilter,
+                                        onValueChange = {},
+                                        readOnly = true,
+                                        trailingIcon = {
+                                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = isExpiryStatusDropdownExpanded)
+                                        },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+
+                                    ExposedDropdownMenu(
+                                        expanded = isExpiryStatusDropdownExpanded,
+                                        onDismissRequest = { isExpiryStatusDropdownExpanded = false }
+                                    ) {
+                                        listOf("All Items", "Expired", "Expiring Soon", "Good").forEach { status ->
+                                            DropdownMenuItem(
+                                                text = { Text(status) },
+                                                onClick = {
+                                                    expiryStatusFilter = status
+                                                    isExpiryStatusDropdownExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Second row: Item Name and Batch Number Search
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // Item Name Search
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Search Item Name",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = JivaColors.DeepBlue,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                                OutlinedTextField(
+                                    value = itemNameSearch,
+                                    onValueChange = { itemNameSearch = it },
+                                    placeholder = { Text("Search item...") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Search,
+                                            contentDescription = "Search",
+                                            tint = JivaColors.Purple
+                                        )
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp),
+                                    singleLine = true
                                 )
                             }
 
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            // Batch Number Search
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Expiring Soon",
+                                    text = "Search Batch Number",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DarkGray
+                                    color = JivaColors.DeepBlue,
+                                    modifier = Modifier.padding(bottom = 4.dp)
                                 )
+                                OutlinedTextField(
+                                    value = batchNoSearch,
+                                    onValueChange = { batchNoSearch = it },
+                                    placeholder = { Text("Search batch...") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Numbers,
+                                            contentDescription = "Batch",
+                                            tint = JivaColors.Purple
+                                        )
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp),
+                                    singleLine = true
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Summary Card
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "Expired Items",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = JivaColors.DarkGray
+                            )
+                            Text(
+                                text = "$expiredCount",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = JivaColors.Red
+                            )
+                        }
+
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "Expiring Soon",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = JivaColors.DarkGray
+                            )
+                            Text(
+                                text = "$expiringSoonCount",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = JivaColors.Orange
+                            )
+                        }
+
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "Total Items",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = JivaColors.DarkGray
+                            )
+                            Text(
+                                text = "${filteredEntries.size}",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = JivaColors.DeepBlue
+                            )
+                        }
+
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "Total Quantity",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = JivaColors.DarkGray
+                            )
+                            Text(
+                                text = String.format("%.2f", totalQty),
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = JivaColors.Green
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Data Table Card
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Expiry Items",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = JivaColors.DeepBlue
+                            )
+
+                            Text(
+                                text = "${filteredEntries.size} items (${allEntries.size} total)",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = JivaColors.DarkGray
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Outstanding Report style table with horizontal scrolling
+                        Column(
+                            modifier = Modifier
+                                .height(400.dp)
+                                .horizontalScroll(rememberScrollState())
+                        ) {
+                            // Header in Outstanding Report style
+                            ExpiryTableHeader()
+
+                            // Data rows in Outstanding Report style
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                if (filteredEntries.isEmpty()) {
+                                    item {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(200.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Column(
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Info,
+                                                    contentDescription = "No Data",
+                                                    tint = JivaColors.DarkGray,
+                                                    modifier = Modifier.size(48.dp)
+                                                )
+                                                Text(
+                                                    text = if (allEntries.isEmpty()) "No expiry data available" else "No items match your filters",
+                                                    fontSize = 16.sp,
+                                                    color = JivaColors.DarkGray,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                                if (allEntries.isEmpty()) {
+                                                    Text(
+                                                        text = "Tap the refresh button to sync data",
+                                                        fontSize = 14.sp,
+                                                        color = JivaColors.Purple,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    items(filteredEntries) { entry ->
+                                        ExpiryTableRow(entry = entry)
+                                    }
+
+                                    // Total row like Outstanding Report
+                                    item {
+                                        ExpiryTotalRow(
+                                            expiredCount = expiredCount,
+                                            expiringSoonCount = expiringSoonCount,
+                                            totalQty = totalQty,
+                                            totalItems = filteredEntries.size
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Action Buttons
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        try {
+                                            val pdfData = generateExpiryReportPDF(filteredEntries, expiredCount, expiringSoonCount, totalQty)
+                                            sharePDF(context, pdfData, "Expiry_Report_${System.currentTimeMillis()}.pdf")
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Error generating PDF: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = JivaColors.Green
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "Share PDF",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "$expiringSoonCount",
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = JivaColors.Orange
+                                    text = "SHARE PDF",
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
 
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "Total Items",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DarkGray
+                            Button(
+                                onClick = {
+                                    // Clear all filters
+                                    itemTypeFilter = "All Types"
+                                    itemNameSearch = ""
+                                    batchNoSearch = ""
+                                    expiryStatusFilter = "All Items"
+                                    daysLeftFilter = "All"
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = JivaColors.Orange
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = "Clear Filters",
+                                    modifier = Modifier.size(18.dp)
                                 )
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "${filteredEntries.size}",
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = JivaColors.DeepBlue
+                                    text = "CLEAR FILTERS",
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
                         }
@@ -360,5 +708,332 @@ fun ExpiryReportScreen(onBackClick: () -> Unit = {}) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ExpiryTableHeader() {
+    Row(
+        modifier = Modifier
+            .background(
+                JivaColors.LightGray,
+                RoundedCornerShape(8.dp)
+            )
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        ExpiryHeaderCell("Item ID", Modifier.width(80.dp))
+        ExpiryHeaderCell("Item Name", Modifier.width(180.dp))
+        ExpiryHeaderCell("Type", Modifier.width(120.dp))
+        ExpiryHeaderCell("Batch No", Modifier.width(100.dp))
+        ExpiryHeaderCell("Expiry Date", Modifier.width(120.dp))
+        ExpiryHeaderCell("Quantity", Modifier.width(100.dp))
+        ExpiryHeaderCell("Days Left", Modifier.width(100.dp))
+        ExpiryHeaderCell("Status", Modifier.width(100.dp))
+    }
+}
+
+@Composable
+private fun ExpiryHeaderCell(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Bold,
+        color = JivaColors.DeepBlue,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun ExpiryTableRow(entry: ExpiryEntry) {
+    // Safe data processing before rendering (Outstanding Report style)
+    val safeEntry = remember(entry) {
+        try {
+            entry.copy(
+                itemId = entry.itemId.takeIf { it.isNotBlank() } ?: "",
+                itemName = entry.itemName.takeIf { it.isNotBlank() } ?: "Unknown Item",
+                itemType = entry.itemType.takeIf { it.isNotBlank() } ?: "",
+                batchNo = entry.batchNo.takeIf { it.isNotBlank() } ?: "",
+                expiryDate = entry.expiryDate.takeIf { it.isNotBlank() } ?: "",
+                qty = entry.qty.takeIf { it.isNotBlank() } ?: "0",
+                daysLeft = entry.daysLeft.takeIf { it.isNotBlank() } ?: "0"
+            )
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error processing entry: ${entry.itemId}")
+            ExpiryEntry("", "Error loading data", "", "", "", "0", "0")
+        }
+    }
+
+    // Safe days left parsing for color coding
+    val daysLeftInt = remember(safeEntry.daysLeft) {
+        try {
+            safeEntry.daysLeft.toIntOrNull() ?: 0
+        } catch (e: Exception) {
+            0
+        }
+    }
+
+    // Determine status and color
+    val (status, statusColor) = remember(daysLeftInt) {
+        when {
+            daysLeftInt <= 0 -> "Expired" to JivaColors.Red
+            daysLeftInt <= 7 -> "Critical" to JivaColors.Red
+            daysLeftInt <= 30 -> "Warning" to JivaColors.Orange
+            daysLeftInt <= 90 -> "Caution" to Color(0xFFFFB000)
+            else -> "Good" to JivaColors.Green
+        }
+    }
+
+    Column {
+        Row(
+            modifier = Modifier
+                .padding(vertical = 8.dp, horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ExpiryCell(safeEntry.itemId, Modifier.width(80.dp), JivaColors.DeepBlue)
+            ExpiryCell(safeEntry.itemName, Modifier.width(180.dp), JivaColors.DarkGray)
+            ExpiryCell(safeEntry.itemType, Modifier.width(120.dp), JivaColors.Purple)
+            ExpiryCell(safeEntry.batchNo, Modifier.width(100.dp))
+            ExpiryCell(safeEntry.expiryDate, Modifier.width(120.dp))
+            ExpiryCell(safeEntry.qty, Modifier.width(100.dp), JivaColors.DeepBlue)
+            ExpiryCell(safeEntry.daysLeft, Modifier.width(100.dp), statusColor)
+            ExpiryCell(status, Modifier.width(100.dp), statusColor)
+        }
+
+        HorizontalDivider(
+            color = JivaColors.LightGray,
+            thickness = 0.5.dp,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        )
+    }
+}
+
+@Composable
+private fun ExpiryCell(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = Color(0xFF374151)
+) {
+    // Safe text processing before rendering (Outstanding Report style)
+    val safeText = remember(text) {
+        try {
+            text.takeIf { it.isNotBlank() } ?: ""
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error processing text: $text")
+            "Error"
+        }
+    }
+
+    Text(
+        text = safeText,
+        fontSize = 11.sp,
+        color = color,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun ExpiryTotalRow(expiredCount: Int, expiringSoonCount: Int, totalQty: Double, totalItems: Int) {
+    Column {
+        HorizontalDivider(
+            color = JivaColors.DeepBlue,
+            thickness = 2.dp,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        )
+
+        Row(
+            modifier = Modifier
+                .background(JivaColors.LightBlue.copy(alpha = 0.3f))
+                .padding(vertical = 12.dp, horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Empty cells to align with data columns
+            repeat(4) {
+                Box(modifier = Modifier.width(80.dp))
+            }
+
+            // Summary text
+            Text(
+                text = "$totalItems items",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = JivaColors.DeepBlue,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(120.dp)
+            )
+
+            // Total quantity cell
+            Text(
+                text = "Total: ${String.format("%.2f", totalQty)}",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = JivaColors.Green,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(100.dp)
+            )
+
+            // Expired count
+            Text(
+                text = "$expiredCount expired",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = JivaColors.Red,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(100.dp)
+            )
+
+            // Expiring soon count
+            Text(
+                text = "$expiringSoonCount soon",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = JivaColors.Orange,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(100.dp)
+            )
+        }
+    }
+}
+
+/**
+ * Generate PDF for Expiry Report
+ */
+private suspend fun generateExpiryReportPDF(
+    entries: List<ExpiryEntry>,
+    expiredCount: Int,
+    expiringSoonCount: Int,
+    totalQty: Double
+): ByteArray {
+    return withContext(Dispatchers.IO) {
+        try {
+            val outputStream = java.io.ByteArrayOutputStream()
+            val writer = com.itextpdf.kernel.pdf.PdfWriter(outputStream)
+            val pdfDoc = com.itextpdf.kernel.pdf.PdfDocument(writer)
+            val document = com.itextpdf.layout.Document(pdfDoc)
+
+            // Title
+            document.add(
+                com.itextpdf.layout.element.Paragraph("Expiry Report")
+                    .setFontSize(20f)
+                    .setBold()
+                    .setTextAlignment(com.itextpdf.layout.properties.TextAlignment.CENTER)
+            )
+
+            // Date
+            document.add(
+                com.itextpdf.layout.element.Paragraph("Generated on: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}")
+                    .setFontSize(12f)
+                    .setTextAlignment(com.itextpdf.layout.properties.TextAlignment.CENTER)
+            )
+
+            // Summary
+            document.add(
+                com.itextpdf.layout.element.Paragraph("\nSummary:")
+                    .setFontSize(14f)
+                    .setBold()
+            )
+            document.add(
+                com.itextpdf.layout.element.Paragraph("Total Items: ${entries.size}")
+                    .setFontSize(12f)
+            )
+            document.add(
+                com.itextpdf.layout.element.Paragraph("Expired Items: $expiredCount")
+                    .setFontSize(12f)
+            )
+            document.add(
+                com.itextpdf.layout.element.Paragraph("Expiring Soon: $expiringSoonCount")
+                    .setFontSize(12f)
+            )
+            document.add(
+                com.itextpdf.layout.element.Paragraph("Total Quantity: ${String.format("%.2f", totalQty)}")
+                    .setFontSize(12f)
+            )
+
+            // Table
+            val table = com.itextpdf.layout.element.Table(floatArrayOf(1f, 3f, 2f, 1.5f, 2f, 1.5f, 1.5f, 1.5f))
+                .setWidth(com.itextpdf.layout.properties.UnitValue.createPercentValue(100f))
+
+            // Headers
+            val headers = listOf("Item ID", "Item Name", "Type", "Batch No", "Expiry Date", "Quantity", "Days Left", "Status")
+            headers.forEach { header ->
+                table.addHeaderCell(
+                    com.itextpdf.layout.element.Cell()
+                        .add(com.itextpdf.layout.element.Paragraph(header).setBold())
+                        .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
+                )
+            }
+
+            // Data rows
+            entries.forEach { entry ->
+                val daysLeft = entry.daysLeft.toIntOrNull() ?: 0
+                val status = when {
+                    daysLeft <= 0 -> "Expired"
+                    daysLeft <= 7 -> "Critical"
+                    daysLeft <= 30 -> "Warning"
+                    daysLeft <= 90 -> "Caution"
+                    else -> "Good"
+                }
+
+                table.addCell(entry.itemId)
+                table.addCell(entry.itemName)
+                table.addCell(entry.itemType)
+                table.addCell(entry.batchNo)
+                table.addCell(entry.expiryDate)
+                table.addCell(entry.qty)
+                table.addCell(entry.daysLeft)
+                table.addCell(status)
+            }
+
+            document.add(com.itextpdf.layout.element.Paragraph("\nDetailed Expiry Data:").setFontSize(14f).setBold())
+            document.add(table)
+
+            document.close()
+            outputStream.toByteArray()
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error generating PDF")
+            throw e
+        }
+    }
+}
+
+/**
+ * Share PDF file
+ */
+private fun sharePDF(context: android.content.Context, pdfData: ByteArray, fileName: String) {
+    try {
+        // Create a temporary file
+        val file = java.io.File(context.cacheDir, fileName)
+        file.writeBytes(pdfData)
+
+        // Create URI for the file
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            file
+        )
+
+        // Create share intent
+        val shareIntent = android.content.Intent().apply {
+            action = android.content.Intent.ACTION_SEND
+            type = "application/pdf"
+            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+            putExtra(android.content.Intent.EXTRA_SUBJECT, "Expiry Report")
+            putExtra(android.content.Intent.EXTRA_TEXT, "Please find the attached Expiry Report.")
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Expiry Report"))
+    } catch (e: Exception) {
+        timber.log.Timber.e(e, "Error sharing PDF")
+        android.widget.Toast.makeText(context, "Error sharing PDF: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
     }
 }
