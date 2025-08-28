@@ -1,3 +1,4 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
 package com.example.jiva.screens
 
 import androidx.compose.animation.core.*
@@ -817,7 +818,7 @@ private suspend fun generateStockPDF(context: Context, data: List<StockEntry>) {
 
             // Simple PDF content
             paint.textSize = 16f
-            paint.color = Color.BLACK
+            paint.color = android.graphics.Color.BLACK
             canvas.drawText("Stock Report", 50f, 50f, paint)
 
             paint.textSize = 12f

@@ -72,10 +72,7 @@ fun SimpleStockReportScreen() {
                         avgRate = entity.avgRate ?: "",
                         valuation = entity.valuation ?: "",
                         itemType = entity.itemType ?: "",
-                        companyName = entity.company ?: "",
-                        cgst = entity.cgst ?: "",
-                        sgst = entity.sgst ?: "",
-                        igst = entity.igst ?: ""
+                        companyName = entity.company ?: ""
                     )
                 } catch (e: Exception) {
                     timber.log.Timber.e(e, "Error mapping entity")

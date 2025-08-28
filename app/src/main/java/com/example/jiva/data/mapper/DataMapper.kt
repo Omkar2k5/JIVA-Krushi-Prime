@@ -41,10 +41,7 @@ object DataMapper {
             avgRate = this.avgRate,
             valuation = this.valuation,
             itemType = this.itemType,
-            companyName = this.company,
-            cgst = this.cgst,
-            sgst = this.sgst,
-            igst = this.igst
+            companyName = this.company
         )
     }
     
