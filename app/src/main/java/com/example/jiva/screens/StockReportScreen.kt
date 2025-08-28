@@ -102,9 +102,8 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
     var companySearch by remember { mutableStateOf("") }
     var isStockDropdownExpanded by remember { mutableStateOf(false) }
 
-    // Selection state for PDF
-    var selectedEntries by remember { mutableStateOf(setOf<String>()) }
-    var selectAll by remember { mutableStateOf(false) }
+    // PDF generation state
+    var isPdfGenerating by remember { mutableStateOf(false) }
 
     // Get current year and user ID
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
@@ -213,19 +212,7 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
         }
     }
 
-    // Handle select all functionality
-    LaunchedEffect(selectAll, filteredEntries) {
-        if (selectAll) {
-            selectedEntries = filteredEntries.map { it.itemId }.toSet()
-        } else {
-            selectedEntries = emptySet()
-        }
-    }
 
-    // Update selectAll state based on individual selections
-    LaunchedEffect(selectedEntries, filteredEntries) {
-        selectAll = filteredEntries.isNotEmpty() && selectedEntries.containsAll(filteredEntries.map { it.itemId })
-    }
 
     // Calculate totals from string values
     val totalOpeningStock = remember(filteredEntries) {
@@ -420,19 +407,9 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
                 item {
                     StockTableSection(
                         entries = filteredEntries,
-                        selectedEntries = selectedEntries,
-                        onEntrySelectionChange = { entryId, isSelected ->
-                            selectedEntries = if (isSelected) {
-                                selectedEntries + entryId
-                            } else {
-                                selectedEntries - entryId
-                            }
-                        },
-                        selectAll = selectAll,
-                        onSelectAllChange = { selectAll = it },
-                        onGeneratePDF = { selectedData ->
+                        onGeneratePDF = { data ->
                             scope.launch {
-                                generateStockPDF(context, selectedData)
+                                generateAndShareStockPDF(context, data)
                             }
                         }
                     )
@@ -647,10 +624,6 @@ private fun SummaryItem(label: String, value: String) {
 @Composable
 private fun StockTableSection(
     entries: List<StockEntry>,
-    selectedEntries: Set<String>,
-    onEntrySelectionChange: (String, Boolean) -> Unit,
-    selectAll: Boolean,
-    onSelectAllChange: (Boolean) -> Unit,
     onGeneratePDF: (List<StockEntry>) -> Unit
 ) {
     Card(
@@ -677,59 +650,38 @@ private fun StockTableSection(
 
                 Button(
                     onClick = {
-                        val selectedData = entries.filter { selectedEntries.contains(it.itemId) }
-                        onGeneratePDF(if (selectedData.isEmpty()) entries else selectedData)
+                        onGeneratePDF(entries) // Generate PDF for all entries
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = JivaColors.Green)
                 ) {
                     Icon(
                         imageVector = Icons.Default.PictureAsPdf,
-                        contentDescription = "Generate PDF"
+                        contentDescription = "Generate & Share PDF"
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("PDF")
+                    Text("Export & Share PDF")
                 }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Select All Checkbox
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Checkbox(
-                    checked = selectAll,
-                    onCheckedChange = onSelectAllChange,
-                    colors = CheckboxDefaults.colors(checkedColor = JivaColors.DeepBlue)
-                )
-                Text(
-                    text = "Select All (${selectedEntries.size} selected)",
-                    fontSize = 14.sp,
-                    color = JivaColors.DarkGray
-                )
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Simple table
-            LazyColumn(
-                modifier = Modifier.height(400.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            // Professional table with unified horizontal scrolling
+            Column(
+                modifier = Modifier
+                    .height(400.dp)
+                    .horizontalScroll(rememberScrollState())
             ) {
                 // Header
-                item {
-                    StockTableHeader()
-                }
+                StockTableHeader()
 
-                // Data rows
-                items(entries) { entry ->
-                    StockTableRow(
-                        entry = entry,
-                        isSelected = selectedEntries.contains(entry.itemId),
-                        onSelectionChange = { isSelected ->
-                            onEntrySelectionChange(entry.itemId, isSelected)
-                        }
-                    )
+                // Data rows in scrollable column
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    items(entries) { entry ->
+                        StockTableRow(entry = entry)
+                    }
                 }
             }
         }
@@ -739,168 +691,110 @@ private fun StockTableSection(
 @Composable
 private fun StockTableHeader() {
     Card(
-        colors = CardDefaults.cardColors(containerColor = JivaColors.DeepBlue)
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = JivaColors.DeepBlue),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(8.dp)
+                .padding(vertical = 12.dp, horizontal = 8.dp)
         ) {
-            Text("☑", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(30.dp))
-            Text("Item ID", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-            Text("Item Name", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(120.dp))
-            Text("Opening", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-            Text("InWard", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-            Text("OutWard", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-            Text("Closing", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-            Text("Avg Rate", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(70.dp))
-            Text("Valuation", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(80.dp))
-            Text("Type", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(80.dp))
-            Text("Company", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(80.dp))
-            Text("CGST", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(50.dp))
-            Text("SGST", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(50.dp))
-            Text("IGST", color = JivaColors.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(50.dp))
+            HeaderCell("Item ID", 80.dp)
+            HeaderCell("Item Name", 150.dp)
+            HeaderCell("Opening", 80.dp)
+            HeaderCell("InWard", 80.dp)
+            HeaderCell("OutWard", 80.dp)
+            HeaderCell("Closing", 80.dp)
+            HeaderCell("Avg Rate", 90.dp)
+            HeaderCell("Valuation", 100.dp)
+            HeaderCell("Type", 100.dp)
+            HeaderCell("Company", 120.dp)
+            HeaderCell("CGST%", 70.dp)
+            HeaderCell("SGST%", 70.dp)
+            HeaderCell("IGST%", 70.dp)
         }
     }
 }
 
 @Composable
-private fun StockTableRow(
-    entry: StockEntry,
-    isSelected: Boolean,
-    onSelectionChange: (Boolean) -> Unit
-) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) JivaColors.LightBlue.copy(alpha = 0.3f) else JivaColors.LightGray.copy(alpha = 0.3f)
+private fun HeaderCell(text: String, width: androidx.compose.ui.unit.Dp) {
+    Box(
+        modifier = Modifier
+            .width(width)
+            .padding(horizontal = 4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = JivaColors.White,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
         )
+    }
+}
+
+@Composable
+private fun StockTableRow(entry: StockEntry) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(8.dp),
+                .padding(vertical = 8.dp, horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Checkbox(
-                checked = isSelected,
-                onCheckedChange = onSelectionChange,
-                modifier = Modifier.width(30.dp),
-                colors = CheckboxDefaults.colors(checkedColor = JivaColors.DeepBlue)
-            )
-            Text(
-                text = entry.itemId,
-                fontSize = 7.sp,
-                color = JivaColors.DarkGray,
-                modifier = Modifier.width(60.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = entry.itemName,
-                fontSize = 7.sp,
-                color = JivaColors.DarkGray,
-                modifier = Modifier.width(120.dp),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = entry.opening,
-                fontSize = 7.sp,
-                color = JivaColors.DarkGray,
-                modifier = Modifier.width(60.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = entry.inWard,
-                fontSize = 7.sp,
-                color = JivaColors.Green,
-                modifier = Modifier.width(60.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = entry.outWard,
-                fontSize = 7.sp,
-                color = JivaColors.Orange,
-                modifier = Modifier.width(60.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = entry.closingStock,
-                fontSize = 7.sp,
-                color = JivaColors.DeepBlue,
-                modifier = Modifier.width(60.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "₹${entry.avgRate}",
-                fontSize = 7.sp,
-                color = JivaColors.DarkGray,
-                modifier = Modifier.width(70.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = "₹${entry.valuation}",
-                fontSize = 7.sp,
-                color = JivaColors.Green,
-                modifier = Modifier.width(80.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = entry.itemType,
-                fontSize = 7.sp,
-                color = JivaColors.Purple,
-                modifier = Modifier.width(80.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = entry.company,
-                fontSize = 7.sp,
-                color = JivaColors.DarkGray,
-                modifier = Modifier.width(80.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = "${entry.cgst}%",
-                fontSize = 7.sp,
-                color = JivaColors.DarkGray,
-                modifier = Modifier.width(50.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = "${entry.sgst}%",
-                fontSize = 7.sp,
-                color = JivaColors.DarkGray,
-                modifier = Modifier.width(50.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = "${entry.igst}%",
-                fontSize = 7.sp,
-                color = JivaColors.DarkGray,
-                modifier = Modifier.width(50.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            DataCell(entry.itemId, 80.dp, JivaColors.DeepBlue, FontWeight.Medium)
+            DataCell(entry.itemName, 150.dp, JivaColors.DarkGray, FontWeight.Normal, maxLines = 2)
+            DataCell(entry.opening, 80.dp, JivaColors.DarkGray)
+            DataCell(entry.inWard, 80.dp, JivaColors.Green, FontWeight.Medium)
+            DataCell(entry.outWard, 80.dp, JivaColors.Orange, FontWeight.Medium)
+            DataCell(entry.closingStock, 80.dp, JivaColors.DeepBlue, FontWeight.Bold)
+            DataCell("₹${entry.avgRate}", 90.dp, JivaColors.DarkGray)
+            DataCell("₹${entry.valuation}", 100.dp, JivaColors.Green, FontWeight.Bold)
+            DataCell(entry.itemType, 100.dp, JivaColors.Purple, FontWeight.Medium)
+            DataCell(entry.company, 120.dp, JivaColors.DarkGray)
+            DataCell("${entry.cgst}%", 70.dp, JivaColors.DarkGray)
+            DataCell("${entry.sgst}%", 70.dp, JivaColors.DarkGray)
+            DataCell("${entry.igst}%", 70.dp, JivaColors.DarkGray)
         }
     }
 }
 
-// Simple PDF generation function
-private suspend fun generateStockPDF(context: Context, data: List<StockEntry>) {
+@Composable
+private fun DataCell(
+    text: String,
+    width: androidx.compose.ui.unit.Dp,
+    color: Color = JivaColors.DarkGray,
+    fontWeight: FontWeight = FontWeight.Normal,
+    maxLines: Int = 1
+) {
+    Box(
+        modifier = Modifier
+            .width(width)
+            .padding(horizontal = 4.dp),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Text(
+            text = text,
+            fontSize = 9.sp,
+            color = color,
+            fontWeight = fontWeight,
+            maxLines = maxLines,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = if (maxLines > 1) TextAlign.Start else TextAlign.Center
+        )
+    }
+}
+
+// Enhanced PDF generation with auto-sharing
+private suspend fun generateAndShareStockPDF(context: Context, data: List<StockEntry>) {
     withContext(Dispatchers.IO) {
         try {
             val pdfDocument = PdfDocument()
@@ -936,14 +830,36 @@ private suspend fun generateStockPDF(context: Context, data: List<StockEntry>) {
             pdfDocument.finishPage(page)
 
             // Save PDF
-            val fileName = "stock_report_${System.currentTimeMillis()}.pdf"
+            val fileName = "Stock_Report_${java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", java.util.Locale.getDefault()).format(java.util.Date())}.pdf"
             val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), fileName)
             pdfDocument.writeTo(FileOutputStream(file))
             pdfDocument.close()
 
-            // Show success message
+            // Auto-share PDF
             withContext(Dispatchers.Main) {
-                Toast.makeText(context, "PDF saved: ${file.absolutePath}", Toast.LENGTH_LONG).show()
+                try {
+                    val uri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        file
+                    )
+
+                    val shareIntent = Intent().apply {
+                        action = Intent.ACTION_SEND
+                        type = "application/pdf"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        putExtra(Intent.EXTRA_SUBJECT, "Stock Report - ${java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()).format(java.util.Date())}")
+                        putExtra(Intent.EXTRA_TEXT, "Please find attached the Stock Report generated on ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}")
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+
+                    val chooserIntent = Intent.createChooser(shareIntent, "Share Stock Report")
+                    context.startActivity(chooserIntent)
+
+                    Toast.makeText(context, "PDF generated successfully!", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "PDF saved but sharing failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
             }
 
         } catch (e: Exception) {
