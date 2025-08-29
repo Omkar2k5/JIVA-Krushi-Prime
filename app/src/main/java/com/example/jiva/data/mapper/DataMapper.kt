@@ -59,11 +59,11 @@ object DataMapper {
             itemName = this.itemName,
             hsnNo = this.hsn ?: "",
             itemType = this.category ?: "",
-            qty = this.qty.toDouble(),
+            qty = this.qty.toPlainString(),
             unit = this.unit ?: "",
-            rate = this.rate.toDouble(),
-            amount = this.amount.toDouble(),
-            discount = this.discount.toDouble()
+            rate = this.rate.toPlainString(),
+            amount = this.amount.toPlainString(),
+            discount = this.discount.toPlainString()
         )
     }
     

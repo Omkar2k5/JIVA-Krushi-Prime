@@ -115,15 +115,25 @@ fun ExpiryReportScreen(onBackClick: () -> Unit = {}) {
     val allEntries = remember(expiryEntities) {
         try {
             expiryEntities.map { entity ->
+                // Safely map DB -> UI and parse date string like "25/07/2025 00:00:00" to "25/07/2025"
+                val formattedDate = entity.expiryDate?.let { raw ->
+                    try {
+                        val inFmt = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
+                        val outFmt = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                        val parsed = inFmt.parse(raw)
+                        if (parsed != null) outFmt.format(parsed) else raw.substringBefore(' ')
+                    } catch (_: Exception) {
+                        raw.substringBefore(' ')
+                    }
+                } ?: ""
+
                 ExpiryEntry(
-                    itemId = entity.itemId?.toString() ?: "",
-                    itemName = entity.itemName ?: "",
+                    itemId = entity.itemId.toString(),
+                    itemName = entity.itemName,
                     itemType = entity.itemType ?: "",
                     batchNo = entity.batchNo ?: "",
-                    expiryDate = entity.expiryDate?.let { 
-                        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it) 
-                    } ?: "",
-                    qty = entity.qty?.toString() ?: "0",
+                    expiryDate = formattedDate,
+                    qty = try { entity.qty.toPlainString() } catch (_: Exception) { entity.qty.toString() },
                     daysLeft = entity.daysLeft?.toString() ?: "0"
                 )
             }
@@ -915,65 +925,56 @@ private suspend fun generateExpiryReportPDF(
 ): ByteArray {
     return withContext(Dispatchers.IO) {
         try {
-            val outputStream = java.io.ByteArrayOutputStream()
-            val writer = com.itextpdf.kernel.pdf.PdfWriter(outputStream)
-            val pdfDoc = com.itextpdf.kernel.pdf.PdfDocument(writer)
-            val document = com.itextpdf.layout.Document(pdfDoc)
+            val pdfDocument = android.graphics.pdf.PdfDocument()
+            val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, 1).create()
+            val page = pdfDocument.startPage(pageInfo)
+            val canvas = page.canvas
+            val paint = android.graphics.Paint().apply { textSize = 12f }
 
-            // Title
-            document.add(
-                com.itextpdf.layout.element.Paragraph("Expiry Report")
-                    .setFontSize(20f)
-                    .setBold()
-                    .setTextAlignment(com.itextpdf.layout.properties.TextAlignment.CENTER)
-            )
-
-            // Date
-            document.add(
-                com.itextpdf.layout.element.Paragraph("Generated on: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}")
-                    .setFontSize(12f)
-                    .setTextAlignment(com.itextpdf.layout.properties.TextAlignment.CENTER)
-            )
-
-            // Summary
-            document.add(
-                com.itextpdf.layout.element.Paragraph("\nSummary:")
-                    .setFontSize(14f)
-                    .setBold()
-            )
-            document.add(
-                com.itextpdf.layout.element.Paragraph("Total Items: ${entries.size}")
-                    .setFontSize(12f)
-            )
-            document.add(
-                com.itextpdf.layout.element.Paragraph("Expired Items: $expiredCount")
-                    .setFontSize(12f)
-            )
-            document.add(
-                com.itextpdf.layout.element.Paragraph("Expiring Soon: $expiringSoonCount")
-                    .setFontSize(12f)
-            )
-            document.add(
-                com.itextpdf.layout.element.Paragraph("Total Quantity: ${String.format("%.2f", totalQty)}")
-                    .setFontSize(12f)
+            var y = 40f
+            paint.textSize = 18f
+            paint.isFakeBoldText = true
+            canvas.drawText("Expiry Report", 40f, y, paint)
+            paint.isFakeBoldText = false
+            paint.textSize = 10f
+            y += 16f
+            canvas.drawText(
+                "Generated on: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}",
+                40f,
+                y,
+                paint
             )
 
-            // Table
-            val table = com.itextpdf.layout.element.Table(floatArrayOf(1f, 3f, 2f, 1.5f, 2f, 1.5f, 1.5f, 1.5f))
-                .setWidth(com.itextpdf.layout.properties.UnitValue.createPercentValue(100f))
+            y += 20f
+            paint.textSize = 12f
+            paint.isFakeBoldText = true
+            canvas.drawText("Summary:", 40f, y, paint)
+            paint.isFakeBoldText = false
+            y += 16f
+            canvas.drawText("Total Items: ${entries.size}", 40f, y, paint)
+            y += 14f
+            canvas.drawText("Expired Items: $expiredCount", 40f, y, paint)
+            y += 14f
+            canvas.drawText("Expiring Soon: $expiringSoonCount", 40f, y, paint)
+            y += 14f
+            canvas.drawText("Total Quantity: ${String.format("%.2f", totalQty)}", 40f, y, paint)
 
-            // Headers
-            val headers = listOf("Item ID", "Item Name", "Type", "Batch No", "Expiry Date", "Quantity", "Days Left", "Status")
-            headers.forEach { header ->
-                table.addHeaderCell(
-                    com.itextpdf.layout.element.Cell()
-                        .add(com.itextpdf.layout.element.Paragraph(header).setBold())
-                        .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
-                )
-            }
+            y += 20f
+            paint.isFakeBoldText = true
+            canvas.drawText("Detailed Expiry Data:", 40f, y, paint)
+            paint.isFakeBoldText = false
+            y += 16f
 
-            // Data rows
-            entries.forEach { entry ->
+            // Table header
+            val headers = listOf("Item ID", "Item Name", "Type", "Batch", "Expiry", "Qty", "Days", "Status")
+            val colX = floatArrayOf(40f, 100f, 260f, 320f, 370f, 430f, 470f, 510f)
+            headers.forEachIndexed { idx, h -> canvas.drawText(h, colX[idx], y, paint) }
+            y += 12f
+            canvas.drawLine(40f, y, 555f, y, paint)
+            y += 12f
+
+            entries.take(40).forEach { entry ->
+                if (y > 800f) return@forEach
                 val daysLeft = entry.daysLeft.toIntOrNull() ?: 0
                 val status = when {
                     daysLeft <= 0 -> "Expired"
@@ -982,22 +983,22 @@ private suspend fun generateExpiryReportPDF(
                     daysLeft <= 90 -> "Caution"
                     else -> "Good"
                 }
-
-                table.addCell(entry.itemId)
-                table.addCell(entry.itemName)
-                table.addCell(entry.itemType)
-                table.addCell(entry.batchNo)
-                table.addCell(entry.expiryDate)
-                table.addCell(entry.qty)
-                table.addCell(entry.daysLeft)
-                table.addCell(status)
+                canvas.drawText(entry.itemId, colX[0], y, paint)
+                canvas.drawText(entry.itemName.take(20), colX[1], y, paint)
+                canvas.drawText(entry.itemType.take(12), colX[2], y, paint)
+                canvas.drawText(entry.batchNo, colX[3], y, paint)
+                canvas.drawText(entry.expiryDate, colX[4], y, paint)
+                canvas.drawText(entry.qty, colX[5], y, paint)
+                canvas.drawText(entry.daysLeft, colX[6], y, paint)
+                canvas.drawText(status, colX[7], y, paint)
+                y += 14f
             }
 
-            document.add(com.itextpdf.layout.element.Paragraph("\nDetailed Expiry Data:").setFontSize(14f).setBold())
-            document.add(table)
-
-            document.close()
-            outputStream.toByteArray()
+            pdfDocument.finishPage(page)
+            val baos = java.io.ByteArrayOutputStream()
+            pdfDocument.writeTo(baos)
+            pdfDocument.close()
+            baos.toByteArray()
         } catch (e: Exception) {
             timber.log.Timber.e(e, "Error generating PDF")
             throw e

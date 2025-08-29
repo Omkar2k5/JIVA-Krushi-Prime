@@ -102,7 +102,7 @@ fun LedgerScreen(onBackClick: () -> Unit = {}) {
 
 @Composable
 fun ItemSellPurchaseScreen(onBackClick: () -> Unit = {}) {
-    SalesReportScreenImpl(onBackClick = onBackClick)
+    SalesReportScreen(onBackClick = onBackClick)
 }
 
 @Composable

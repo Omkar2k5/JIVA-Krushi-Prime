@@ -940,90 +940,75 @@ private suspend fun generateSalesReportPDF(
 ): ByteArray {
     return withContext(Dispatchers.IO) {
         try {
-            val document = com.itextpdf.kernel.pdf.PdfDocument(
-                com.itextpdf.kernel.pdf.PdfWriter(java.io.ByteArrayOutputStream().also { outputStream ->
-                    val doc = com.itextpdf.layout.Document(
-                        com.itextpdf.kernel.pdf.PdfDocument(
-                            com.itextpdf.kernel.pdf.PdfWriter(outputStream)
-                        )
-                    )
+            val pdfDocument = android.graphics.pdf.PdfDocument()
+            val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, 1).create()
+            val page = pdfDocument.startPage(pageInfo)
+            val canvas = page.canvas
+            val paint = android.graphics.Paint().apply { textSize = 12f }
 
-                    // Title
-                    doc.add(
-                        com.itextpdf.layout.element.Paragraph("Sales Report")
-                            .setFontSize(20f)
-                            .setBold()
-                            .setTextAlignment(com.itextpdf.layout.properties.TextAlignment.CENTER)
-                    )
-
-                    // Date
-                    doc.add(
-                        com.itextpdf.layout.element.Paragraph("Generated on: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}")
-                            .setFontSize(12f)
-                            .setTextAlignment(com.itextpdf.layout.properties.TextAlignment.CENTER)
-                    )
-
-                    // Summary
-                    doc.add(
-                        com.itextpdf.layout.element.Paragraph("\nSummary:")
-                            .setFontSize(14f)
-                            .setBold()
-                    )
-                    doc.add(
-                        com.itextpdf.layout.element.Paragraph("Total Entries: ${entries.size}")
-                            .setFontSize(12f)
-                    )
-                    doc.add(
-                        com.itextpdf.layout.element.Paragraph("Total Amount: ₹${String.format("%.2f", totalAmount)}")
-                            .setFontSize(12f)
-                    )
-                    doc.add(
-                        com.itextpdf.layout.element.Paragraph("Total Quantity: ${String.format("%.2f", totalQty)}")
-                            .setFontSize(12f)
-                    )
-                    doc.add(
-                        com.itextpdf.layout.element.Paragraph("Total Discount: ₹${String.format("%.2f", totalDiscount)}")
-                            .setFontSize(12f)
-                    )
-
-                    // Table
-                    val table = com.itextpdf.layout.element.Table(floatArrayOf(1f, 2f, 1f, 1f, 2f, 1f, 1f, 1f, 1f, 1f, 1.5f, 1f))
-                        .setWidth(com.itextpdf.layout.properties.UnitValue.createPercentValue(100f))
-
-                    // Headers
-                    val headers = listOf("Date", "Party", "Type", "Ref", "Item", "HSN", "Category", "Qty", "Unit", "Rate", "Amount", "Discount")
-                    headers.forEach { header ->
-                        table.addHeaderCell(
-                            com.itextpdf.layout.element.Cell()
-                                .add(com.itextpdf.layout.element.Paragraph(header).setBold())
-                                .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
-                        )
-                    }
-
-                    // Data rows
-                    entries.forEach { entry ->
-                        table.addCell(entry.trDate)
-                        table.addCell(entry.partyName)
-                        table.addCell(entry.entryType)
-                        table.addCell(entry.refNo)
-                        table.addCell(entry.itemName)
-                        table.addCell(entry.hsnNo)
-                        table.addCell(entry.itemType)
-                        table.addCell(entry.qty)
-                        table.addCell(entry.unit)
-                        table.addCell("₹${entry.rate}")
-                        table.addCell("₹${entry.amount}")
-                        table.addCell("₹${entry.discount}")
-                    }
-
-                    doc.add(com.itextpdf.layout.element.Paragraph("\nDetailed Data:").setFontSize(14f).setBold())
-                    doc.add(table)
-
-                    doc.close()
-                    outputStream.toByteArray()
-                })
+            var y = 40f
+            paint.textSize = 18f
+            paint.isFakeBoldText = true
+            canvas.drawText("Sales Report", 40f, y, paint)
+            paint.isFakeBoldText = false
+            paint.textSize = 10f
+            y += 16f
+            canvas.drawText(
+                "Generated on: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}",
+                40f,
+                y,
+                paint
             )
-            ByteArray(0) // Placeholder - implement actual PDF generation
+
+            y += 20f
+            paint.textSize = 12f
+            paint.isFakeBoldText = true
+            canvas.drawText("Summary:", 40f, y, paint)
+            paint.isFakeBoldText = false
+            y += 16f
+            canvas.drawText("Total Entries: ${entries.size}", 40f, y, paint)
+            y += 14f
+            canvas.drawText("Total Amount: ₹${String.format("%.2f", totalAmount)}", 40f, y, paint)
+            y += 14f
+            canvas.drawText("Total Quantity: ${String.format("%.2f", totalQty)}", 40f, y, paint)
+            y += 14f
+            canvas.drawText("Total Discount: ₹${String.format("%.2f", totalDiscount)}", 40f, y, paint)
+
+            y += 20f
+            paint.isFakeBoldText = true
+            canvas.drawText("Detailed Data:", 40f, y, paint)
+            paint.isFakeBoldText = false
+            y += 16f
+
+            val headers = listOf("Date", "Party", "Type", "Ref", "Item", "HSN", "Category", "Qty", "Unit", "Rate", "Amount", "Discount")
+            val colX = floatArrayOf(40f, 90f, 150f, 190f, 230f, 300f, 350f, 410f, 440f, 470f, 510f, 550f)
+            headers.forEachIndexed { idx, h -> canvas.drawText(h, colX[idx], y, paint) }
+            y += 12f
+            canvas.drawLine(40f, y, 555f, y, paint)
+            y += 12f
+
+            entries.take(35).forEach { entry ->
+                if (y > 800f) return@forEach
+                canvas.drawText(entry.trDate, colX[0], y, paint)
+                canvas.drawText(entry.partyName.take(16), colX[1], y, paint)
+                canvas.drawText(entry.entryType, colX[2], y, paint)
+                canvas.drawText(entry.refNo, colX[3], y, paint)
+                canvas.drawText(entry.itemName.take(16), colX[4], y, paint)
+                canvas.drawText(entry.hsnNo, colX[5], y, paint)
+                canvas.drawText(entry.itemType.take(12), colX[6], y, paint)
+                canvas.drawText(entry.qty, colX[7], y, paint)
+                canvas.drawText(entry.unit, colX[8], y, paint)
+                canvas.drawText(entry.rate, colX[9], y, paint)
+                canvas.drawText(entry.amount, colX[10], y, paint)
+                canvas.drawText(entry.discount, colX[11], y, paint)
+                y += 14f
+            }
+
+            pdfDocument.finishPage(page)
+            val baos = java.io.ByteArrayOutputStream()
+            pdfDocument.writeTo(baos)
+            pdfDocument.close()
+            baos.toByteArray()
         } catch (e: Exception) {
             timber.log.Timber.e(e, "Error generating PDF")
             throw e
