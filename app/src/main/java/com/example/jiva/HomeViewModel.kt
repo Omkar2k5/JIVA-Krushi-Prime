@@ -83,8 +83,8 @@ class HomeViewModel(
     }
     
     /**
-     * Syncs all data from the server
-     * Updates the UI state with sync status
+     * Syncs all business data endpoints sequentially to avoid server/app overload.
+     * Calls: Outstanding, Ledger, Stock, Sale/Purchase, Expiry, Price List.
      */
     fun syncData() {
         viewModelScope.launch {
@@ -98,91 +98,81 @@ class HomeViewModel(
                     )
                     return@launch
                 }
-                
+
                 // Set syncing state
                 _uiState.value = _uiState.value.copy(
                     isSyncing = true,
                     syncSuccess = false,
                     errorMessage = null
                 )
-                
-                try {
-                    // Perform sync operation
-                    val result = jivaRepository.syncAllData()
 
-                    // Also sync Outstanding data with user context if available
-                    try {
-                        val context = getApplication<JivaApplication>().applicationContext
-                        val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
-                        val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
+                // Resolve user and year context
+                val context = getApplication<JivaApplication>().applicationContext
+                val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
+                val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
 
-                        if (userId != null) {
-                            val outstandingResult = jivaRepository.syncOutstanding(userId, year)
-                            if (outstandingResult.isSuccess) {
-                                Timber.d("Successfully synced Outstanding data for user $userId, year $year")
-                            } else {
-                                Timber.w("Failed to sync Outstanding data: ${outstandingResult.exceptionOrNull()?.message}")
-                            }
-                        } else {
-                            Timber.w("No user ID available for Outstanding sync")
-                        }
-                    } catch (e: Exception) {
-                        Timber.w(e, "Error during Outstanding sync in main refresh")
-                    }
-
-                    if (result.isSuccess) {
-                        _uiState.value = _uiState.value.copy(
-                            isSyncing = false,
-                            syncSuccess = true,
-                            errorMessage = null
-                        )
-                        Timber.d("Data sync completed successfully")
-                        
-                        // Reset success state after 3 seconds
-                        kotlinx.coroutines.delay(3000)
-                        _uiState.value = _uiState.value.copy(syncSuccess = false)
-                    } else {
-                        // Even if API call failed, we still loaded dummy data as fallback
-                        // So we'll show a warning but still mark as success
-                        val error = result.exceptionOrNull()?.message ?: "Unknown error during sync"
-                        
-                        if (error.contains("Server not available") || error.contains("using dummy data")) {
-                            // Server not available, but we loaded dummy data
-                            _uiState.value = _uiState.value.copy(
-                                isSyncing = false,
-                                syncSuccess = true,
-                                errorMessage = "Server not available - using local data"
-                            )
-                            Timber.w("Server not available, using dummy data")
-                            
-                            // Reset success state after 3 seconds
-                            kotlinx.coroutines.delay(3000)
-                            _uiState.value = _uiState.value.copy(
-                                syncSuccess = false,
-                                errorMessage = null
-                            )
-                        } else {
-                            // Other error
-                            _uiState.value = _uiState.value.copy(
-                                isSyncing = false,
-                                syncSuccess = false,
-                                errorMessage = "Sync warning: $error"
-                            )
-                            Timber.w(result.exceptionOrNull(), "Data sync had issues")
-                        }
-                    }
-                } catch (e: Exception) {
-                    // Catch any exceptions during the sync operation
-                    Timber.e(e, "Error during data sync operation")
+                if (userId == null) {
                     _uiState.value = _uiState.value.copy(
                         isSyncing = false,
                         syncSuccess = false,
-                        errorMessage = "Sync operation error: ${e.message ?: "Unknown error"}"
+                        errorMessage = "Cannot sync: missing user id"
+                    )
+                    return@launch
+                }
+
+                // Build sequential tasks
+                val tasks: List<Pair<String, suspend () -> Result<Unit>>> = listOf(
+                    "Outstanding" to { jivaRepository.syncOutstanding(userId, year) },
+                    "Ledger" to { jivaRepository.syncLedger(userId, year) },
+                    "Stock" to { jivaRepository.syncStock(userId, year) },
+                    "Sale/Purchase" to { jivaRepository.syncSalePurchase(userId, year) },
+                    "Expiry" to { jivaRepository.syncExpiry(userId, year) },
+                    "Price List" to { jivaRepository.syncPriceList(userId, year) }
+                )
+
+                var anySuccess = false
+                val failures = mutableListOf<String>()
+
+                for ((name, task) in tasks) {
+                    try {
+                        Timber.d("Starting sequential sync for $name ...")
+                        val result = task()
+                        if (result.isSuccess) {
+                            anySuccess = true
+                            Timber.d("$name sync succeeded")
+                        } else {
+                            val msg = result.exceptionOrNull()?.message ?: "unknown error"
+                            failures.add("$name: $msg")
+                            Timber.w("$name sync failed: $msg")
+                        }
+                    } catch (e: Exception) {
+                        failures.add("$name: ${e.message ?: "exception"}")
+                        Timber.w(e, "$name sync threw exception")
+                    }
+
+                    // Small gap between calls to reduce load on server
+                    kotlinx.coroutines.delay(500)
+                }
+
+                // Update final state
+                if (anySuccess) {
+                    _uiState.value = _uiState.value.copy(
+                        isSyncing = false,
+                        syncSuccess = true,
+                        errorMessage = if (failures.isNotEmpty()) failures.joinToString("; ") else null
+                    )
+                    // Reset success state after 3 seconds
+                    kotlinx.coroutines.delay(3000)
+                    _uiState.value = _uiState.value.copy(syncSuccess = false, errorMessage = null)
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        isSyncing = false,
+                        syncSuccess = false,
+                        errorMessage = if (failures.isNotEmpty()) failures.joinToString("; ") else "All sync calls failed"
                     )
                 }
             } catch (e: Exception) {
-                // Catch any exceptions in the outer block
-                Timber.e(e, "Critical error during data sync")
+                Timber.e(e, "Critical error during sequential data sync")
                 _uiState.value = _uiState.value.copy(
                     isSyncing = false,
                     syncSuccess = false,

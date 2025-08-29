@@ -136,13 +136,14 @@ class LoginViewModel(
                                 saveCredentialsIfNeeded()
                             }
 
-                            // Fetch company info and store companyName
+                            // Fetch company info and store companyName; also fetch financial years and store latest into env
                             viewModelScope.launch {
                                 try {
                                     val uidStr = response.user?.id?.toString()
                                     val uid = uidStr?.toIntOrNull()
                                     if (uid != null) {
                                         val api = com.example.jiva.data.network.RetrofitClient.jivaApiService
+                                        // Company info
                                         val companyRes = api.getCompanyInfo(
                                             com.example.jiva.data.api.models.CompanyInfoRequest(userId = uid)
                                         )
@@ -154,9 +155,21 @@ class LoginViewModel(
                                                 }
                                             }
                                         }
+                                        // Year list
+                                        val yearRes = api.getYear(
+                                            com.example.jiva.data.api.models.YearRequest(userId = uid)
+                                        )
+                                        if (yearRes.isSuccess) {
+                                            val year = yearRes.data?.firstOrNull()?.yearString
+                                            if (!year.isNullOrBlank()) {
+                                                context?.let { ctx ->
+                                                    com.example.jiva.utils.UserEnv.setFinancialYear(ctx, year)
+                                                }
+                                            }
+                                        }
                                     }
                                 } catch (e: Exception) {
-                                    Timber.w(e, "CompanyInfo fetch failed")
+                                    Timber.w(e, "CompanyInfo/Year fetch failed")
                                 }
                             }
                         } else {

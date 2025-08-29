@@ -196,6 +196,20 @@ class RemoteDataSource {
     }
     
     /**
+     * Fetch financial year list for the user
+     */
+    suspend fun getYears(userId: Int): Result<com.example.jiva.data.api.models.YearResponse> {
+        return try {
+            val request = com.example.jiva.data.api.models.YearRequest(userId)
+            val response = apiService.getYear(request)
+            Result.success(response)
+        } catch (e: Exception) {
+            Timber.e(e, "GetYear API call failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    /**
      * Get all data in a single call (for initial sync)
      */
     suspend fun syncAllData(): Result<SyncDataResponse> {

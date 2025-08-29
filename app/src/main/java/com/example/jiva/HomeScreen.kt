@@ -195,7 +195,9 @@ fun HomeScreen(
             .background(JivaColors.LightGray)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
         ) {
             // Modern Header with gradient
             ModernHeader(
@@ -206,6 +208,9 @@ fun HomeScreen(
                 },
                 viewModel = actualViewModel
             )
+
+            // Year selector under header
+            YearRowFromApi(actualViewModel)
 
             // Main Content - Responsive Grid with Performance Optimizations
             LazyVerticalGrid(
@@ -452,6 +457,98 @@ private fun ModernMenuCard(
     }
 }
 
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun YearRowFromApi(viewModel: HomeViewModel) {
+    val context = LocalContext.current
+
+    var years by remember { mutableStateOf<List<String>>(emptyList()) }
+    var expanded by remember { mutableStateOf(false) }
+    var selectedYear by remember { mutableStateOf(com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "") }
+
+    // Fetch years from API once; prefer API over local saved
+    LaunchedEffect(Unit) {
+        val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
+        if (userId != null) {
+            try {
+                val remote = com.example.jiva.data.network.RemoteDataSource()
+                val result = remote.getYears(userId)
+                if (result.isSuccess) {
+                    val apiYears = result.getOrNull()?.data?.map { it.yearString }?.filter { it.isNotBlank() } ?: emptyList()
+                    if (apiYears.isNotEmpty()) {
+                        years = apiYears
+                        if (selectedYear.isBlank() || selectedYear !in apiYears) {
+                            selectedYear = apiYears.first()
+                            com.example.jiva.utils.UserEnv.setFinancialYear(context, selectedYear)
+                        }
+                    }
+                }
+            } catch (_: Exception) { }
+        }
+    }
+
+    // Persist selected year to env whenever it changes
+    LaunchedEffect(selectedYear) {
+        if (selectedYear.isNotBlank()) {
+            com.example.jiva.utils.UserEnv.setFinancialYear(context, selectedYear)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = "Financial Year",
+            style = MaterialTheme.typography.labelLarge,
+            color = Color.Black,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+        if (years.size <= 1) {
+            // Single year: show plain black text
+            val displayYear = selectedYear.ifBlank { years.firstOrNull().orEmpty() }
+            Text(
+                text = displayYear,
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.Black
+            )
+        } else {
+            // Multiple years: show a dropdown
+            ExposedDropdownMenuBox(
+                expanded = expanded,
+                onExpandedChange = { expanded = !expanded }
+            ) {
+                OutlinedTextField(
+                    readOnly = true,
+                    value = selectedYear,
+                    onValueChange = {},
+                    label = { Text("Year") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    years.forEach { y ->
+                        DropdownMenuItem(
+                            text = { Text(y) },
+                            onClick = {
+                                selectedYear = y
+                                com.example.jiva.utils.UserEnv.setFinancialYear(context, y)
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun FooterBranding() {

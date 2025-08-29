@@ -297,60 +297,7 @@ private fun LoginContent(
             isError = uiState.errorMessage != null && uiState.password.isBlank()
         )
 
-        // Financial Year Dropdown (last 5 years + explicit 2026-27)
-        val context = LocalContext.current
-        var expanded by remember { mutableStateOf(false) }
-        val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
-        // Build financial years like 2024-25, 2023-24 etc.
-        val dynamicYears = (0 until 5).map { offset ->
-            val start = currentYear - offset - 1
-            val end = (start + 1) % 100
-            String.format("%d-%02d", start, end)
-        }
-        val years = remember { (dynamicYears + listOf("2025-26")).distinct() }
-        var selectedYear by remember {
-            mutableStateOf(com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: years.first())
-        }
-        // Persist initial selection if nothing saved
-        LaunchedEffect(Unit) {
-            if (com.example.jiva.utils.UserEnv.getFinancialYear(context).isNullOrBlank()) {
-                com.example.jiva.utils.UserEnv.setFinancialYear(context, selectedYear)
-            }
-        }
 
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = !expanded },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 24.dp)
-        ) {
-            OutlinedTextField(
-                readOnly = true,
-                value = selectedYear,
-                onValueChange = {},
-                label = { Text("Select Year") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                modifier = Modifier
-                    .menuAnchor()
-                    .fillMaxWidth()
-            )
-            ExposedDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
-            ) {
-                years.forEach { option ->
-                    DropdownMenuItem(
-                        text = { Text(option) },
-                        onClick = {
-                            selectedYear = option
-                            com.example.jiva.utils.UserEnv.setFinancialYear(context, option)
-                            expanded = false
-                        }
-                    )
-                }
-            }
-        }
 
         // Rate limiting warning
         if (uiState.isRateLimited) {
