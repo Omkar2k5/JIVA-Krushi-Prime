@@ -12,6 +12,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import com.example.jiva.components.ReportLoading
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
@@ -214,33 +215,17 @@ fun ExpiryReportScreen(onBackClick: () -> Unit = {}) {
         } else 0.0
     }
 
-    // Show loading screen if still loading
+    // Unified loading screen (matches Outstanding)
     if (isScreenLoading) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                CircularProgressIndicator(
-                    progress = { dataLoadingProgress / 100f },
-                    color = JivaColors.Purple,
-                    modifier = Modifier.size(60.dp)
-                )
-                Text(
-                    text = loadingMessage,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = JivaColors.DeepBlue
-                )
-                Text(
-                    text = "${loadingProgress}% Complete",
-                    fontSize = 14.sp,
-                    color = JivaColors.DarkGray
-                )
-            }
+            ReportLoading(
+                title = "Loading Expiry Report...",
+                message = loadingMessage,
+                progressPercent = loadingProgress
+            )
         }
         return
     }

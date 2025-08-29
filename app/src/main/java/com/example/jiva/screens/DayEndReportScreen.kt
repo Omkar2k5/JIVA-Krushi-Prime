@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import com.example.jiva.components.ReportLoading
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -111,14 +112,18 @@ fun DayEndReportScreenImpl(onBackClick: () -> Unit = {}) {
 
     // Main content with loading state
     if (uiState.isLoading) {
-        // Loading state
+        // Unified loading screen (matches Outstanding)
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(JivaColors.LightGray),
             contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator(color = JivaColors.DeepBlue)
+            ReportLoading(
+                title = "Loading Day End Report...",
+                message = "Please wait while we prepare your data",
+                progressPercent = null
+            )
         }
     } else {
         Column(

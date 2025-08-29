@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import com.example.jiva.components.ReportLoading
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
@@ -306,35 +307,17 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
             }
         )
 
-        // High-performance loading screen with progress
+        // Unified loading screen (matches Outstanding)
         if (isScreenLoading) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    CircularProgressIndicator(
-                        progress = { dataLoadingProgress / 100f },
-                        modifier = Modifier.size(64.dp),
-                        color = JivaColors.DeepBlue,
-                        strokeWidth = 6.dp
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Text(
-                        text = loadingMessage,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = JivaColors.DeepBlue
-                    )
-                    Text(
-                        text = "${loadingProgress}% Complete",
-                        fontSize = 10.sp,
-                        color = JivaColors.DarkGray
-                    )
-                }
+                ReportLoading(
+                    title = "Loading Stock Report...",
+                    message = loadingMessage,
+                    progressPercent = loadingProgress
+                )
             }
         } else if (allEntries.isEmpty()) {
             // Empty state
