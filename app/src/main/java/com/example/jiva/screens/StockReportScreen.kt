@@ -104,9 +104,6 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
     var companySearch by remember { mutableStateOf("") }
     var isStockDropdownExpanded by remember { mutableStateOf(false) }
 
-    // PDF generation state
-    var isPdfGenerating by remember { mutableStateOf(false) }
-
     // Get current year and user ID
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
 
@@ -145,19 +142,19 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
         try {
             stockEntities.map { entity ->
                 StockEntry(
-                    itemId = entity.itemId ?: "",
-                    itemName = entity.itemName ?: "",
-                    opening = entity.opening ?: "0.000",
-                    inWard = entity.inWard ?: "0.000",
-                    outWard = entity.outWard ?: "0.000",
-                    closingStock = entity.closingStock ?: "0.000",
-                    avgRate = entity.avgRate ?: "0.00",
-                    valuation = entity.valuation ?: "0.00",
-                    itemType = entity.itemType ?: "",
-                    company = entity.company ?: "",
-                    cgst = entity.cgst ?: "0.00",
-                    sgst = entity.sgst ?: "0.00",
-                    igst = entity.igst ?: "0.00"
+                    itemId = entity.itemId,
+                    itemName = entity.itemName,
+                    opening = entity.opening,
+                    inWard = entity.inWard,
+                    outWard = entity.outWard,
+                    closingStock = entity.closingStock,
+                    avgRate = entity.avgRate,
+                    valuation = entity.valuation,
+                    itemType = entity.itemType,
+                    company = entity.company,
+                    cgst = entity.cgst,
+                    sgst = entity.sgst,
+                    igst = entity.igst
                 )
             }
         } catch (e: Exception) {

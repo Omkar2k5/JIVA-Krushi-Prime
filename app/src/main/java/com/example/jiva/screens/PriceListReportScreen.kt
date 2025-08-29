@@ -79,7 +79,6 @@ fun PriceListReportScreen(onBackClick: () -> Unit = {}) {
     var rateTypeFilter by remember { mutableStateOf("All Rates") }
     var isSortByDropdownExpanded by remember { mutableStateOf(false) }
     var isPriceRangeDropdownExpanded by remember { mutableStateOf(false) }
-    var isRateTypeDropdownExpanded by remember { mutableStateOf(false) }
 
     // Get current year and user ID
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"

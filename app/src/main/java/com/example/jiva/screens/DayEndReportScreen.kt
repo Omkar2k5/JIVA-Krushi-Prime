@@ -162,7 +162,7 @@ fun DayEndReportScreenImpl(onBackClick: () -> Unit = {}) {
                             )
                     ) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                            imageVector = Icons.Filled.ArrowBack,
                             contentDescription = "Back",
                             tint = JivaColors.White
                         )

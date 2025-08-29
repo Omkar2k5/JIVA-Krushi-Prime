@@ -45,7 +45,7 @@ fun ReportLoading(
         )
         if (progressPercent != null) {
             LinearProgressIndicator(
-                progress = progressPercent / 100f,
+                progress = { progressPercent / 100f },
                 modifier = Modifier.fillMaxWidth(),
                 color = JivaColors.DeepBlue,
                 trackColor = JivaColors.LightGray

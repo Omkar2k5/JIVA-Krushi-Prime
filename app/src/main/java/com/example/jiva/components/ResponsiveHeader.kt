@@ -110,7 +110,7 @@ private fun CompactHeaderLayout(
                     )
             ) {
                 Icon(
-                    imageVector = Icons.Default.ArrowBack,
+                    imageVector = Icons.Filled.ArrowBack,
                     contentDescription = "Back",
                     tint = JivaColors.White
                 )
@@ -179,7 +179,7 @@ private fun StandardHeaderLayout(
                     )
             ) {
                 Icon(
-                    imageVector = Icons.Default.ArrowBack,
+                    imageVector = Icons.Filled.ArrowBack,
                     contentDescription = "Back",
                     tint = JivaColors.White
                 )

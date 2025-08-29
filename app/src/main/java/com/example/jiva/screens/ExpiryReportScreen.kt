@@ -80,7 +80,6 @@ fun ExpiryReportScreen(onBackClick: () -> Unit = {}) {
     var daysLeftFilter by remember { mutableStateOf("All") }
     var isItemTypeDropdownExpanded by remember { mutableStateOf(false) }
     var isExpiryStatusDropdownExpanded by remember { mutableStateOf(false) }
-    var isDaysLeftDropdownExpanded by remember { mutableStateOf(false) }
 
     // Get current year and user ID
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
@@ -209,11 +208,12 @@ fun ExpiryReportScreen(onBackClick: () -> Unit = {}) {
     val totalQty = remember(filteredEntries) {
         filteredEntries.sumOf { it.qty.toDoubleOrNull() ?: 0.0 }
     }
-    val avgDaysLeft = remember(filteredEntries) {
-        if (filteredEntries.isNotEmpty()) {
-            filteredEntries.mapNotNull { it.daysLeft.toIntOrNull() }.average()
-        } else 0.0
-    }
+    // Average days left can be computed on demand in future if needed to avoid unused state
+    // val avgDaysLeft = remember(filteredEntries) {
+    //     if (filteredEntries.isNotEmpty()) {
+    //         filteredEntries.mapNotNull { it.daysLeft.toIntOrNull() }.average()
+    //     } else 0.0
+    // }
 
     // Unified loading screen (matches Outstanding)
     if (isScreenLoading) {

@@ -131,14 +131,14 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                     } ?: "",
                     refNo = entity.refNo ?: "",
                     acId = entity.acId?.toString() ?: "",
-                    dr = entity.dr?.toString() ?: "0.00",
-                    cr = entity.cr?.toString() ?: "0.00",
+                    dr = entity.dr.toString(),
+                    cr = entity.cr.toString(),
                     narration = entity.narration ?: "",
-                    isClere = if (entity.isClere == true) "True" else "False",
+                    isClere = if (entity.isClere) "True" else "False",
                     trascType = entity.trascType ?: "",
-                    gstRate = entity.gstRate?.toString() ?: "0.00",
-                    amt = entity.amt?.toString() ?: "0.00",
-                    igst = entity.igst?.toString() ?: "0.00"
+                    gstRate = entity.gstRate.toString(),
+                    amt = entity.amt.toString(),
+                    igst = entity.igst.toString()
                 )
             }
         } catch (e: Exception) {

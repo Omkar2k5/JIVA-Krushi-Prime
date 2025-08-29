@@ -81,8 +81,6 @@ fun SalePurchaseReportScreen(onBackClick: () -> Unit = {}) {
     var partyNameSearch by remember { mutableStateOf("") }
     var itemNameSearch by remember { mutableStateOf("") }
     var categoryFilter by remember { mutableStateOf("All Categories") }
-    var dateFromSearch by remember { mutableStateOf("") }
-    var dateToSearch by remember { mutableStateOf("") }
     var isTransactionTypeDropdownExpanded by remember { mutableStateOf(false) }
     var isCategoryDropdownExpanded by remember { mutableStateOf(false) }
 
@@ -140,21 +138,19 @@ fun SalePurchaseReportScreen(onBackClick: () -> Unit = {}) {
         try {
             salePurchaseEntities.map { entity ->
                 SalePurchaseEntry(
-                    trDate = entity.trDate?.let { 
-                        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it) 
-                    } ?: "",
-                    partyName = entity.partyName ?: "",
+                    trDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(entity.trDate),
+                    partyName = entity.partyName,
                     gstin = entity.gstin ?: "",
-                    trType = entity.trType ?: "",
+                    trType = entity.trType,
                     refNo = entity.refNo ?: "",
-                    itemName = entity.itemName ?: "",
+                    itemName = entity.itemName,
                     hsn = entity.hsn ?: "",
                     category = entity.category ?: "",
-                    qty = entity.qty?.toString() ?: "0",
+                    qty = entity.qty.toString(),
                     unit = entity.unit ?: "",
-                    rate = entity.rate?.toString() ?: "0.00",
-                    amount = entity.amount?.toString() ?: "0.00",
-                    discount = entity.discount?.toString() ?: "0.00"
+                    rate = entity.rate.toString(),
+                    amount = entity.amount.toString(),
+                    discount = entity.discount.toString()
                 )
             }
         } catch (e: Exception) {
