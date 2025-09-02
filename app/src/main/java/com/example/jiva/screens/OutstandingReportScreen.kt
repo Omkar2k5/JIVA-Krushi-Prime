@@ -71,23 +71,17 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     
-    // Get the application instance to access the repository
-    val application = context.applicationContext as JivaApplication
-    
-    // Create the ViewModel with the repository
+    // Create the ViewModel with a safe database instance (no Application cast)
+    val db = com.example.jiva.data.database.JivaDatabase.getDatabase(context.applicationContext)
     val viewModel: OutstandingReportViewModel = viewModel(
-        factory = OutstandingReportViewModel.Factory(application.database)
+        factory = OutstandingReportViewModel.Factory(db)
     )
     
     // Observe UI state
     val uiState by viewModel.uiState.collectAsState()
 
-    // High-performance loading states
-    var isScreenLoading by remember { mutableStateOf(true) }
+    // Loading states simplified
     var isRefreshing by remember { mutableStateOf(false) }
-    var loadingProgress by remember { mutableStateOf(0) }
-    var loadingMessage by remember { mutableStateOf("") }
-    var dataLoadingProgress by remember { mutableStateOf(0f) }
 
     // State management
     var outstandingOf by remember { mutableStateOf("Customer") }
@@ -111,68 +105,62 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
     val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
-    // Handle initial screen loading with progress tracking
-    LaunchedEffect(Unit) {
-        isScreenLoading = true
-        loadingMessage = "Initializing Outstanding data..."
-
-        // Simulate progressive loading for better UX
-        for (i in 0..100 step 10) {
-            loadingProgress = i
-            dataLoadingProgress = i.toFloat()
-            loadingMessage = when {
-                i < 30 -> "Loading Outstanding data..."
-                i < 70 -> "Processing ${i}% complete..."
-                i < 100 -> "Finalizing data..."
-                else -> "Complete!"
-            }
-            kotlinx.coroutines.delay(50) // Smooth progress animation
-        }
-
-        isScreenLoading = false
-    }
-
-    // Note: Data loading is now handled automatically by AppDataLoader at app startup
-    // No manual loading needed here - data is already available
-
-    // Re-read userId after potential initialization
+    // Re-read userId
     val finalUserId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
-    // Note: Removed automatic API call on screen load for better performance
-    // Data will be loaded from Room DB only, API calls only on manual refresh
+    // Preload dropdowns (Account_Names) before user interaction
+    LaunchedEffect(finalUserId, year) {
+        val uid = finalUserId ?: return@LaunchedEffect
+        viewModel.loadAccountNames(uid, year)
+    }
 
-    // Optimized data loading - only from Room DB for better performance
-    val outstandingEntities by viewModel.observeOutstanding(year).collectAsState(initial = emptyList())
+    // Collect dropdowns and UI state
+    val accountNames by viewModel.accountNames.collectAsState()
+    val areaOptions by viewModel.areaOptions.collectAsState()
 
-    // Use only Outstanding DB data for better performance and stability
-    val allEntries = remember(outstandingEntities) {
-        try {
-            outstandingEntities.map {
-                OutstandingEntry(
-                    acId = it.acId,
-                    accountName = it.accountName,
-                    mobile = it.mobile,
-                    under = it.under,
-                    balance = it.balance,
-                    lastDate = it.lastDate,
-                    days = it.days,
-                    creditLimitAmount = it.creditLimitAmount,
-                    creditLimitDays = it.creditLimitDays
-                )
-            }
-        } catch (e: Exception) {
-            timber.log.Timber.e(e, "Error mapping outstanding entities")
-            emptyList()
+    // Remote filtered entries from UI state (no Room)
+    val filteredEntries = uiState.outstandingEntries
+
+    // Local filters state
+    var hasClickedShow by remember { mutableStateOf(false) }
+    var accountInputText by remember { mutableStateOf("") }
+    var accountDropdownExpanded by remember { mutableStateOf(false) }
+    val accountSuggestions = remember(accountInputText, accountNames) {
+        accountNames.filter { it.contains(accountInputText, ignoreCase = true) }.take(20)
+    }
+    var selectedAccount by remember { mutableStateOf<String?>(null) }
+    var selectedArea by remember { mutableStateOf<String?>(null) }
+    var selectedUnder by remember { mutableStateOf<String?>(null) }
+
+    // Show button action
+    fun applyFilters() {
+        val uid = finalUserId ?: return
+        hasClickedShow = true
+        val chosenAccount = selectedAccount ?: accountInputText.takeIf { it.isNotBlank() }
+        viewModel.fetchOutstandingFiltered(
+            userId = uid,
+            year = year,
+            accountName = chosenAccount,
+            area = selectedArea,
+            under = selectedUnder
+        )
+    }
+
+    // Optimized data loading - legacy Room path removed for remote-filter mode
+    // Keep mobile search within fetched results
+    val filteredEntriesAfterSearch = remember(mobileNumberSearch, filteredEntries) {
+        if (mobileNumberSearch.isBlank()) filteredEntries else filteredEntries.filter {
+            it.mobile.contains(mobileNumberSearch, ignoreCase = true)
         }
     }
 
     // Optimized filtering with error handling
-    val filteredEntries = remember(partyNameSearch, mobileNumberSearch, allEntries) {
+    val finalEntries = remember(partyNameSearch, filteredEntriesAfterSearch) {
         try {
-            if (allEntries.isEmpty()) {
+            if (filteredEntriesAfterSearch.isEmpty()) {
                 emptyList()
             } else {
-                allEntries.filter { entry ->
+                filteredEntriesAfterSearch.filter { entry ->
                     try {
                         val nameMatch = if (partyNameSearch.isBlank()) true else
                             entry.accountName.contains(partyNameSearch, ignoreCase = true)
@@ -232,93 +220,25 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
             .fillMaxSize()
             .background(JivaColors.LightGray)
     ) {
-        // Responsive Header with Refresh Button
+        // Header without refresh action
         ResponsiveReportHeader(
             title = "Outstanding Report",
             subtitle = "Manage outstanding payments and dues",
             onBackClick = onBackClick,
-            actions = {
-                IconButton(
-                    onClick = {
-                        if (finalUserId != null) {
-                            isRefreshing = true
-                            scope.launch {
-                                viewModel.refreshOutstandingData(finalUserId, year, context)
-                                kotlinx.coroutines.delay(1000) // Show loading for at least 1 second
-                                isRefreshing = false
-                            }
-                        }
-                    },
-                    enabled = finalUserId != null && !isRefreshing,
-                    modifier = Modifier
-                        .background(
-                            JivaColors.White.copy(alpha = 0.2f),
-                            RoundedCornerShape(8.dp)
-                        )
-                ) {
-                    if (isRefreshing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = JivaColors.White,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh Outstanding Data",
-                            tint = JivaColors.White
-                        )
-                    }
-                }
-            }
+            actions = { }
         )
 
-        // High-performance loading screen with progress
-        if (isScreenLoading || allEntries.isEmpty()) {
+        // Simplified loading state: only show while initial dropdowns or fetches are in progress
+        if (uiState.isLoading) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.padding(32.dp)
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(48.dp),
-                        color = JivaColors.DeepBlue,
-                        strokeWidth = 4.dp
-                    )
-
-                    Text(
-                        text = "Loading Outstanding Report...",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = JivaColors.DeepBlue
-                    )
-
-                    if (loadingProgress > 0) {
-                        LinearProgressIndicator(
-                            progress = dataLoadingProgress / 100f,
-                            modifier = Modifier.fillMaxWidth(),
-                            color = JivaColors.DeepBlue,
-                            trackColor = JivaColors.LightGray
-                        )
-
-                        Text(
-                            text = loadingMessage,
-                            fontSize = 12.sp,
-                            color = JivaColors.DarkGray,
-                            textAlign = TextAlign.Center
-                        )
-
-                        Text(
-                            text = "${loadingProgress}% Complete",
-                            fontSize = 10.sp,
-                            color = JivaColors.DarkGray
-                        )
-                    }
-                }
+                CircularProgressIndicator(
+                    modifier = Modifier.size(48.dp),
+                    color = JivaColors.DeepBlue,
+                    strokeWidth = 4.dp
+                )
             }
         } else {
             // Main content with performance optimizations
@@ -344,21 +264,160 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
 
                         // Removed Interest Calculation Section as per new requirements
 
-                        // Search and Filter Section
-                        Row(
+                        // Compact initial layout: only Account + Show until data is fetched
+                        Column(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.Bottom
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            // Party Name Search
-                            Column(modifier = Modifier.weight(1f)) {
+                            // Account autocomplete (type to search + dropdown)
+                            Column(modifier = Modifier.fillMaxWidth()) {
                                 Text(
-                                    text = "Party Name",
+                                    text = "Account Name",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = JivaColors.DeepBlue,
                                     modifier = Modifier.padding(bottom = 4.dp)
                                 )
+                                ExposedDropdownMenuBox(
+                                    expanded = accountDropdownExpanded,
+                                    onExpandedChange = { accountDropdownExpanded = !accountDropdownExpanded }
+                                ) {
+                                    OutlinedTextField(
+                                        value = accountInputText,
+                                        onValueChange = { accountInputText = it; accountDropdownExpanded = true },
+                                        placeholder = { Text("Type to search account...") },
+                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = accountDropdownExpanded) },
+                                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    ExposedDropdownMenu(
+                                        expanded = accountDropdownExpanded,
+                                        onDismissRequest = { accountDropdownExpanded = false }
+                                    ) {
+                                        accountSuggestions.forEach { name ->
+                                            DropdownMenuItem(
+                                                text = { Text(name) },
+                                                onClick = {
+                                                    selectedAccount = name
+                                                    accountInputText = name
+                                                    accountDropdownExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Show button
+                            Button(
+                                onClick = { applyFilters() },
+                                enabled = (accountInputText.isNotBlank() || selectedAccount != null),
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = JivaColors.DeepBlue)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Visibility,
+                                    contentDescription = "Show",
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Show")
+                            }
+
+                            // Inline loader shown only after Show is clicked and while fetching
+                            if (hasClickedShow && uiState.isLoading) {
+                                LinearProgressIndicator(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = JivaColors.DeepBlue,
+                                    trackColor = JivaColors.LightGray
+                                )
+                            }
+
+                            // After data fetched, show the remaining filters and content
+                            if (!uiState.isLoading && filteredEntries.isNotEmpty()) {
+                                // Secondary filters
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Area dropdown
+                                var areaExpanded by remember { mutableStateOf(false) }
+                                Text(
+                                    text = "Area",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = JivaColors.DeepBlue,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                                ExposedDropdownMenuBox(
+                                    expanded = areaExpanded,
+                                    onExpandedChange = { areaExpanded = !areaExpanded }
+                                ) {
+                                    OutlinedTextField(
+                                        value = selectedArea ?: "",
+                                        onValueChange = {},
+                                        readOnly = true,
+                                        placeholder = { Text("Select Area...") },
+                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = areaExpanded) },
+                                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    ExposedDropdownMenu(
+                                        expanded = areaExpanded,
+                                        onDismissRequest = { areaExpanded = false }
+                                    ) {
+                                        areaOptions.forEach { area ->
+                                            DropdownMenuItem(
+                                                text = { Text(area) },
+                                                onClick = {
+                                                    selectedArea = area
+                                                    areaExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Under dropdown
+                                var underExpanded by remember { mutableStateOf(false) }
+                                val underOptions = listOf("Sundary Debtors", "Sundary Creditors")
+                                Text(
+                                    text = "Under",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = JivaColors.DeepBlue,
+                                    modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
+                                )
+                                ExposedDropdownMenuBox(
+                                    expanded = underExpanded,
+                                    onExpandedChange = { underExpanded = !underExpanded }
+                                ) {
+                                    OutlinedTextField(
+                                        value = selectedUnder ?: "",
+                                        onValueChange = {},
+                                        readOnly = true,
+                                        placeholder = { Text("Select Under...") },
+                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = underExpanded) },
+                                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    ExposedDropdownMenu(
+                                        expanded = underExpanded,
+                                        onDismissRequest = { underExpanded = false }
+                                    ) {
+                                        underOptions.forEach { u ->
+                                            DropdownMenuItem(
+                                                text = { Text(u) },
+                                                onClick = {
+                                                    selectedUnder = u
+                                                    underExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Extra text filters (optional)
+                                Spacer(modifier = Modifier.height(8.dp))
                                 OutlinedTextField(
                                     value = partyNameSearch,
                                     onValueChange = { partyNameSearch = it },
@@ -378,17 +437,6 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                     ),
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(8.dp)
-                                )
-                            }
-
-                            // Mobile Number search
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Mobile Number",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
                                 )
                                 OutlinedTextField(
                                     value = mobileNumberSearch,
@@ -411,49 +459,6 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(8.dp)
                                 )
-                            }
-                        }
-
-                        // Filter Actions
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            // Clear Filters Button
-                            OutlinedButton(
-                                onClick = {
-                                    partyNameSearch = ""
-                                    mobileNumberSearch = ""
-                                },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Clear,
-                                    contentDescription = "Clear Filters",
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Clear Filters")
-                            }
-
-                            // Apply Filters Button (for future use)
-                            Button(
-                                onClick = {
-                                    // Filters are applied automatically through remember
-                                    // This button can be used for additional filter actions if needed
-                                },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = JivaColors.DeepBlue)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = "Apply Filters",
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Apply Filters")
                             }
                         }
 

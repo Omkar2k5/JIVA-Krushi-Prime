@@ -23,44 +23,77 @@ class OutstandingReportViewModel(
     
     // Create repository instance
     private val repository: JivaRepository = JivaRepositoryImpl(database)
+
+    // Network data source for new endpoints
+    private val remote = com.example.jiva.data.network.RemoteDataSource()
     
     private val _uiState = MutableStateFlow(OutstandingReportUiState())
     val uiState: StateFlow<OutstandingReportUiState> = _uiState.asStateFlow()
-    
-    // Removed automatic data loading from init for better performance
-    // Data will be loaded from Room DB only, API calls only on manual refresh
+
+    // Account names and area options for dropdowns
+    private val _accountNames = MutableStateFlow<List<String>>(emptyList())
+    val accountNames: StateFlow<List<String>> = _accountNames.asStateFlow()
+
+    private val _areaOptions = MutableStateFlow<List<String>>(emptyList())
+    val areaOptions: StateFlow<List<String>> = _areaOptions.asStateFlow()
 
     // Observe Outstanding table directly (fast for large datasets)
     fun observeOutstanding(year: String): Flow<List<com.example.jiva.data.database.entities.OutstandingEntity>> {
         return repository.getOutstandingFlow(year)
     }
 
-    // Refresh Outstanding data - API call → Permanent Storage
-    fun refreshOutstandingData(userId: Int, year: String, context: android.content.Context) {
+    // Load account names and areas
+    fun loadAccountNames(userId: Int, year: String) {
         viewModelScope.launch {
             try {
-                Timber.d("🔄 Starting Outstanding refresh for userId: $userId, year: $year")
                 _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-
-                // Use ApiDataManager to handle API → Permanent Storage
-                val result = com.example.jiva.utils.ApiDataManager.refreshOutstandingData(
-                    context = context,
-                    repository = repository,
-                    database = database,
-                    userId = userId,
-                    year = year
-                )
-
-                if (result.isSuccess) {
-                    Timber.d("✅ Outstanding refresh completed successfully")
-                    _uiState.value = _uiState.value.copy(isLoading = false, error = null)
+                val res = remote.getAccountNames(userId, year)
+                if (res.isSuccess) {
+                    val data = res.getOrNull()?.data.orEmpty()
+                    _accountNames.value = data.map { it.accountName }.distinct().sorted()
+                    _areaOptions.value = data.mapNotNull { it.area?.takeIf { a -> a.isNotBlank() } }.distinct().sorted()
+                    _uiState.value = _uiState.value.copy(isLoading = false)
                 } else {
-                    val errorMsg = result.exceptionOrNull()?.message ?: "Outstanding refresh failed"
-                    Timber.e("❌ Outstanding refresh failed: $errorMsg")
-                    _uiState.value = _uiState.value.copy(isLoading = false, error = errorMsg)
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = res.exceptionOrNull()?.message)
                 }
             } catch (e: Exception) {
-                Timber.e(e, "❌ Outstanding refresh failed with exception")
+                Timber.e(e, "Failed to load account names")
+                _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
+            }
+        }
+    }
+
+    // Fetch filtered Outstanding entries (no Room write, UI only)
+    fun fetchOutstandingFiltered(userId: Int, year: String, accountName: String?, area: String?, under: String?) {
+        viewModelScope.launch {
+            try {
+                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+                val filters = mutableMapOf<String, String>()
+                if (!accountName.isNullOrBlank()) filters["account_Name"] = accountName
+                if (!area.isNullOrBlank()) filters["area"] = area
+                if (!under.isNullOrBlank()) filters["under"] = under
+
+                val res = remote.getOutstanding(userId, year, if (filters.isEmpty()) null else filters)
+                if (res.isSuccess) {
+                    val entries = res.getOrNull()?.data.orEmpty().map {
+                        OutstandingEntry(
+                            acId = it.acId,
+                            accountName = it.accountName,
+                            mobile = it.mobile,
+                            under = it.under,
+                            balance = it.balance,
+                            lastDate = it.lastDate,
+                            days = it.days,
+                            creditLimitAmount = it.creditLimitAmount,
+                            creditLimitDays = it.creditLimitDays
+                        )
+                    }
+                    _uiState.value = _uiState.value.copy(outstandingEntries = entries, isLoading = false)
+                } else {
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = res.exceptionOrNull()?.message)
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to fetch filtered outstanding")
                 _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
             }
         }

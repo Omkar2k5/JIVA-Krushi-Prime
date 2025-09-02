@@ -17,7 +17,7 @@ import timber.log.Timber
 object ApiDataManager {
     
     /**
-     * Refresh Outstanding data - API → Permanent Storage
+     * Refresh Outstanding data - API → Room only (permanent storage removed)
      */
     suspend fun refreshOutstandingData(
         context: Context,
@@ -28,24 +28,14 @@ object ApiDataManager {
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
             Timber.d("🔄 Starting Outstanding API refresh for userId: $userId, year: $year")
-            
-            // 1. Call API
+
+            // Call API to sync Outstanding directly into Room
             val apiResult = repository.syncOutstanding(userId, year)
-            
+
             if (apiResult.isSuccess) {
-                // 2. Get data from Room DB (API stores data here first)
-                val dbData = database.outstandingDao().getAllSync(year)
-                
-                // 3. Store in Permanent Storage
-                val saveSuccess = PermanentStorageManager.saveOutstandingData(context, dbData, year)
-                
-                if (saveSuccess) {
-                    Timber.d("✅ Outstanding data refreshed successfully: ${dbData.size} entries")
-                    Result.success("Outstanding data refreshed: ${dbData.size} entries")
-                } else {
-                    Timber.e("❌ Failed to save Outstanding data to permanent storage")
-                    Result.failure(Exception("Failed to save to permanent storage"))
-                }
+                val count = database.outstandingDao().count(year)
+                Timber.d("✅ Outstanding data synced to Room: ${count} entries")
+                Result.success("Outstanding data synced: ${count} entries")
             } else {
                 val error = apiResult.exceptionOrNull()?.message ?: "API call failed"
                 Timber.e("❌ Outstanding API call failed: $error")

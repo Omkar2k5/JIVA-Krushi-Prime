@@ -229,4 +229,56 @@ object PermanentStorageManager {
             false
         }
     }
+
+    /**
+     * Delete ALL Outstanding permanent storage files across all years
+     */
+    suspend fun deleteAllOutstandingPermanentData(context: Context): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val filesDir = context.filesDir
+            val dataFiles = filesDir.listFiles { _, name ->
+                name.endsWith("_outstanding_permanent.json")
+            }
+
+            var deletedCount = 0
+            dataFiles?.forEach { file ->
+                if (file.delete()) {
+                    deletedCount++
+                    Timber.d("🗑️ Deleted Outstanding permanent file: ${file.name}")
+                }
+            }
+
+            Timber.d("✅ Deleted $deletedCount Outstanding permanent files")
+            true
+        } catch (e: Exception) {
+            Timber.e(e, "❌ Failed to delete Outstanding permanent files")
+            false
+        }
+    }
+
+    /**
+     * Delete ALL Ledger permanent storage files across all years
+     */
+    suspend fun deleteAllLedgerPermanentData(context: Context): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val filesDir = context.filesDir
+            val dataFiles = filesDir.listFiles { _, name ->
+                name.endsWith("_ledger_permanent.json")
+            }
+
+            var deletedCount = 0
+            dataFiles?.forEach { file ->
+                if (file.delete()) {
+                    deletedCount++
+                    Timber.d("🗑️ Deleted Ledger permanent file: ${file.name}")
+                }
+            }
+
+            Timber.d("✅ Deleted $deletedCount Ledger permanent files")
+            true
+        } catch (e: Exception) {
+            Timber.e(e, "❌ Failed to delete Ledger permanent files")
+            false
+        }
+    }
 }

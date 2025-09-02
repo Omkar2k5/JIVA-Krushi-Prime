@@ -131,6 +131,13 @@ interface JivaApiService {
     suspend fun getOutstanding(@Body request: OutstandingRequest): OutstandingResponse
 
     /**
+     * POST /api/JivaBusiness/Account_Names
+     */
+    @Headers("Content-Type: application/json")
+    @POST("api/JivaBusiness/Account_Names")
+    suspend fun getAccountNames(@Body request: com.example.jiva.data.api.models.AccountNamesRequest): com.example.jiva.data.api.models.AccountNamesResponse
+
+    /**
      * POST /api/JivaBusiness/Stock
      */
     @Headers("Content-Type: application/json")

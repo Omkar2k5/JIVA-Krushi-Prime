@@ -2,11 +2,12 @@ package com.example.jiva.data.api.models
 
 import com.google.gson.annotations.SerializedName
 
-// Request model for Outstanding API
+// Request model for Outstanding API with optional filters
 
 data class OutstandingRequest(
     @SerializedName("userID") val userID: Int,
-    @SerializedName("yearString") val yearString: String
+    @SerializedName("yearString") val yearString: String,
+    @SerializedName("filters") val filters: Map<String, String>? = null
 )
 
 // Response wrapper
@@ -31,4 +32,24 @@ data class OutstandingData(
     @SerializedName("credit_Limit_Amount") val creditLimitAmount: String,
     @SerializedName("credit_Limit_Days") val creditLimitDays: String,
     @SerializedName("yearString") val yearString: String
+)
+
+// Account Names API models
+
+data class AccountNamesRequest(
+    @SerializedName("userID") val userID: Int,
+    @SerializedName("yearString") val yearString: String
+)
+
+data class AccountNamesResponse(
+    @SerializedName("isSuccess") val isSuccess: Boolean,
+    @SerializedName("message") val message: String?,
+    @SerializedName("data") val data: List<AccountNameItem>?
+)
+
+data class AccountNameItem(
+    @SerializedName("account_Name") val accountName: String,
+    // Optional fields if API returns them; safe defaults
+    @SerializedName("area") val area: String? = null,
+    @SerializedName("under") val under: String? = null
 )

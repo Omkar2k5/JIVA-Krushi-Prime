@@ -98,10 +98,10 @@ class RemoteDataSource {
     }
     
     /** Outstanding API */
-    suspend fun getOutstanding(userId: Int, yearString: String): Result<com.example.jiva.data.api.models.OutstandingResponse> {
+    suspend fun getOutstanding(userId: Int, yearString: String, filters: Map<String, String>? = null): Result<com.example.jiva.data.api.models.OutstandingResponse> {
         return try {
-            Timber.d("Making Outstanding API call with userId: $userId, yearString: $yearString")
-            val request = com.example.jiva.data.api.models.OutstandingRequest(userID = userId, yearString = yearString)
+            Timber.d("Making Outstanding API call with userId: $userId, yearString: $yearString, filters: $filters")
+            val request = com.example.jiva.data.api.models.OutstandingRequest(userID = userId, yearString = yearString, filters = filters)
             Timber.d("Request body: $request")
 
             val response = apiService.getOutstanding(request)
@@ -110,6 +110,20 @@ class RemoteDataSource {
             Result.success(response)
         } catch (e: Exception) {
             Timber.e(e, "Outstanding API call failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    /** Account Names API */
+    suspend fun getAccountNames(userId: Int, yearString: String): Result<com.example.jiva.data.api.models.AccountNamesResponse> {
+        return try {
+            Timber.d("Making Account_Names API call with userId: $userId, yearString: $yearString")
+            val request = com.example.jiva.data.api.models.AccountNamesRequest(userID = userId, yearString = yearString)
+            val response = apiService.getAccountNames(request)
+            Timber.d("Account_Names response: isSuccess=${response.isSuccess}, size=${response.data?.size}")
+            Result.success(response)
+        } catch (e: Exception) {
+            Timber.e(e, "Account_Names API call failed: ${e.message}")
             Result.failure(e)
         }
     }

@@ -27,21 +27,13 @@ object AppDataLoader {
             
             val summary = LoadingSummary()
             
-            // 1. Load Outstanding Data
+            // 1. Load Outstanding Data (permanent storage removed)
             try {
-                val outstandingData = PermanentStorageManager.loadOutstandingData(context, year)
-                if (outstandingData.isNotEmpty()) {
-                    database.outstandingDao().clearYear(year)
-                    database.outstandingDao().insertAll(outstandingData)
-                    summary.loadedScreens.add("Outstanding: ${outstandingData.size} entries")
-                    Timber.d("✅ Outstanding data loaded: ${outstandingData.size} entries")
-                } else {
-                    summary.emptyScreens.add("Outstanding: No data")
-                    Timber.d("📁 Outstanding: No permanent data found")
-                }
+                summary.pendingScreens.add("Outstanding: Loaded via API → Room only")
+                Timber.d("ℹ️ Outstanding permanent storage removed; data will load via API into Room")
             } catch (e: Exception) {
                 summary.errorScreens.add("Outstanding: ${e.message}")
-                Timber.e(e, "❌ Error loading Outstanding data")
+                Timber.e(e, "❌ Error marking Outstanding loading mode")
             }
             
             // 2. Load Stock Data
