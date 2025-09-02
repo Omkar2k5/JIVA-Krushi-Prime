@@ -48,8 +48,12 @@ data class AccountNamesResponse(
 )
 
 data class AccountNameItem(
-    @SerializedName("account_Name") val accountName: String,
-    // Optional fields if API returns them; safe defaults
+    // API may return either 'account_Name' or 'items' for the display name
+    @SerializedName("account_Name") val accountName: String? = null,
+    @SerializedName("items") val items: String? = null,
+    // Also include AC id if provided
+    @SerializedName("aC_ID") val acId: String? = null,
+    // Optional fields if API returns them
     @SerializedName("area") val area: String? = null,
     @SerializedName("under") val under: String? = null
 )

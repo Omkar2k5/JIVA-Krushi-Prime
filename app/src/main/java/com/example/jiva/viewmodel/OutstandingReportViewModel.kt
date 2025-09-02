@@ -50,8 +50,15 @@ class OutstandingReportViewModel(
                 val res = remote.getAccountNames(userId, year)
                 if (res.isSuccess) {
                     val data = res.getOrNull()?.data.orEmpty()
-                    _accountNames.value = data.map { it.accountName }.distinct().sorted()
-                    _areaOptions.value = data.mapNotNull { it.area?.takeIf { a -> a.isNotBlank() } }.distinct().sorted()
+                    // Sanitize possible nulls from API; prefer 'account_Name' then 'items'
+                    _accountNames.value = data
+                        .mapNotNull { (it.accountName ?: it.items)?.takeIf { a -> a.isNotBlank() } }
+                        .distinct()
+                        .sorted()
+                    _areaOptions.value = data
+                        .mapNotNull { it.area?.takeIf { a -> a.isNotBlank() } }
+                        .distinct()
+                        .sorted()
                     _uiState.value = _uiState.value.copy(isLoading = false)
                 } else {
                     _uiState.value = _uiState.value.copy(isLoading = false, error = res.exceptionOrNull()?.message)
@@ -77,15 +84,15 @@ class OutstandingReportViewModel(
                 if (res.isSuccess) {
                     val entries = res.getOrNull()?.data.orEmpty().map {
                         OutstandingEntry(
-                            acId = it.acId,
-                            accountName = it.accountName,
-                            mobile = it.mobile,
-                            under = it.under,
-                            balance = it.balance,
-                            lastDate = it.lastDate,
-                            days = it.days,
-                            creditLimitAmount = it.creditLimitAmount,
-                            creditLimitDays = it.creditLimitDays
+                            acId = it.acId ?: "",
+                            accountName = it.accountName ?: "",
+                            mobile = it.mobile ?: "",
+                            under = it.under ?: "",
+                            balance = it.balance ?: "0",
+                            lastDate = it.lastDate ?: "",
+                            days = it.days ?: "",
+                            creditLimitAmount = it.creditLimitAmount ?: "",
+                            creditLimitDays = it.creditLimitDays ?: ""
                         )
                     }
                     _uiState.value = _uiState.value.copy(outstandingEntries = entries, isLoading = false)

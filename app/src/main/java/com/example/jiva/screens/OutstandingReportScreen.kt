@@ -108,10 +108,36 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
     // Re-read userId
     val finalUserId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
+    // Early guard if session not initialized
+    if (finalUserId == null) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(JivaColors.LightGray),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "User session not initialized. Please login again.",
+                color = JivaColors.Red
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "If you are logged in, please go back and reopen the screen.",
+                color = JivaColors.DarkGray
+            )
+        }
+        return
+    }
+
     // Preload dropdowns (Account_Names) before user interaction
     LaunchedEffect(finalUserId, year) {
         val uid = finalUserId ?: return@LaunchedEffect
-        viewModel.loadAccountNames(uid, year)
+        try {
+            viewModel.loadAccountNames(uid, year)
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "loadAccountNames crashed")
+        }
     }
 
     // Collect dropdowns and UI state
@@ -228,6 +254,21 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
             actions = { }
         )
 
+        // Error state UI
+        if (uiState.error != null) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Failed to load Outstanding data.\n${uiState.error}",
+                    color = JivaColors.Red,
+                    textAlign = TextAlign.Center
+                )
+            }
+            return
+        }
+
         // Simplified loading state: only show while initial dropdowns or fetches are in progress
         if (uiState.isLoading) {
             Box(
@@ -284,8 +325,14 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                 ) {
                                     OutlinedTextField(
                                         value = accountInputText,
-                                        onValueChange = { accountInputText = it; accountDropdownExpanded = true },
+                                        onValueChange = { accountInputText = it; selectedAccount = null; accountDropdownExpanded = true },
                                         placeholder = { Text("Type to search account...") },
+                                        singleLine = true,
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedTextColor = Color.Black,
+                                            unfocusedTextColor = Color.Black,
+                                            cursorColor = JivaColors.DeepBlue
+                                        ),
                                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = accountDropdownExpanded) },
                                         modifier = Modifier.menuAnchor().fillMaxWidth(),
                                         shape = RoundedCornerShape(8.dp)
@@ -314,15 +361,19 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                 enabled = (accountInputText.isNotBlank() || selectedAccount != null),
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = JivaColors.DeepBlue)
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = JivaColors.DeepBlue,
+                                    contentColor = Color.White
+                                )
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Visibility,
                                     contentDescription = "Show",
+                                    tint = Color.White,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Show")
+                                Text("Show", color = Color.White)
                             }
 
                             // Inline loader shown only after Show is clicked and while fetching
@@ -339,43 +390,7 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                 // Secondary filters
                                 Spacer(modifier = Modifier.height(8.dp))
 
-                                // Area dropdown
-                                var areaExpanded by remember { mutableStateOf(false) }
-                                Text(
-                                    text = "Area",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                                ExposedDropdownMenuBox(
-                                    expanded = areaExpanded,
-                                    onExpandedChange = { areaExpanded = !areaExpanded }
-                                ) {
-                                    OutlinedTextField(
-                                        value = selectedArea ?: "",
-                                        onValueChange = {},
-                                        readOnly = true,
-                                        placeholder = { Text("Select Area...") },
-                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = areaExpanded) },
-                                        modifier = Modifier.menuAnchor().fillMaxWidth(),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    ExposedDropdownMenu(
-                                        expanded = areaExpanded,
-                                        onDismissRequest = { areaExpanded = false }
-                                    ) {
-                                        areaOptions.forEach { area ->
-                                            DropdownMenuItem(
-                                                text = { Text(area) },
-                                                onClick = {
-                                                    selectedArea = area
-                                                    areaExpanded = false
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
+                                // Removed Area filter as requested
 
                                 // Under dropdown
                                 var underExpanded by remember { mutableStateOf(false) }
@@ -385,7 +400,7 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
+                                    modifier = Modifier.padding(bottom = 4.dp)
                                 )
                                 ExposedDropdownMenuBox(
                                     expanded = underExpanded,
@@ -438,6 +453,65 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(8.dp)
                                 )
+
+                                // Action buttons row: Search and Remove Filter
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            // Trigger filter apply again
+                                            applyFilters()
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = JivaColors.DeepBlue,
+                                            contentColor = Color.White
+                                        )
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Search,
+                                            contentDescription = "Search",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Search", color = Color.White)
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = {
+                                            // Clear filters
+                                            selectedAccount = null
+                                            selectedUnder = null
+                                            accountInputText = ""
+                                            partyNameSearch = ""
+                                            hasClickedShow = false
+                                            // Re-fetch full data (no filters)
+                                            val uid = finalUserId ?: return@OutlinedButton
+                                            viewModel.fetchOutstandingFiltered(
+                                                userId = uid,
+                                                year = year,
+                                                accountName = null,
+                                                area = null,
+                                                under = null
+                                            )
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Clear,
+                                            contentDescription = "Remove Filter",
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Remove Filter")
+                                    }
+                                }
                                 OutlinedTextField(
                                     value = mobileNumberSearch,
                                     onValueChange = { mobileNumberSearch = it },
@@ -992,8 +1066,8 @@ private suspend fun generateAndSharePDF(
                 pdfDocument.finishPage(page)
             }
 
-            // Save PDF to external storage
-            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            // Save PDF to app-scoped external storage for compatibility with Android 13+
+            val downloadsDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
             val fileName = "Outstanding_Report_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())}.pdf"
             val file = File(downloadsDir, fileName)
 
