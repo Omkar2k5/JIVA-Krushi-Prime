@@ -431,63 +431,7 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                     shape = RoundedCornerShape(8.dp)
                                 )
 
-                                // Action buttons row: Search and Remove Filter
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Button(
-                                        onClick = {
-                                            // Trigger filter apply again
-                                            applyFilters()
-                                        },
-                                        modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(8.dp),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = JivaColors.DeepBlue,
-                                            contentColor = Color.White
-                                        )
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Search,
-                                            contentDescription = "Search",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Search", color = Color.White)
-                                    }
-
-                                    OutlinedButton(
-                                        onClick = {
-                                            // Clear filters
-                                            selectedUnder = null
-                                            partyNameSearch = ""
-                                            mobileNumberSearch = ""
-                                            hasClickedShow = false
-                                            // Re-fetch full data (no filters)
-                                            val uid = finalUserId ?: return@OutlinedButton
-                                            viewModel.fetchOutstandingFiltered(
-                                                userId = uid,
-                                                year = year,
-                                                accountName = null,
-                                                area = null,
-                                                under = null
-                                            )
-                                        },
-                                        modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(8.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Clear,
-                                            contentDescription = "Remove Filter",
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Remove Filter")
-                                    }
-                                }
+                                // Action buttons removed; filtering happens automatically while typing
                             }
                         }
 
