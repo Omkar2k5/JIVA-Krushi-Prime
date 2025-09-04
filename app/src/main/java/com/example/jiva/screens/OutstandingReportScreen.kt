@@ -208,24 +208,24 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
         }
     }
 
-    // Handle select all functionality
-    LaunchedEffect(selectAll, filteredEntries) {
+    // Handle select all functionality based on currently displayed entries
+    LaunchedEffect(selectAll, finalEntries) {
         if (selectAll) {
-            selectedEntries = filteredEntries.map { it.acId }.toSet()
+            selectedEntries = finalEntries.map { it.acId }.toSet()
         } else {
             selectedEntries = emptySet()
         }
     }
 
     // Update selectAll state based on individual selections
-    LaunchedEffect(selectedEntries, filteredEntries) {
-        selectAll = filteredEntries.isNotEmpty() && selectedEntries.containsAll(filteredEntries.map { it.acId })
+    LaunchedEffect(selectedEntries, finalEntries) {
+        selectAll = finalEntries.isNotEmpty() && selectedEntries.containsAll(finalEntries.map { it.acId })
     }
 
-    // Calculate total balance with proper string to number conversion
-    val totalBalance = remember(filteredEntries) {
+    // Calculate total balance from currently displayed entries
+    val totalBalance = remember(finalEntries) {
         try {
-            filteredEntries.sumOf { entry ->
+            finalEntries.sumOf { entry ->
                 try {
                     // Remove currency symbols, commas, and convert to double
                     val cleanBalance = entry.balance
@@ -408,6 +408,31 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
 
                                 // Action buttons row: Search and Remove Filter
                                 Spacer(modifier = Modifier.height(12.dp))
+                                // Mobile filter moved above action buttons
+                                OutlinedTextField(
+                                    value = mobileNumberSearch,
+                                    onValueChange = { mobileNumberSearch = it },
+                                    placeholder = { Text("Search by mobile...") },
+                                    trailingIcon = {
+                                        IconButton(onClick = { mobileNumberSearch = "" }) {
+                                            Icon(
+                                                imageVector = if (mobileNumberSearch.isNotEmpty()) Icons.Default.Clear else Icons.Default.Phone,
+                                                contentDescription = if (mobileNumberSearch.isNotEmpty()) "Clear" else "Mobile"
+                                            )
+                                        }
+                                    },
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = Color.Black,
+                                        unfocusedTextColor = Color.Black,
+                                        cursorColor = JivaColors.DeepBlue
+                                    ),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+
+                                // Action buttons row: Search and Remove Filter
+                                Spacer(modifier = Modifier.height(12.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -463,27 +488,6 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                         Text("Remove Filter")
                                     }
                                 }
-                                OutlinedTextField(
-                                    value = mobileNumberSearch,
-                                    onValueChange = { mobileNumberSearch = it },
-                                    placeholder = { Text("Search by mobile...") },
-                                    trailingIcon = {
-                                        IconButton(onClick = { mobileNumberSearch = "" }) {
-                                            Icon(
-                                                imageVector = if (mobileNumberSearch.isNotEmpty()) Icons.Default.Clear else Icons.Default.Phone,
-                                                contentDescription = if (mobileNumberSearch.isNotEmpty()) "Clear" else "Mobile"
-                                            )
-                                        }
-                                    },
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = Color.Black,
-                                        unfocusedTextColor = Color.Black,
-                                        cursorColor = JivaColors.DeepBlue
-                                    ),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(8.dp)
-                                )
                             }
                         }
 
@@ -685,8 +689,8 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                     OutstandingLoadingRow()
                                 }
                             } else if (filteredEntries.isNotEmpty()) {
-                                // Show all entries (removed 100 limit)
-                                filteredEntries.forEach { entry ->
+                                // Show displayed entries after local search filters
+                                finalEntries.forEach { entry ->
                                     OutstandingTableRow(
                                         entry = entry,
                                         isSelected = selectedEntries.contains(entry.acId),
