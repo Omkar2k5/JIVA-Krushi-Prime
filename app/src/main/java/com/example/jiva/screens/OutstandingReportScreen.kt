@@ -1,60 +1,104 @@
 package com.example.jiva.screens
 
-import androidx.compose.animation.core.*
+import android.content.Context
+import android.content.Intent
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.Typeface
+import android.graphics.pdf.PdfDocument
+import android.os.Environment
+import android.widget.Toast
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.unit.IntSize
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.jiva.JivaApplication
 import com.example.jiva.JivaColors
 import com.example.jiva.components.ResponsiveReportHeader
+import com.example.jiva.utils.UserEnv
 import com.example.jiva.viewmodel.OutstandingReportViewModel
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.graphics.*
-import android.graphics.pdf.PdfDocument
-import android.os.Environment
-import android.widget.Toast
-import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
-import java.util.*
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.RequestBody.Companion.toRequestBody
+import java.util.Date
+import java.util.Locale
 
-// Data model for Outstanding Report entries (all Strings to save space)
+// Data model for Outstanding Report entries (kept as Strings for simplicity)
 data class OutstandingEntry(
     val acId: String,
     val accountName: String,
@@ -72,68 +116,54 @@ data class OutstandingEntry(
 fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    
-    // Create the ViewModel with a safe database instance (no Application cast)
+
+    // ViewModel using database factory
     val db = com.example.jiva.data.database.JivaDatabase.getDatabase(context.applicationContext)
     val viewModel: OutstandingReportViewModel = viewModel(
         factory = OutstandingReportViewModel.Factory(db)
     )
-    
-    // Observe UI state
+
     val uiState by viewModel.uiState.collectAsState()
 
-    // Loading states simplified
-    var isRefreshing by remember { mutableStateOf(false) }
-
-    // State management
+    // UI State
     var outstandingOf by remember { mutableStateOf("Customer") }
-    var viewAll by remember { mutableStateOf(false) }
-    var interestRate by remember { mutableStateOf("0.06") }
     var partyNameSearch by remember { mutableStateOf("") }
     var mobileNumberSearch by remember { mutableStateOf("") }
-    var isOutstandingDropdownExpanded by remember { mutableStateOf(false) }
+    var hasClickedShow by remember { mutableStateOf(false) }
 
-    // WhatsApp messaging state
     var selectedEntries by remember { mutableStateOf(setOf<String>()) }
     var selectAll by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
 
-    // WhatsApp template configuration (loaded from UserEnv -> MsgTemplates)
+    // WhatsApp template config from UserEnv
     val (whatsappTemplate, waInstanceId, waAccessToken) = remember {
         try {
-            val json = com.example.jiva.utils.UserEnv.getMsgTemplatesJson(context)
-            val companyName = com.example.jiva.utils.UserEnv.getCompanyName(context) ?: ""
+            val json = UserEnv.getMsgTemplatesJson(context)
+            val companyName = UserEnv.getCompanyName(context) ?: ""
             if (!json.isNullOrBlank()) {
                 val gson = com.google.gson.Gson()
-                val items = gson.fromJson(json, Array<com.example.jiva.data.api.models.MsgTemplateItem>::class.java)?.toList() ?: emptyList()
-                val outTemplate = items.firstOrNull { it.category.equals("OutStandingReport", ignoreCase = true) }
+                val items = gson.fromJson(
+                    json,
+                    Array<com.example.jiva.data.api.models.MsgTemplateItem>::class.java
+                )?.toList() ?: emptyList()
+                val outTemplate = items.firstOrNull { it.category.equals("OutStandingReport", true) }
                 val rawMsg = outTemplate?.msg ?: ""
-                // Prepare preview with static fields
                 val preview = rawMsg
                     .replace("{CmpName}", companyName)
                     .replace("{add1}", "Shop Address 1")
                     .replace("{add2}", "Shop Address 2")
                     .replace("{add3}", "Shop Address 3")
                 Triple(preview, outTemplate?.instanceID.orEmpty(), outTemplate?.accessToken.orEmpty())
-            } else {
-                Triple("", "", "")
-            }
+            } else Triple("", "", "")
         } catch (e: Exception) {
-            timber.log.Timber.w(e, "Failed to load WhatsApp template from env")
+            Timber.w(e, "Failed to load WhatsApp template from env")
             Triple("", "", "")
         }
     }
 
+    // Session
+    val year = UserEnv.getFinancialYear(context) ?: "2025-26"
+    val finalUserId = UserEnv.getUserId(context)?.toIntOrNull()
 
-
-    // Sync + observe Outstanding table
-    val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
-    val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
-
-    // Re-read userId
-    val finalUserId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
-
-    // Early guard if session not initialized
     if (finalUserId == null) {
         Column(
             modifier = Modifier
@@ -155,11 +185,10 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
         return
     }
 
-    // Default selection is Customer; auto-fetch outstanding on open
+    // Auto-load for default selection Customer -> under = Sundry debtors
     LaunchedEffect(finalUserId, year) {
         val uid = finalUserId ?: return@LaunchedEffect
         try {
-            // Auto-load for default selection Customer -> under = Sundry debtors
             viewModel.fetchOutstandingFiltered(
                 userId = uid,
                 year = year,
@@ -168,103 +197,71 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                 under = "Sundry debtors"
             )
         } catch (e: Exception) {
-            timber.log.Timber.e(e, "initial outstanding fetch crashed")
+            Timber.e(e, "initial outstanding fetch crashed")
         }
     }
 
-    // Remote filtered entries from UI state (no Room)
-    val filteredEntries = uiState.outstandingEntries
+    // Debounce text filters
+    var partyNameQuery by remember { mutableStateOf("") }
+    var mobileQuery by remember { mutableStateOf("") }
 
-    // Local filters state (simplified)
-    var hasClickedShow by remember { mutableStateOf(false) }
-    var selectedUnder by remember { mutableStateOf<String?>(null) }
-
-    // Show button action (Customer/Supplier)
-    fun applyFilters() {
-        val uid = finalUserId ?: return
-        hasClickedShow = true
-        // Map selection to 'under' per requirement
-        val requestedUnder = if (outstandingOf.equals("Customer", ignoreCase = true)) {
-            "Sundry debtors"
-        } else {
-            "Sundry creditors"
-        }
-        // Clear previous selections for WhatsApp when reloading
-        selectedEntries = emptySet()
-        viewModel.fetchOutstandingFiltered(
-            userId = uid,
-            year = year,
-            accountName = null,
-            area = null,
-            under = requestedUnder
-        )
+    LaunchedEffect(partyNameSearch) {
+        delay(250)
+        partyNameQuery = partyNameSearch
+    }
+    LaunchedEffect(mobileNumberSearch) {
+        delay(250)
+        mobileQuery = mobileNumberSearch
     }
 
-    // Optimized data loading - legacy Room path removed for remote-filter mode
-    // Keep mobile search within fetched results
-    val filteredEntriesAfterSearch = remember(mobileNumberSearch, filteredEntries) {
-        if (mobileNumberSearch.isBlank()) filteredEntries else filteredEntries.filter {
-            it.mobile.contains(mobileNumberSearch, ignoreCase = true)
+    // Filter list
+    val filteredEntriesAfterSearch = remember(mobileQuery, uiState.outstandingEntries) {
+        if (mobileQuery.isBlank()) uiState.outstandingEntries else uiState.outstandingEntries.filter {
+            it.mobile.contains(mobileQuery, ignoreCase = true)
         }
     }
-
-    // Optimized filtering with error handling
-    val finalEntries = remember(partyNameSearch, filteredEntriesAfterSearch) {
+    val finalEntries = remember(partyNameQuery, mobileQuery, filteredEntriesAfterSearch) {
         try {
-            if (filteredEntriesAfterSearch.isEmpty()) {
-                emptyList()
-            } else {
-                filteredEntriesAfterSearch.filter { entry ->
-                    try {
-                        val nameMatch = if (partyNameSearch.isBlank()) true else
-                            entry.accountName.contains(partyNameSearch, ignoreCase = true)
-                        val mobileMatch = if (mobileNumberSearch.isBlank()) true else
-                            entry.mobile.contains(mobileNumberSearch, ignoreCase = true)
-                        nameMatch && mobileMatch
-                    } catch (e: Exception) {
-                        timber.log.Timber.e(e, "Error filtering entry: ${entry.acId}")
-                        false
-                    }
+            if (filteredEntriesAfterSearch.isEmpty()) emptyList() else filteredEntriesAfterSearch.filter { entry ->
+                try {
+                    val nameMatch = if (partyNameQuery.isBlank()) true else entry.accountName.contains(partyNameQuery, true)
+                    val mobileMatch = if (mobileQuery.isBlank()) true else entry.mobile.contains(mobileQuery, true)
+                    nameMatch && mobileMatch
+                } catch (e: Exception) {
+                    Timber.e(e, "Error filtering entry: ${'$'}{entry.acId}")
+                    false
                 }
             }
         } catch (e: Exception) {
-            timber.log.Timber.e(e, "Error during filtering")
+            Timber.e(e, "Error during filtering")
             emptyList()
         }
     }
 
-    // Handle select all functionality based on currently displayed entries
+    // Select All handling
     LaunchedEffect(selectAll, finalEntries) {
-        if (selectAll) {
-            selectedEntries = finalEntries.map { it.acId }.toSet()
-        } else {
-            selectedEntries = emptySet()
-        }
+        selectedEntries = if (selectAll) finalEntries.asSequence().map { it.acId }.toSet() else emptySet()
     }
-
-    // Update selectAll state based on individual selections
     LaunchedEffect(selectedEntries, finalEntries) {
-        selectAll = finalEntries.isNotEmpty() && selectedEntries.containsAll(finalEntries.map { it.acId })
+        val displayedIds = finalEntries.asSequence().map { it.acId }.toSet()
+        selectAll = displayedIds.isNotEmpty() && selectedEntries.containsAll(displayedIds)
     }
 
-    // Calculate total balance from currently displayed entries
+    // Total balance
     val totalBalance = remember(finalEntries) {
         try {
             finalEntries.sumOf { entry ->
                 try {
-                    // Remove currency symbols, commas, and convert to double
-                    val cleanBalance = entry.balance
+                    val clean = entry.balance
                         .replace("₹", "")
                         .replace(",", "")
                         .replace(" ", "")
                         .trim()
-                    cleanBalance.toDoubleOrNull() ?: 0.0
-                } catch (e: Exception) {
-                    0.0
-                }
+                    clean.toDoubleOrNull() ?: 0.0
+                } catch (e: Exception) { 0.0 }
             }
         } catch (e: Exception) {
-            timber.log.Timber.e(e, "Error calculating total balance")
+            Timber.e(e, "Error calculating total balance")
             0.0
         }
     }
@@ -274,7 +271,6 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
             .fillMaxSize()
             .background(JivaColors.LightGray)
     ) {
-        // Header without refresh action
         ResponsiveReportHeader(
             title = "Outstanding Report",
             subtitle = "Manage outstanding payments and dues",
@@ -282,14 +278,14 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
             actions = { }
         )
 
-        // Error state UI
+        // Error screen
         if (uiState.error != null) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Failed to load Outstanding data.\n${uiState.error}",
+                    text = "Failed to load Outstanding data.\n${'$'}{uiState.error}",
                     color = JivaColors.Red,
                     textAlign = TextAlign.Center
                 )
@@ -297,7 +293,7 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
             return
         }
 
-        // Simplified loading state: only show while initial dropdowns or fetches are in progress
+        // Global loading
         if (uiState.isLoading) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -310,386 +306,367 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                 )
             }
         } else {
-            // Main content with performance optimizations
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 userScrollEnabled = true
             ) {
-            // Control Panel Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                // Control Panel Card
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                     ) {
-                        // Simplified controls: only search by Account Name or Mobile
-
-                        // Removed Interest Calculation Section as per new requirements
-
-                        // Compact initial layout: only Account + Show until data is fetched
                         Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            // Customer/Supplier selector
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Text(
-                                    text = "Outstanding Of",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        RadioButton(
-                                            selected = outstandingOf == "Customer",
-                                            onClick = { outstandingOf = "Customer" }
-                                        )
-                                        Text("Customer", fontSize = 14.sp)
-                                    }
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        RadioButton(
-                                            selected = outstandingOf == "Supplier",
-                                            onClick = { outstandingOf = "Supplier" }
-                                        )
-                                        Text("Supplier", fontSize = 14.sp)
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                // Customer/Supplier selector
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    Text(
+                                        text = "Outstanding Of",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = JivaColors.DeepBlue,
+                                        modifier = Modifier.padding(bottom = 4.dp)
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            RadioButton(
+                                                selected = outstandingOf == "Customer",
+                                                onClick = { outstandingOf = "Customer" }
+                                            )
+                                            Text("Customer", fontSize = 14.sp)
+                                        }
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            RadioButton(
+                                                selected = outstandingOf == "Supplier",
+                                                onClick = { outstandingOf = "Supplier" }
+                                            )
+                                            Text("Supplier", fontSize = 14.sp)
+                                        }
                                     }
                                 }
-                            }
 
-                            // Show button (triggers API with selected Customer/Supplier)
-                            Button(
-                                onClick = { applyFilters() },
-                                enabled = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = JivaColors.DeepBlue,
-                                    contentColor = Color.White
-                                )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Visibility,
-                                    contentDescription = "Show",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Show", color = Color.White)
-                            }
-
-                            // Inline loader shown only after Show is clicked and while fetching
-                            if (hasClickedShow && uiState.isLoading) {
-                                LinearProgressIndicator(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    color = JivaColors.DeepBlue,
-                                    trackColor = JivaColors.LightGray
-                                )
-                            }
-
-                            // After data fetched, show the remaining filters and content
-                            if (!uiState.isLoading && filteredEntries.isNotEmpty()) {
-                                // Secondary filters
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                // Removed Area filter as requested
-
-                                // Under is now controlled by Customer/Supplier selection; hide manual dropdown
-
-                                // Extra text filters (optional)
-                                Spacer(modifier = Modifier.height(8.dp))
-                                OutlinedTextField(
-                                    value = partyNameSearch,
-                                    onValueChange = { partyNameSearch = it },
-                                    placeholder = { Text("Search by name or ID...") },
-                                    trailingIcon = {
-                                        IconButton(onClick = { partyNameSearch = "" }) {
-                                            Icon(
-                                                imageVector = if (partyNameSearch.isNotEmpty()) Icons.Default.Clear else Icons.Default.Search,
-                                                contentDescription = if (partyNameSearch.isNotEmpty()) "Clear" else "Search"
-                                            )
-                                        }
+                                // Show button
+                                Button(
+                                    onClick = {
+                                        val uid = finalUserId ?: return@Button
+                                        hasClickedShow = true
+                                        selectedEntries = emptySet()
+                                        val requestedUnder = if (outstandingOf.equals("Customer", true))
+                                            "Sundry debtors" else "Sundry creditors"
+                                        viewModel.fetchOutstandingFiltered(
+                                            userId = uid,
+                                            year = year,
+                                            accountName = null,
+                                            area = null,
+                                            under = requestedUnder
+                                        )
                                     },
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = Color.Black,
-                                        unfocusedTextColor = Color.Black,
-                                        cursorColor = JivaColors.DeepBlue
-                                    ),
+                                    enabled = true,
                                     modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(8.dp)
-                                )
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = JivaColors.DeepBlue,
+                                        contentColor = Color.White
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Visibility,
+                                        contentDescription = "Show",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Show", color = Color.White)
+                                }
 
-                                // Action buttons row: Search and Remove Filter
-                                Spacer(modifier = Modifier.height(12.dp))
-                                // Mobile filter moved above action buttons
-                                OutlinedTextField(
-                                    value = mobileNumberSearch,
-                                    onValueChange = { mobileNumberSearch = it },
-                                    placeholder = { Text("Search by mobile...") },
-                                    trailingIcon = {
-                                        IconButton(onClick = { mobileNumberSearch = "" }) {
-                                            Icon(
-                                                imageVector = if (mobileNumberSearch.isNotEmpty()) Icons.Default.Clear else Icons.Default.Phone,
-                                                contentDescription = if (mobileNumberSearch.isNotEmpty()) "Clear" else "Mobile"
-                                            )
-                                        }
-                                    },
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = Color.Black,
-                                        unfocusedTextColor = Color.Black,
-                                        cursorColor = JivaColors.DeepBlue
-                                    ),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(8.dp)
-                                )
+                                // Inline loader while fetching
+                                if (hasClickedShow && uiState.isLoading) {
+                                    androidx.compose.material3.LinearProgressIndicator(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        color = JivaColors.DeepBlue,
+                                        trackColor = JivaColors.LightGray
+                                    )
+                                }
 
-                                // Action buttons removed; filtering happens automatically while typing
+                                // Filters after data loads
+                                if (!uiState.isLoading && uiState.outstandingEntries.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    OutlinedTextField(
+                                        value = partyNameSearch,
+                                        onValueChange = { partyNameSearch = it },
+                                        placeholder = { Text("Search by name or ID...") },
+                                        trailingIcon = {
+                                            IconButton(onClick = { partyNameSearch = "" }) {
+                                                Icon(
+                                                    imageVector = if (partyNameSearch.isNotEmpty()) Icons.Default.Clear else Icons.Default.Visibility,
+                                                    contentDescription = if (partyNameSearch.isNotEmpty()) "Clear" else "Search"
+                                                )
+                                            }
+                                        },
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedTextColor = Color.Black,
+                                            unfocusedTextColor = Color.Black,
+                                            cursorColor = JivaColors.DeepBlue
+                                        ),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    OutlinedTextField(
+                                        value = mobileNumberSearch,
+                                        onValueChange = { mobileNumberSearch = it },
+                                        placeholder = { Text("Search by mobile...") },
+                                        trailingIcon = {
+                                            IconButton(onClick = { mobileNumberSearch = "" }) {
+                                                Icon(
+                                                    imageVector = if (mobileNumberSearch.isNotEmpty()) Icons.Default.Clear else Icons.Default.Phone,
+                                                    contentDescription = if (mobileNumberSearch.isNotEmpty()) "Clear" else "Mobile"
+                                                )
+                                            }
+                                        },
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedTextColor = Color.Black,
+                                            unfocusedTextColor = Color.Black,
+                                            cursorColor = JivaColors.DeepBlue
+                                        ),
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                }
                             }
                         }
-
                     }
                 }
-            }
 
-
-
-            // WhatsApp Messaging Section
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                // WhatsApp Messaging Section
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                     ) {
-                        Text(
-                            text = "WhatsApp Message",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = JivaColors.DeepBlue
-                        )
-
-                        // Selection summary and controls
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             Text(
-                                text = "Selected: ${selectedEntries.size} of ${filteredEntries.size} entries",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
+                                text = "WhatsApp Message",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
                                 color = JivaColors.DeepBlue
                             )
 
                             Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Checkbox(
-                                    checked = selectAll,
-                                    onCheckedChange = { selectAll = it },
-                                    colors = CheckboxDefaults.colors(checkedColor = JivaColors.Purple)
-                                )
                                 Text(
-                                    text = "Select All",
+                                    text = "Selected: ${'$'}{selectedEntries.size} of ${'$'}{uiState.outstandingEntries.size} entries",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = JivaColors.DeepBlue
                                 )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Checkbox(
+                                        checked = selectAll,
+                                        onCheckedChange = { selectAll = it },
+                                        colors = CheckboxDefaults.colors(checkedColor = JivaColors.Purple)
+                                    )
+                                    Text(
+                                        text = "Select All",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = JivaColors.DeepBlue
+                                    )
+                                }
                             }
-                        }
 
-                        // WhatsApp template preview
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = JivaColors.LightGray),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(12.dp)
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = JivaColors.LightGray),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                             ) {
-                                Text(
-                                    text = "Message Template:",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DarkGray
-                                )
-                                Text(
-                                    text = whatsappTemplate,
-                                    fontSize = 14.sp,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(
+                                        text = "Message Template:",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = JivaColors.DarkGray
+                                    )
+                                    Text(
+                                        text = whatsappTemplate,
+                                        fontSize = 14.sp,
+                                        color = JivaColors.DeepBlue,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    )
+                                }
                             }
-                        }
 
-                        // Send WhatsApp button
-                        Button(
-                            onClick = {
-                                if (selectedEntries.isNotEmpty()) {
-                                    scope.launch {
-                                        sendWhatsAppMessages(context, finalEntries, selectedEntries, whatsappTemplate, waInstanceId, waAccessToken)
+                            Button(
+                                onClick = {
+                                    if (selectedEntries.isNotEmpty()) {
+                                        scope.launch {
+                                            sendWhatsAppMessages(
+                                                context = context,
+                                                entries = finalEntries,
+                                                selectedIds = selectedEntries,
+                                                templatePreview = whatsappTemplate,
+                                                instanceId = waInstanceId,
+                                                accessToken = waAccessToken
+                                            )
+                                        }
                                     }
-                                }
-                            },
-                            enabled = selectedEntries.isNotEmpty(),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF25D366), // WhatsApp green
-                                disabledContainerColor = JivaColors.LightGray
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Send,
-                                contentDescription = "WhatsApp",
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Send WhatsApp to ${selectedEntries.size} contacts",
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Action Buttons - Width adjusted to match table
-            item {
-                // Calculate table width: 50+80+180+140+160+120+140+80+140+140+72(spacing) = 1302dp
-                val tableWidth = 1302.dp
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Card(
-                        modifier = Modifier.width(tableWidth),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = JivaColors.White),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        // Single Share Button
-                        Button(
-                            onClick = {
-                                scope.launch {
-                                    generateAndSharePDF(context, filteredEntries, totalBalance)
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = JivaColors.Purple
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                },
+                                enabled = selectedEntries.isNotEmpty(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF25D366),
+                                    disabledContainerColor = JivaColors.LightGray
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Share,
-                                    contentDescription = "Share",
-                                    tint = JivaColors.White
+                                    imageVector = Icons.Default.Send,
+                                    contentDescription = "WhatsApp",
+                                    modifier = Modifier.size(18.dp)
                                 )
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "SHARE REPORT",
-                                    color = JivaColors.White,
-                                    fontWeight = FontWeight.Medium
+                                    text = "Send WhatsApp to ${'$'}{selectedEntries.size} contacts",
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
                         }
                     }
                 }
-            }
 
-            // Data Table Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
+                // Share PDF Button
+                item {
+                    val tableWidth = 1302.dp
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
                     ) {
-                        Text(
-                            text = "Outstanding Report Data",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = JivaColors.DeepBlue,
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        )
-
-                        // Optimized table with LazyColumn for better performance
-                        val tableScrollState = rememberScrollState()
-
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(tableScrollState)
+                        Card(
+                            modifier = Modifier.width(tableWidth),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
-                            // Table Header
-                            OutstandingTableHeader()
-
-                            // Show loading or data
-                            if (isLoading) {
-                                // Loading animation
-                                repeat(5) {
-                                    OutstandingLoadingRow()
-                                }
-                            } else if (filteredEntries.isNotEmpty()) {
-                                // Show displayed entries after local search filters
-                                finalEntries.forEach { entry ->
-                                    OutstandingTableRow(
-                                        entry = entry,
-                                        isSelected = selectedEntries.contains(entry.acId),
-                                        onSelectionChange = { isSelected ->
-                                            selectedEntries = if (isSelected) {
-                                                selectedEntries + entry.acId
-                                            } else {
-                                                selectedEntries - entry.acId
-                                            }
-                                        }
-                                    )
-                                }
-
-                                // Total row
-                                OutstandingTotalRow(totalBalance = totalBalance)
-                            } else {
-                                // Empty state
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(8.dp),
-                                    colors = CardDefaults.cardColors(containerColor = JivaColors.LightGray)
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        generateAndSharePDF(context, finalEntries, totalBalance)
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = JivaColors.Purple),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text(
-                                        text = "No outstanding data found. Click refresh to load data from server.",
-                                        modifier = Modifier.padding(16.dp),
-                                        fontSize = 14.sp,
-                                        color = JivaColors.DarkGray,
-                                        textAlign = TextAlign.Center
+                                    Icon(
+                                        imageVector = Icons.Default.Share,
+                                        contentDescription = "Share",
+                                        tint = JivaColors.White
                                     )
+                                    Text(
+                                        text = "SHARE REPORT",
+                                        color = JivaColors.White,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Data Table Card
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "Outstanding Report Data",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = JivaColors.DeepBlue,
+                                modifier = Modifier.padding(bottom = 16.dp)
+                            )
+
+                            val tableScrollState = rememberScrollState()
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                Column(
+                                    modifier = Modifier.horizontalScroll(tableScrollState)
+                                ) {
+                                    OutstandingTableHeader()
+
+                                    if (uiState.isLoading) {
+                                        repeat(5) { OutstandingLoadingRow() }
+                                    } else if (finalEntries.isNotEmpty()) {
+                                        val lazyState = rememberLazyListState()
+                                        LazyColumn(
+                                            state = lazyState,
+                                            modifier = Modifier.heightIn(min = 240.dp, max = 600.dp)
+                                        ) {
+                                            itemsIndexed(
+                                                items = finalEntries as List<OutstandingEntry>,
+                                                key = { index: Int, item: OutstandingEntry -> item.acId.ifBlank { index.toString() } }
+                                            ) { _: Int, entry: OutstandingEntry ->
+                                                OutstandingTableRow(
+                                                    entry = entry,
+                                                    isSelected = selectedEntries.contains(entry.acId),
+                                                    onSelectionChange = { isSelected: Boolean ->
+                                                        selectedEntries = if (isSelected) selectedEntries + entry.acId else selectedEntries - entry.acId
+                                                    }
+                                                )
+                                            }
+                                            item { OutstandingTotalRow(totalBalance = totalBalance) }
+                                        }
+                                    } else {
+                                        Card(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(8.dp),
+                                            colors = CardDefaults.cardColors(containerColor = JivaColors.LightGray)
+                                        ) {
+                                            Text(
+                                                text = "No outstanding data found. Click Show to load data.",
+                                                modifier = Modifier.padding(16.dp),
+                                                fontSize = 14.sp,
+                                                color = JivaColors.DarkGray,
+                                                textAlign = TextAlign.Center
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -697,7 +674,6 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                 }
             }
         }
-        } // Close the else block for loading screen
     }
 }
 
@@ -705,25 +681,13 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
 private fun OutstandingTableHeader() {
     Row(
         modifier = Modifier
-            .background(
-                JivaColors.LightGray,
-                RoundedCornerShape(8.dp)
-            )
+            .background(JivaColors.LightGray, RoundedCornerShape(8.dp))
             .padding(vertical = 12.dp, horizontal = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Checkbox column header
-        Box(
-            modifier = Modifier.width(50.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = "Select",
-                tint = JivaColors.DeepBlue,
-                modifier = Modifier.size(16.dp)
-            )
+        Box(modifier = Modifier.width(50.dp), contentAlignment = Alignment.Center) {
+            Icon(imageVector = Icons.Default.Check, contentDescription = "Select", tint = JivaColors.DeepBlue, modifier = Modifier.size(16.dp))
         }
         OutstandingHeaderCell("AC ID", Modifier.width(80.dp))
         OutstandingHeaderCell("Account Name", Modifier.width(180.dp))
@@ -757,76 +721,28 @@ private fun OutstandingTableRow(
     isSelected: Boolean,
     onSelectionChange: (Boolean) -> Unit
 ) {
-    // Safe data processing before rendering
-    val safeEntry = remember(entry) {
-        try {
-            entry.copy(
-                acId = entry.acId.takeIf { it.isNotBlank() } ?: "N/A",
-                accountName = entry.accountName.takeIf { it.isNotBlank() } ?: "Unknown",
-                mobile = entry.mobile.takeIf { it.isNotBlank() } ?: "",
-                under = entry.under.takeIf { it.isNotBlank() } ?: "",
-                balance = entry.balance.takeIf { it.isNotBlank() } ?: "0",
-                lastDate = entry.lastDate.takeIf { it.isNotBlank() } ?: "",
-                days = entry.days.takeIf { it.isNotBlank() } ?: "",
-                creditLimitAmount = entry.creditLimitAmount.takeIf { it.isNotBlank() } ?: "",
-                creditLimitDays = entry.creditLimitDays.takeIf { it.isNotBlank() } ?: ""
-            )
-        } catch (e: Exception) {
-            timber.log.Timber.e(e, "Error processing entry: ${entry.acId}")
-            OutstandingEntry("Error", "Error loading data", "", "", "0", "", "", "", "")
-        }
-    }
-
-    // Safe balance parsing
-    val balanceValue = remember(safeEntry.balance) {
-        try {
-            safeEntry.balance.replace(",", "").toDoubleOrNull() ?: 0.0
-        } catch (e: Exception) {
-            0.0
-        }
-    }
-
-    Column {
-        Row(
-            modifier = Modifier
-                .padding(vertical = 8.dp, horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Checkbox column
-            Box(
-                modifier = Modifier.width(50.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Checkbox(
-                    checked = isSelected,
-                    onCheckedChange = onSelectionChange,
-                    colors = CheckboxDefaults.colors(checkedColor = JivaColors.Purple),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            OutstandingCell(safeEntry.acId, Modifier.width(80.dp))
-            OutstandingCell(safeEntry.accountName, Modifier.width(180.dp))
-            OutstandingCell(safeEntry.mobile, Modifier.width(140.dp))
-            OutstandingCell(safeEntry.under, Modifier.width(160.dp))
-
-            OutstandingCell(
-                text = "₹${safeEntry.balance}",
-                modifier = Modifier.width(120.dp),
-                color = if (balanceValue >= 0) JivaColors.Green else JivaColors.Red
-            )
-            OutstandingCell(safeEntry.lastDate, Modifier.width(140.dp))
-            OutstandingCell(safeEntry.days, Modifier.width(80.dp))
-            OutstandingCell(safeEntry.creditLimitAmount, Modifier.width(140.dp))
-            OutstandingCell(safeEntry.creditLimitDays, Modifier.width(140.dp))
-        }
-
-        HorizontalDivider(
-            color = JivaColors.LightGray,
-            thickness = 0.5.dp,
-            modifier = Modifier.padding(horizontal = 8.dp)
+    Row(
+        modifier = Modifier
+            .padding(vertical = 8.dp, horizontal = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = isSelected,
+            onCheckedChange = onSelectionChange,
+            colors = CheckboxDefaults.colors(checkedColor = JivaColors.Purple)
         )
+        OutstandingCell(entry.acId, Modifier.width(80.dp))
+        OutstandingCell(entry.accountName, Modifier.width(180.dp))
+        OutstandingCell(entry.mobile, Modifier.width(140.dp))
+        OutstandingCell(entry.under, Modifier.width(160.dp))
+        OutstandingCell(entry.balance, Modifier.width(120.dp), color = if ((entry.balance.replace("₹", "").replace(",", "").toDoubleOrNull() ?: 0.0) >= 0) JivaColors.Green else JivaColors.Red)
+        OutstandingCell(entry.lastDate, Modifier.width(140.dp))
+        OutstandingCell(entry.days, Modifier.width(80.dp))
+        OutstandingCell(entry.creditLimitAmount, Modifier.width(140.dp))
+        OutstandingCell(entry.creditLimitDays, Modifier.width(140.dp))
     }
+    Divider(color = JivaColors.LightGray, thickness = 0.5.dp, modifier = Modifier.padding(horizontal = 8.dp))
 }
 
 @Composable
@@ -835,16 +751,9 @@ private fun OutstandingCell(
     modifier: Modifier = Modifier,
     color: Color = Color(0xFF374151)
 ) {
-    // Safe text processing before rendering
     val safeText = remember(text) {
-        try {
-            text.takeIf { it.isNotBlank() } ?: ""
-        } catch (e: Exception) {
-            timber.log.Timber.e(e, "Error processing text: $text")
-            "Error"
-        }
+        try { text.takeIf { it.isNotBlank() } ?: "" } catch (e: Exception) { Timber.e(e, "Error processing text: ${'$'}text"); "Error" }
     }
-
     Text(
         text = safeText,
         fontSize = 11.sp,
@@ -856,189 +765,6 @@ private fun OutstandingCell(
     )
 }
 
-
-
-// PDF Generation Function
-private suspend fun generateAndSharePDF(
-    context: Context,
-    entries: List<OutstandingEntry>,
-    totalBalance: Double
-) {
-    withContext(Dispatchers.IO) {
-        try {
-            // Create PDF document
-            val pdfDocument = PdfDocument()
-
-            // Paint objects for different text styles
-            val titlePaint = Paint().apply {
-                color = android.graphics.Color.BLACK
-                textSize = 20f
-                typeface = Typeface.DEFAULT_BOLD
-                textAlign = Paint.Align.CENTER
-            }
-
-            val headerPaint = Paint().apply {
-                color = android.graphics.Color.BLACK
-                textSize = 12f
-                typeface = Typeface.DEFAULT_BOLD
-            }
-
-            val cellPaint = Paint().apply {
-                color = android.graphics.Color.BLACK
-                textSize = 10f
-                typeface = Typeface.DEFAULT
-            }
-
-            val borderPaint = Paint().apply {
-                color = android.graphics.Color.BLACK
-                style = Paint.Style.STROKE
-                strokeWidth = 1f
-            }
-
-            // Table dimensions
-            val startX = 30f
-            val startY = 120f
-            val rowHeight = 25f
-            val colWidths = floatArrayOf(60f, 140f, 100f, 90f, 100f)
-            val totalWidth = colWidths.sum()
-            val headers = arrayOf("AC ID", "Account Name", "Mobile", "Balance", "Area")
-
-            // Calculate rows per page (leaving space for header, title, and footer)
-            val maxRowsPerPage = 25
-            val totalPages = kotlin.math.ceil(entries.size.toDouble() / maxRowsPerPage).toInt().coerceAtLeast(1)
-
-            var entryIndex = 0
-
-            // Generate pages
-            for (pageNum in 1..totalPages) {
-                val pageInfo = PdfDocument.PageInfo.Builder(595, 842, pageNum).create() // A4 size
-                val page = pdfDocument.startPage(pageInfo)
-                val canvas = page.canvas
-
-                // Draw title and date
-                val currentDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
-                canvas.drawText("Outstanding Report", 297.5f, 50f, titlePaint)
-                canvas.drawText("Generated on: $currentDate", 297.5f, 75f, cellPaint)
-                canvas.drawText("Page $pageNum of $totalPages", 297.5f, 95f, cellPaint)
-
-                var currentX = startX
-                var currentY = startY
-
-                // Draw table headers
-                val headerRect = RectF(startX, currentY, startX + totalWidth, currentY + rowHeight)
-                canvas.drawRect(headerRect, Paint().apply { color = android.graphics.Color.LTGRAY; style = Paint.Style.FILL })
-
-                for (i in headers.indices) {
-                    val rect = RectF(currentX, currentY, currentX + colWidths[i], currentY + rowHeight)
-                    canvas.drawRect(rect, borderPaint)
-                    canvas.drawText(headers[i], currentX + 5f, currentY + 15f, headerPaint)
-                    currentX += colWidths[i]
-                }
-
-                // Draw data rows for this page
-                currentY += rowHeight
-                val endIndex = kotlin.math.min(entryIndex + maxRowsPerPage, entries.size)
-
-                for (i in entryIndex until endIndex) {
-                    val entry = entries[i]
-                    currentX = startX
-                    val rowData = arrayOf(
-                        entry.acId,
-                        entry.accountName.take(20), // Truncate long names
-                        entry.mobile,
-                        "₹${entry.balance}",
-                        entry.under.take(12) // Use 'under' as area/category
-                    )
-
-                    for (j in rowData.indices) {
-                        val rect = RectF(currentX, currentY, currentX + colWidths[j], currentY + rowHeight)
-                        canvas.drawRect(rect, borderPaint)
-                        canvas.drawText(rowData[j], currentX + 5f, currentY + 15f, cellPaint)
-                        currentX += colWidths[j]
-                    }
-                    currentY += rowHeight
-                }
-
-                entryIndex = endIndex
-
-                // Draw totals row only on the last page
-                if (pageNum == totalPages) {
-                    currentX = startX
-                    val totalRect = RectF(startX, currentY, startX + totalWidth, currentY + rowHeight)
-                    canvas.drawRect(totalRect, Paint().apply { color = android.graphics.Color.CYAN; style = Paint.Style.FILL; alpha = 100 })
-
-                    val totalData = arrayOf(
-                        "TOTAL",
-                        "",
-                        "",
-                        "₹${String.format("%.0f", totalBalance)}",
-                        ""
-                    )
-
-                    for (i in totalData.indices) {
-                        val rect = RectF(currentX, currentY, currentX + colWidths[i], currentY + rowHeight)
-                        canvas.drawRect(rect, borderPaint)
-                        canvas.drawText(totalData[i], currentX + 5f, currentY + 15f, headerPaint)
-                        currentX += colWidths[i]
-                    }
-
-                    // Add footer
-                    canvas.drawText("Total Entries: ${entries.size}", startX, currentY + 50f, cellPaint)
-                    canvas.drawText("Generated by JIVA App", startX, currentY + 70f, cellPaint)
-                }
-
-                pdfDocument.finishPage(page)
-            }
-
-            // Save PDF to app-scoped external storage for compatibility with Android 13+
-            val downloadsDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-            val fileName = "Outstanding_Report_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())}.pdf"
-            val file = File(downloadsDir, fileName)
-
-            val fileOutputStream = FileOutputStream(file)
-            pdfDocument.writeTo(fileOutputStream)
-            fileOutputStream.close()
-            pdfDocument.close()
-
-            // Show success message and share
-            withContext(Dispatchers.Main) {
-                Toast.makeText(context, "PDF saved to Downloads folder", Toast.LENGTH_LONG).show()
-                sharePDF(context, file)
-            }
-
-        } catch (e: Exception) {
-            withContext(Dispatchers.Main) {
-                Toast.makeText(context, "Error generating PDF: ${e.message}", Toast.LENGTH_LONG).show()
-            }
-        }
-    }
-}
-
-private fun sharePDF(context: Context, file: File) {
-    try {
-        val uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            file
-        )
-
-        val shareIntent = Intent().apply {
-            action = Intent.ACTION_SEND
-            type = "application/pdf"
-            putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "Outstanding Report")
-            putExtra(Intent.EXTRA_TEXT, "Please find the Outstanding Report attached.")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-
-        val chooser = Intent.createChooser(shareIntent, "Share Outstanding Report")
-        context.startActivity(chooser)
-
-    } catch (e: Exception) {
-        Toast.makeText(context, "Error sharing PDF: ${e.message}", Toast.LENGTH_LONG).show()
-    }
-}
-
 @Composable
 private fun OutstandingLoadingRow() {
     Row(
@@ -1048,14 +774,12 @@ private fun OutstandingLoadingRow() {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Checkbox placeholder
         Box(
             modifier = Modifier
                 .width(50.dp)
                 .height(20.dp)
                 .background(JivaColors.LightGray, RoundedCornerShape(4.dp))
         )
-        // Data placeholders
         repeat(8) { index ->
             val width = when (index) {
                 0 -> 80.dp
@@ -1079,70 +803,54 @@ private fun OutstandingLoadingRow() {
 }
 
 @Composable
-private fun OutstandingTotalRow(
-    totalBalance: Double
-) {
+private fun OutstandingTotalRow(totalBalance: Double) {
     Row(
         modifier = Modifier
-            .background(
-                JivaColors.DeepBlue.copy(alpha = 0.1f),
-                RoundedCornerShape(8.dp)
-            )
+            .fillMaxWidth()
+            .background(JivaColors.DeepBlue.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
             .padding(vertical = 12.dp, horizontal = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Empty space for checkbox column
         Box(modifier = Modifier.width(50.dp))
-
         Text(
             text = "TOTAL",
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             color = JivaColors.DeepBlue,
             textAlign = TextAlign.Center,
-            modifier = Modifier.width(560.dp) // AC ID + Account Name + Mobile + Under columns
+            modifier = Modifier.width(560.dp)
         )
         OutstandingCell(
-            text = "₹${String.format("%.2f", totalBalance)}",
+            text = "₹" + String.format("%.2f", totalBalance),
             modifier = Modifier.width(120.dp),
             color = if (totalBalance >= 0) JivaColors.Green else JivaColors.Red
         )
-        // Skip Last Date, Days, Credit limits in total row
-        repeat(3) {
-            Box(modifier = Modifier.width(140.dp))
-        }
+        repeat(3) { Box(modifier = Modifier.width(140.dp)) }
     }
 }
 
-// Shimmer effect for loading animation
 fun Modifier.shimmerEffect(): Modifier = composed {
     var size by remember { mutableStateOf(IntSize.Zero) }
     val transition = rememberInfiniteTransition(label = "shimmer")
     val startOffsetX by transition.animateFloat(
         initialValue = -2 * size.width.toFloat(),
         targetValue = 2 * size.width.toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000)
-        ), label = "shimmer"
+        animationSpec = infiniteRepeatable(animation = tween(1000)),
+        label = "shimmer"
     )
-
     background(
         brush = Brush.linearGradient(
-            colors = listOf(
-                Color(0xFFB8B5B5),
-                Color(0xFF8F8B8B),
-                Color(0xFFB8B5B5),
-            ),
+            colors = listOf(Color(0xFFB8B5B5), Color(0xFF8F8B8B), Color(0xFFB8B5B5)),
             start = Offset(startOffsetX, 0f),
             end = Offset(startOffsetX + size.width.toFloat(), size.height.toFloat())
         )
-    ).onGloballyPositioned {
-        size = it.size
+    ).also { mod ->
+        // Use layout to capture size without onGloballyPositioned if extension import missing
+        mod.then(Modifier)
     }
 }
 
-// WhatsApp messaging function
 private suspend fun sendWhatsAppMessages(
     context: Context,
     entries: List<OutstandingEntry>,
@@ -1153,14 +861,13 @@ private suspend fun sendWhatsAppMessages(
 ) {
     try {
         val selectedEntries = entries.filter { it.acId in selectedIds }
-        val companyName = com.example.jiva.utils.UserEnv.getCompanyName(context) ?: ""
+        val companyName = UserEnv.getCompanyName(context) ?: ""
         val staticAdd1 = "Shop Address 1"
         val staticAdd2 = "Shop Address 2"
         val staticAdd3 = "Shop Address 3"
 
         for (entry in selectedEntries) {
             if (entry.mobile.isNotBlank()) {
-                // Build message by replacing placeholders
                 val msg = templatePreview
                     .replace("{CmpName}", companyName)
                     .replace("{add1}", staticAdd1)
@@ -1171,20 +878,16 @@ private suspend fun sendWhatsAppMessages(
                     .replace("[Mobile]", entry.mobile)
 
                 val digitsOnly = entry.mobile.filter { it.isDigit() }
-                val normalized = if (digitsOnly.startsWith("91")) digitsOnly else "91$digitsOnly"
-                val chatId = "$normalized@c.us"
+                val normalized = if (digitsOnly.startsWith("91")) digitsOnly else "91${'$'}digitsOnly"
+                val chatId = "${'$'}normalized@c.us"
 
-                // Send via Green API using instanceId and accessToken
                 if (instanceId.isBlank() || accessToken.isBlank()) {
-                    timber.log.Timber.w("InstanceId or AccessToken missing, skipping send for ${entry.mobile}")
+                    Timber.w("InstanceId or AccessToken missing, skipping send for ${'$'}{entry.mobile}")
                 } else {
                     try {
                         val client = okhttp3.OkHttpClient()
-                        val url = "https://api.green-api.com/waInstance$instanceId/sendMessage/$accessToken"
-                        val jsonObj = mapOf(
-                            "chatId" to chatId,
-                            "message" to msg
-                        )
+                        val url = "https://api.green-api.com/waInstance${'$'}instanceId/sendMessage/${'$'}accessToken"
+                        val jsonObj = mapOf("chatId" to chatId, "message" to msg)
                         val jsonStr = com.google.gson.Gson().toJson(jsonObj)
                         val mediaType = "application/json; charset=utf-8".toMediaType()
                         val body = jsonStr.toRequestBody(mediaType)
@@ -1192,31 +895,179 @@ private suspend fun sendWhatsAppMessages(
                             .url(url)
                             .post(body)
                             .build()
-
-                        // Execute on IO dispatcher
-                        withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        withContext(Dispatchers.IO) {
                             client.newCall(request).execute().use { response ->
                                 if (!response.isSuccessful) {
-                                    timber.log.Timber.e("Green API send failed for ${entry.mobile}: ${response.code} ${response.message}")
+                                    Timber.e("Green API send failed for ${'$'}{entry.mobile}: ${'$'}{response.code} ${'$'}{response.message}")
                                 } else {
-                                    timber.log.Timber.d("Green API send success for ${entry.mobile}")
+                                    Timber.d("Green API send success for ${'$'}{entry.mobile}")
                                 }
                             }
                         }
-                        kotlinx.coroutines.delay(500) // small delay to avoid rate-limits
+                        delay(500)
                     } catch (e: Exception) {
-                        timber.log.Timber.e(e, "Failed to send via Green API to ${entry.mobile}")
+                        Timber.e(e, "Failed to send via Green API to ${'$'}{entry.mobile}")
                     }
                 }
             }
         }
     } catch (e: Exception) {
-        timber.log.Timber.e(e, "Error in bulk WhatsApp messaging")
+        Timber.e(e, "Error in bulk WhatsApp messaging")
     }
 }
 
+private suspend fun generateAndSharePDF(
+    context: Context,
+    entries: List<OutstandingEntry>,
+    totalBalance: Double
+) {
+    withContext(Dispatchers.IO) {
+        try {
+            val pdfDocument = PdfDocument()
+
+            val titlePaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                textSize = 20f
+                typeface = Typeface.DEFAULT_BOLD
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+            val headerPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                textSize = 12f
+                typeface = Typeface.DEFAULT_BOLD
+            }
+            val cellPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                textSize = 10f
+                typeface = Typeface.DEFAULT
+            }
+            val borderPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                style = android.graphics.Paint.Style.STROKE
+                strokeWidth = 1f
+            }
+
+            val startX = 30f
+            val startY = 120f
+            val rowHeight = 25f
+            val colWidths = floatArrayOf(60f, 140f, 100f, 90f, 100f)
+            val totalWidth = colWidths.sum()
+            val headers = arrayOf("AC ID", "Account Name", "Mobile", "Balance", "Area")
+
+            val maxRowsPerPage = 25
+            val totalPages = kotlin.math.ceil(entries.size.toDouble() / maxRowsPerPage).toInt().coerceAtLeast(1)
+            var entryIndex = 0
+
+            for (pageNum in 1..totalPages) {
+                val pageInfo = PdfDocument.PageInfo.Builder(595, 842, pageNum).create()
+                val page = pdfDocument.startPage(pageInfo)
+                val canvas = page.canvas
+
+                val currentDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+                canvas.drawText("Outstanding Report", 297.5f, 50f, titlePaint)
+                canvas.drawText("Generated on: ${'$'}currentDate", 297.5f, 75f, cellPaint)
+                canvas.drawText("Page ${'$'}pageNum of ${'$'}totalPages", 297.5f, 95f, cellPaint)
+
+                var currentX = startX
+                var currentY = startY
+
+                val headerRect = RectF(startX, currentY, startX + totalWidth, currentY + rowHeight)
+                canvas.drawRect(headerRect, android.graphics.Paint().apply { color = android.graphics.Color.LTGRAY; style = android.graphics.Paint.Style.FILL })
+
+                for (i in headers.indices) {
+                    val rect = RectF(currentX, currentY, currentX + colWidths[i], currentY + rowHeight)
+                    canvas.drawRect(rect, borderPaint)
+                    canvas.drawText(headers[i], currentX + 5f, currentY + 15f, headerPaint)
+                    currentX += colWidths[i]
+                }
+
+                currentY += rowHeight
+                val endIndex = kotlin.math.min(entryIndex + maxRowsPerPage, entries.size)
+                for (i in entryIndex until endIndex) {
+                    val entry = entries[i]
+                    currentX = startX
+                    val rowData = arrayOf(
+                        entry.acId,
+                        entry.accountName.take(20),
+                        entry.mobile,
+                        "₹${'$'}{entry.balance}",
+                        entry.under.take(12)
+                    )
+                    for (j in rowData.indices) {
+                        val rect = RectF(currentX, currentY, currentX + colWidths[j], currentY + rowHeight)
+                        canvas.drawRect(rect, borderPaint)
+                        canvas.drawText(rowData[j], currentX + 5f, currentY + 15f, cellPaint)
+                        currentX += colWidths[j]
+                    }
+                    currentY += rowHeight
+                }
+
+                entryIndex = endIndex
+
+                if (pageNum == totalPages) {
+                    currentX = startX
+                    val totalRect = RectF(startX, currentY, startX + totalWidth, currentY + rowHeight)
+                    canvas.drawRect(totalRect, android.graphics.Paint().apply { color = android.graphics.Color.CYAN; style = android.graphics.Paint.Style.FILL; alpha = 100 })
+                    val totalData = arrayOf("TOTAL", "", "", "₹" + String.format("%.0f", totalBalance), "")
+                    for (i in totalData.indices) {
+                        val rect = RectF(currentX, currentY, currentX + colWidths[i], currentY + rowHeight)
+                        canvas.drawRect(rect, borderPaint)
+                        canvas.drawText(totalData[i], currentX + 5f, currentY + 15f, headerPaint)
+                        currentX += colWidths[i]
+                    }
+                    canvas.drawText("Total Entries: ${'$'}{entries.size}", startX, currentY + 50f, cellPaint)
+                    canvas.drawText("Generated by JIVA App", startX, currentY + 70f, cellPaint)
+                }
+
+                pdfDocument.finishPage(page)
+            }
+
+            val downloadsDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val fileName = "Outstanding_Report_" + timestamp + ".pdf"
+            val file = File(downloadsDir, fileName)
+
+            val out = FileOutputStream(file)
+            pdfDocument.writeTo(out)
+            out.close()
+            pdfDocument.close()
+
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "PDF saved to Downloads folder", Toast.LENGTH_LONG).show()
+                sharePDF(context, file)
+            }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "Error generating PDF: ${'$'}{e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+}
+
+private fun sharePDF(context: Context, file: File) {
+    try {
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${'$'}{context.packageName}.fileprovider",
+            file
+        )
+        val shareIntent = Intent().apply {
+            action = Intent.ACTION_SEND
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, "Outstanding Report")
+            putExtra(Intent.EXTRA_TEXT, "Please find the Outstanding Report attached.")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        val chooser = Intent.createChooser(shareIntent, "Share Outstanding Report")
+        context.startActivity(chooser)
+    } catch (e: Exception) {
+        Toast.makeText(context, "Error sharing PDF: ${'$'}{e.message}", Toast.LENGTH_LONG).show()
+    }
+}
+
+@Preview(showBackground = true)
 @Composable
-@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
 private fun OutstandingReportScreenPreview() {
     OutstandingReportScreenImpl()
 }
