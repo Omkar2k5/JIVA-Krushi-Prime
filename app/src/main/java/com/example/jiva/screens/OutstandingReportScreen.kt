@@ -51,6 +51,8 @@ import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 
 // Data model for Outstanding Report entries (all Strings to save space)
 data class OutstandingEntry(
@@ -96,8 +98,31 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
     var selectAll by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
 
-    // WhatsApp template message
-    val whatsappTemplate = "Hello Kurshi Prime"
+    // WhatsApp template configuration (loaded from UserEnv -> MsgTemplates)
+    val (whatsappTemplate, waInstanceId, waAccessToken) = remember {
+        try {
+            val json = com.example.jiva.utils.UserEnv.getMsgTemplatesJson(context)
+            val companyName = com.example.jiva.utils.UserEnv.getCompanyName(context) ?: ""
+            if (!json.isNullOrBlank()) {
+                val gson = com.google.gson.Gson()
+                val items = gson.fromJson(json, Array<com.example.jiva.data.api.models.MsgTemplateItem>::class.java)?.toList() ?: emptyList()
+                val outTemplate = items.firstOrNull { it.category.equals("OutStandingReport", ignoreCase = true) }
+                val rawMsg = outTemplate?.msg ?: ""
+                // Prepare preview with static fields
+                val preview = rawMsg
+                    .replace("{CmpName}", companyName)
+                    .replace("{add1}", "Shop Address 1")
+                    .replace("{add2}", "Shop Address 2")
+                    .replace("{add3}", "Shop Address 3")
+                Triple(preview, outTemplate?.instanceID.orEmpty(), outTemplate?.accessToken.orEmpty())
+            } else {
+                Triple("", "", "")
+            }
+        } catch (e: Exception) {
+            timber.log.Timber.w(e, "Failed to load WhatsApp template from env")
+            Triple("", "", "")
+        }
+    }
 
 
 
@@ -134,13 +159,13 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
     LaunchedEffect(finalUserId, year) {
         val uid = finalUserId ?: return@LaunchedEffect
         try {
-            // Auto-load for default selection Customer -> under = Sundry creditors
+            // Auto-load for default selection Customer -> under = Sundry debtors
             viewModel.fetchOutstandingFiltered(
                 userId = uid,
                 year = year,
                 accountName = null,
                 area = null,
-                under = "Sundry creditors"
+                under = "Sundry debtors"
             )
         } catch (e: Exception) {
             timber.log.Timber.e(e, "initial outstanding fetch crashed")
@@ -160,9 +185,9 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
         hasClickedShow = true
         // Map selection to 'under' per requirement
         val requestedUnder = if (outstandingOf.equals("Customer", ignoreCase = true)) {
-            "Sundry creditors"
-        } else {
             "Sundry debtors"
+        } else {
+            "Sundry creditors"
         }
         // Clear previous selections for WhatsApp when reloading
         selectedEntries = emptySet()
@@ -519,7 +544,7 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                             onClick = {
                                 if (selectedEntries.isNotEmpty()) {
                                     scope.launch {
-                                        sendWhatsAppMessages(context, filteredEntries, selectedEntries, whatsappTemplate)
+                                        sendWhatsAppMessages(context, finalEntries, selectedEntries, whatsappTemplate, waInstanceId, waAccessToken)
                                     }
                                 }
                             },
@@ -1122,26 +1147,66 @@ private suspend fun sendWhatsAppMessages(
     context: Context,
     entries: List<OutstandingEntry>,
     selectedIds: Set<String>,
-    template: String
+    templatePreview: String,
+    instanceId: String,
+    accessToken: String
 ) {
     try {
         val selectedEntries = entries.filter { it.acId in selectedIds }
+        val companyName = com.example.jiva.utils.UserEnv.getCompanyName(context) ?: ""
+        val staticAdd1 = "Shop Address 1"
+        val staticAdd2 = "Shop Address 2"
+        val staticAdd3 = "Shop Address 3"
 
         for (entry in selectedEntries) {
             if (entry.mobile.isNotBlank()) {
-                val message = "$template\n\nDear ${entry.accountName},\nYour outstanding balance: ₹${entry.balance}"
-                val phoneNumber = entry.mobile.replace("+91", "").replace(" ", "")
+                // Build message by replacing placeholders
+                val msg = templatePreview
+                    .replace("{CmpName}", companyName)
+                    .replace("{add1}", staticAdd1)
+                    .replace("{add2}", staticAdd2)
+                    .replace("{add3}", staticAdd3)
+                    .replace("[customer]", entry.accountName)
+                    .replace("[TM]", entry.balance)
+                    .replace("[Mobile]", entry.mobile)
 
-                val intent = Intent(Intent.ACTION_VIEW).apply {
-                    data = Uri.parse("https://wa.me/91$phoneNumber?text=${Uri.encode(message)}")
-                    setPackage("com.whatsapp")
-                }
+                val digitsOnly = entry.mobile.filter { it.isDigit() }
+                val normalized = if (digitsOnly.startsWith("91")) digitsOnly else "91$digitsOnly"
+                val chatId = "$normalized@c.us"
 
-                try {
-                    context.startActivity(intent)
-                    kotlinx.coroutines.delay(2000) // Delay between messages
-                } catch (e: Exception) {
-                    timber.log.Timber.e(e, "Failed to send WhatsApp to ${entry.mobile}")
+                // Send via Green API using instanceId and accessToken
+                if (instanceId.isBlank() || accessToken.isBlank()) {
+                    timber.log.Timber.w("InstanceId or AccessToken missing, skipping send for ${entry.mobile}")
+                } else {
+                    try {
+                        val client = okhttp3.OkHttpClient()
+                        val url = "https://api.green-api.com/waInstance$instanceId/sendMessage/$accessToken"
+                        val jsonObj = mapOf(
+                            "chatId" to chatId,
+                            "message" to msg
+                        )
+                        val jsonStr = com.google.gson.Gson().toJson(jsonObj)
+                        val mediaType = "application/json; charset=utf-8".toMediaType()
+                        val body = jsonStr.toRequestBody(mediaType)
+                        val request = okhttp3.Request.Builder()
+                            .url(url)
+                            .post(body)
+                            .build()
+
+                        // Execute on IO dispatcher
+                        withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            client.newCall(request).execute().use { response ->
+                                if (!response.isSuccessful) {
+                                    timber.log.Timber.e("Green API send failed for ${entry.mobile}: ${response.code} ${response.message}")
+                                } else {
+                                    timber.log.Timber.d("Green API send success for ${entry.mobile}")
+                                }
+                            }
+                        }
+                        kotlinx.coroutines.delay(500) // small delay to avoid rate-limits
+                    } catch (e: Exception) {
+                        timber.log.Timber.e(e, "Failed to send via Green API to ${entry.mobile}")
+                    }
                 }
             }
         }

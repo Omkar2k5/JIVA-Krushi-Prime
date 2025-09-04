@@ -114,6 +114,34 @@ class RemoteDataSource {
         }
     }
 
+    /** MsgTemplates API */
+    suspend fun getMsgTemplates(userId: Int): Result<com.example.jiva.data.api.models.MsgTemplatesResponse> {
+        return try {
+            Timber.d("Making MsgTemplates API call with userId: $userId")
+            val request = com.example.jiva.data.api.models.MsgTemplatesRequest(userId)
+            val response = apiService.getMsgTemplates(request)
+            Timber.d("MsgTemplates response: isSuccess=${response.isSuccess}, size=${response.data?.size}")
+            Result.success(response)
+        } catch (e: Exception) {
+            Timber.e(e, "MsgTemplates API call failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    /** CompanyInfo API */
+    suspend fun getCompanyInfo(userId: Int): Result<com.example.jiva.data.api.models.CompanyInfoResponse> {
+        return try {
+            Timber.d("Making CompanyInfo API call with userId: $userId")
+            val request = com.example.jiva.data.api.models.CompanyInfoRequest(userId)
+            val response = apiService.getCompanyInfo(request)
+            Timber.d("CompanyInfo response: isSuccess=${response.isSuccess}")
+            Result.success(response)
+        } catch (e: Exception) {
+            Timber.e(e, "CompanyInfo API call failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
     /** Account Names API */
     suspend fun getAccountNames(userId: Int, yearString: String): Result<com.example.jiva.data.api.models.AccountNamesResponse> {
         return try {

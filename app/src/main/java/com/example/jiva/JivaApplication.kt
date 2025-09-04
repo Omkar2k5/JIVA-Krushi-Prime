@@ -67,6 +67,49 @@ class JivaApplication : MultiDexApplication() {
 
         // Log basic device information
         logDeviceInformation()
+
+        // Fetch company info and message templates on startup
+        fetchCompanyInfoAndMsgTemplates()
+    }
+
+    private fun fetchCompanyInfoAndMsgTemplates() {
+        applicationScope.launch(Dispatchers.IO) {
+            try {
+                val ctx = this@JivaApplication
+                // Resolve user id; default to 1017 if not set yet
+                val userId = com.example.jiva.utils.UserEnv.getUserId(ctx)?.toIntOrNull() ?: 1017
+
+                // CompanyInfo
+                runCatching {
+                    remoteDataSource.getCompanyInfo(userId)
+                }.onSuccess { result ->
+                    result.getOrNull()?.let { resp ->
+                        if (resp.isSuccess) {
+                            resp.data?.companyName?.let { name ->
+                                com.example.jiva.utils.UserEnv.setCompanyName(ctx, name)
+                            }
+                        }
+                    }
+                }.onFailure { e -> Timber.w(e, "CompanyInfo fetch failed") }
+
+                // MsgTemplates
+                runCatching {
+                    remoteDataSource.getMsgTemplates(userId)
+                }.onSuccess { result ->
+                    result.getOrNull()?.let { resp ->
+                        if (resp.isSuccess && !resp.data.isNullOrEmpty()) {
+                            // Store templates JSON in UserEnv
+                            val gson = com.google.gson.Gson()
+                            val json = gson.toJson(resp.data)
+                            com.example.jiva.utils.UserEnv.setMsgTemplatesJson(ctx, json)
+                            Timber.d("MsgTemplates stored: ${resp.data.size}")
+                        }
+                    }
+                }.onFailure { e -> Timber.w(e, "MsgTemplates fetch failed") }
+            } catch (e: Exception) {
+                Timber.e(e, "Startup fetch (CompanyInfo/MsgTemplates) error")
+            }
+        }
     }
     
     /**

@@ -12,6 +12,9 @@ object UserEnv {
     private const val KEY_COMPANY_NAME = "company_name"
     private const val KEY_FINANCIAL_YEAR = "financial_year"
 
+    // MsgTemplates storage
+    private const val KEY_MSG_TEMPLATES_JSON = "msg_templates_json"
+
     fun setUserId(context: Context, userId: String) {
         context.applicationContext
             .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
@@ -75,6 +78,29 @@ object UserEnv {
             .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
             .edit()
             .remove(KEY_FINANCIAL_YEAR)
+            .apply()
+    }
+
+    // MsgTemplates helpers: store whole list JSON for simplicity
+    fun setMsgTemplatesJson(context: Context, json: String) {
+        context.applicationContext
+            .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_MSG_TEMPLATES_JSON, json)
+            .apply()
+    }
+
+    fun getMsgTemplatesJson(context: Context): String? {
+        return context.applicationContext
+            .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_MSG_TEMPLATES_JSON, null)
+    }
+
+    fun clearMsgTemplates(context: Context) {
+        context.applicationContext
+            .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .remove(KEY_MSG_TEMPLATES_JSON)
             .apply()
     }
 }

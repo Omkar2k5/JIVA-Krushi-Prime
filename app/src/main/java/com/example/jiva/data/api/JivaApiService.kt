@@ -117,6 +117,13 @@ interface JivaApiService {
     suspend fun getCompanyInfo(@Body request: CompanyInfoRequest): CompanyInfoResponse
 
     /**
+     * POST /api/JivaBusiness/MsgTemplates
+     */
+    @Headers("Content-Type: application/json")
+    @POST("api/JivaBusiness/MsgTemplates")
+    suspend fun getMsgTemplates(@Body request: com.example.jiva.data.api.models.MsgTemplatesRequest): com.example.jiva.data.api.models.MsgTemplatesResponse
+
+    /**
      * POST /api/JivaBusiness/GetYear
      */
     @Headers("Content-Type: application/json")
