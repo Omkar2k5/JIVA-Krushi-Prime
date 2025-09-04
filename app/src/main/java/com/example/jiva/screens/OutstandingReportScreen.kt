@@ -130,45 +130,48 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
         return
     }
 
-    // Preload dropdowns (Account_Names) before user interaction
+    // Default selection is Customer; auto-fetch outstanding on open
     LaunchedEffect(finalUserId, year) {
         val uid = finalUserId ?: return@LaunchedEffect
         try {
-            viewModel.loadAccountNames(uid, year)
+            // Auto-load for default selection Customer -> under = Sundry creditors
+            viewModel.fetchOutstandingFiltered(
+                userId = uid,
+                year = year,
+                accountName = null,
+                area = null,
+                under = "Sundry creditors"
+            )
         } catch (e: Exception) {
-            timber.log.Timber.e(e, "loadAccountNames crashed")
+            timber.log.Timber.e(e, "initial outstanding fetch crashed")
         }
     }
-
-    // Collect dropdowns and UI state
-    val accountNames by viewModel.accountNames.collectAsState()
-    val areaOptions by viewModel.areaOptions.collectAsState()
 
     // Remote filtered entries from UI state (no Room)
     val filteredEntries = uiState.outstandingEntries
 
-    // Local filters state
+    // Local filters state (simplified)
     var hasClickedShow by remember { mutableStateOf(false) }
-    var accountInputText by remember { mutableStateOf("") }
-    var accountDropdownExpanded by remember { mutableStateOf(false) }
-    val accountSuggestions = remember(accountInputText, accountNames) {
-        accountNames.filter { it.contains(accountInputText, ignoreCase = true) }.take(20)
-    }
-    var selectedAccount by remember { mutableStateOf<String?>(null) }
-    var selectedArea by remember { mutableStateOf<String?>(null) }
     var selectedUnder by remember { mutableStateOf<String?>(null) }
 
-    // Show button action
+    // Show button action (Customer/Supplier)
     fun applyFilters() {
         val uid = finalUserId ?: return
         hasClickedShow = true
-        val chosenAccount = selectedAccount ?: accountInputText.takeIf { it.isNotBlank() }
+        // Map selection to 'under' per requirement
+        val requestedUnder = if (outstandingOf.equals("Customer", ignoreCase = true)) {
+            "Sundry creditors"
+        } else {
+            "Sundry debtors"
+        }
+        // Clear previous selections for WhatsApp when reloading
+        selectedEntries = emptySet()
         viewModel.fetchOutstandingFiltered(
             userId = uid,
             year = year,
-            accountName = chosenAccount,
-            area = selectedArea,
-            under = selectedUnder
+            accountName = null,
+            area = null,
+            under = requestedUnder
         )
     }
 
@@ -310,55 +313,41 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                             modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            // Account autocomplete (type to search + dropdown)
+                            // Customer/Supplier selector
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 Text(
-                                    text = "Account Name",
+                                    text = "Outstanding Of",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = JivaColors.DeepBlue,
                                     modifier = Modifier.padding(bottom = 4.dp)
                                 )
-                                ExposedDropdownMenuBox(
-                                    expanded = accountDropdownExpanded,
-                                    onExpandedChange = { accountDropdownExpanded = !accountDropdownExpanded }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    OutlinedTextField(
-                                        value = accountInputText,
-                                        onValueChange = { accountInputText = it; selectedAccount = null; accountDropdownExpanded = true },
-                                        placeholder = { Text("Type to search account...") },
-                                        singleLine = true,
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedTextColor = Color.Black,
-                                            unfocusedTextColor = Color.Black,
-                                            cursorColor = JivaColors.DeepBlue
-                                        ),
-                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = accountDropdownExpanded) },
-                                        modifier = Modifier.menuAnchor().fillMaxWidth(),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    ExposedDropdownMenu(
-                                        expanded = accountDropdownExpanded,
-                                        onDismissRequest = { accountDropdownExpanded = false }
-                                    ) {
-                                        accountSuggestions.forEach { name ->
-                                            DropdownMenuItem(
-                                                text = { Text(name) },
-                                                onClick = {
-                                                    selectedAccount = name
-                                                    accountInputText = name
-                                                    accountDropdownExpanded = false
-                                                }
-                                            )
-                                        }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        RadioButton(
+                                            selected = outstandingOf == "Customer",
+                                            onClick = { outstandingOf = "Customer" }
+                                        )
+                                        Text("Customer", fontSize = 14.sp)
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        RadioButton(
+                                            selected = outstandingOf == "Supplier",
+                                            onClick = { outstandingOf = "Supplier" }
+                                        )
+                                        Text("Supplier", fontSize = 14.sp)
                                     }
                                 }
                             }
 
-                            // Show button
+                            // Show button (triggers API with selected Customer/Supplier)
                             Button(
                                 onClick = { applyFilters() },
-                                enabled = (accountInputText.isNotBlank() || selectedAccount != null),
+                                enabled = true,
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(8.dp),
                                 colors = ButtonDefaults.buttonColors(
@@ -392,44 +381,7 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
 
                                 // Removed Area filter as requested
 
-                                // Under dropdown
-                                var underExpanded by remember { mutableStateOf(false) }
-                                val underOptions = listOf("Sundary Debtors", "Sundary Creditors")
-                                Text(
-                                    text = "Under",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                                ExposedDropdownMenuBox(
-                                    expanded = underExpanded,
-                                    onExpandedChange = { underExpanded = !underExpanded }
-                                ) {
-                                    OutlinedTextField(
-                                        value = selectedUnder ?: "",
-                                        onValueChange = {},
-                                        readOnly = true,
-                                        placeholder = { Text("Select Under...") },
-                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = underExpanded) },
-                                        modifier = Modifier.menuAnchor().fillMaxWidth(),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    ExposedDropdownMenu(
-                                        expanded = underExpanded,
-                                        onDismissRequest = { underExpanded = false }
-                                    ) {
-                                        underOptions.forEach { u ->
-                                            DropdownMenuItem(
-                                                text = { Text(u) },
-                                                onClick = {
-                                                    selectedUnder = u
-                                                    underExpanded = false
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
+                                // Under is now controlled by Customer/Supplier selection; hide manual dropdown
 
                                 // Extra text filters (optional)
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -485,10 +437,9 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                     OutlinedButton(
                                         onClick = {
                                             // Clear filters
-                                            selectedAccount = null
                                             selectedUnder = null
-                                            accountInputText = ""
                                             partyNameSearch = ""
+                                            mobileNumberSearch = ""
                                             hasClickedShow = false
                                             // Re-fetch full data (no filters)
                                             val uid = finalUserId ?: return@OutlinedButton
