@@ -114,6 +114,11 @@ data class OutstandingEntry(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
+    // Bulk send progress state
+    var isBulkSending by remember { mutableStateOf(false) }
+    var bulkSent by remember { mutableStateOf(0) }
+    var bulkTotal by remember { mutableStateOf(0) }
+    var etaLeftSec by remember { mutableStateOf(0) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -475,65 +480,77 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                 color = JivaColors.DeepBlue
                             )
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Selected: ${'$'}{selectedEntries.size} of ${'$'}{uiState.outstandingEntries.size} entries",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue
-                                )
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Checkbox(
-                                        checked = selectAll,
-                                        onCheckedChange = { selectAll = it },
-                                        colors = CheckboxDefaults.colors(checkedColor = JivaColors.Purple)
-                                    )
-                                    Text(
-                                        text = "Select All",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = JivaColors.DeepBlue
-                                    )
-                                }
-                            }
-
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = JivaColors.LightGray),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Text(
-                                        text = "Message Template:",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = JivaColors.DarkGray
-                                    )
-                                    Text(
-                                        text = whatsappTemplate,
-                                        fontSize = 14.sp,
-                                        color = JivaColors.DeepBlue,
-                                        modifier = Modifier.padding(top = 4.dp)
-                                    )
-                                }
-                            }
+                            
 
                             Button(
                                 onClick = {
                                     if (selectedEntries.isNotEmpty()) {
                                         scope.launch {
-                                            sendWhatsAppMessages(
-                                                context = context,
-                                                entries = finalEntries,
-                                                selectedIds = selectedEntries,
-                                                templatePreview = whatsappTemplate,
-                                                instanceId = waInstanceId,
-                                                accessToken = waAccessToken
-                                            )
+                                            // If exactly one selection -> single-user API call
+                                            if (selectedEntries.size == 1) {
+                                                val acId = selectedEntries.first()
+                                                val entry = finalEntries.firstOrNull { it.acId == acId }
+                                                if (entry != null) {
+                                                    val digits = entry.mobile.filter { it.isDigit() }
+                                                    val number = when (digits.length) {
+                                                        10 -> "91$digits"
+                                                        12 -> digits
+                                                        else -> entry.mobile.trim()
+                                                    }
+                                                    val companyName = UserEnv.getCompanyName(context) ?: ""
+                                                    val msg = whatsappTemplate
+                                                        .replace("{CmpName}", companyName)
+                                                        .replace("{add1}", "Shop Address 1")
+                                                        .replace("{add2}", "Shop Address 2")
+                                                        .replace("{add3}", "Shop Address 3")
+                                                        .replace("[customer]", entry.accountName)
+                                                        .replace("[TM]", entry.balance)
+                                                        .replace("[Mobile]", entry.mobile)
+                                                        .ifBlank { "test message" }
+                                                    val (ok, _) = com.example.jiva.data.network.JivabotApi.send(
+                                                        number = number,
+                                                        type = "text",
+                                                        message = msg,
+                                                        instanceId = waInstanceId,
+                                                        accessToken = waAccessToken
+                                                    )
+                                                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                        Toast.makeText(
+                                                            context,
+                                                            if (ok) "Message sent" else "Failed to send message",
+                                                            Toast.LENGTH_LONG
+                                                        ).show()
+                                                    }
+                                                }
+                                            } else {
+                                                // Bulk send with progress updates
+                                                isBulkSending = true
+                                                bulkTotal = selectedEntries.size
+                                                bulkSent = 0
+                                                etaLeftSec = bulkTotal * 5
+                                                sendWhatsAppMessages(
+                                                    context = context,
+                                                    entries = finalEntries,
+                                                    selectedIds = selectedEntries,
+                                                    templatePreview = whatsappTemplate,
+                                                    instanceId = waInstanceId,
+                                                    accessToken = waAccessToken
+                                                ) { sentCount, totalCount ->
+                                                    bulkSent = sentCount
+                                                    bulkTotal = totalCount
+                                                    etaLeftSec = (totalCount - sentCount) * 5
+                                                    if (sentCount == totalCount) {
+                                                        isBulkSending = false
+                                                        scope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                                                            Toast.makeText(
+                                                                context,
+                                                                "Bulk messages sent",
+                                                                Toast.LENGTH_LONG
+                                                            ).show()
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 },
@@ -552,7 +569,7 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Send WhatsApp to ${'$'}{selectedEntries.size} contacts",
+                                    text = "Send WhatsApp",
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
@@ -857,7 +874,8 @@ private suspend fun sendWhatsAppMessages(
     selectedIds: Set<String>,
     templatePreview: String,
     instanceId: String,
-    accessToken: String
+    accessToken: String,
+    onProgress: ((sent: Int, total: Int) -> Unit)? = null
 ) {
     try {
         val selectedEntries = entries.filter { it.acId in selectedIds }
@@ -865,6 +883,23 @@ private suspend fun sendWhatsAppMessages(
         val staticAdd1 = "Shop Address 1"
         val staticAdd2 = "Shop Address 2"
         val staticAdd3 = "Shop Address 3"
+
+        // Validate credentials once before sending; show toast and return if invalid
+        if (instanceId.isBlank() || accessToken.isBlank()) {
+            withContext(Dispatchers.Main) {
+                Toast.makeText(
+                    context,
+                    "Invalid WhatsApp credentials. Please set Instance ID and Access Token.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+            return
+        }
+
+        var invalidCredToastShown = false
+        var sent = 0
+        val total = selectedEntries.size
+        onProgress?.invoke(sent, total)
 
         for (entry in selectedEntries) {
             if (entry.mobile.isNotBlank()) {
@@ -877,36 +912,45 @@ private suspend fun sendWhatsAppMessages(
                     .replace("[TM]", entry.balance)
                     .replace("[Mobile]", entry.mobile)
 
-                val digitsOnly = entry.mobile.filter { it.isDigit() }
-                val normalized = if (digitsOnly.startsWith("91")) digitsOnly else "91${'$'}digitsOnly"
-                val chatId = "${'$'}normalized@c.us"
+                // Normalize number: add 91 for 10-digit numbers, pass-through for 12-digit
+                val digits = entry.mobile.filter { it.isDigit() }
+                val numberRaw = when (digits.length) {
+                    10 -> "91$digits"
+                    12 -> digits
+                    else -> entry.mobile.trim()
+                }
 
                 if (instanceId.isBlank() || accessToken.isBlank()) {
                     Timber.w("InstanceId or AccessToken missing, skipping send for ${'$'}{entry.mobile}")
                 } else {
                     try {
-                        val client = okhttp3.OkHttpClient()
-                        val url = "https://api.green-api.com/waInstance${'$'}instanceId/sendMessage/${'$'}accessToken"
-                        val jsonObj = mapOf("chatId" to chatId, "message" to msg)
-                        val jsonStr = com.google.gson.Gson().toJson(jsonObj)
-                        val mediaType = "application/json; charset=utf-8".toMediaType()
-                        val body = jsonStr.toRequestBody(mediaType)
-                        val request = okhttp3.Request.Builder()
-                            .url(url)
-                            .post(body)
-                            .build()
-                        withContext(Dispatchers.IO) {
-                            client.newCall(request).execute().use { response ->
-                                if (!response.isSuccessful) {
-                                    Timber.e("Green API send failed for ${'$'}{entry.mobile}: ${'$'}{response.code} ${'$'}{response.message}")
-                                } else {
-                                    Timber.d("Green API send success for ${'$'}{entry.mobile}")
+                        // Use centralized Jivabot API helper
+                        val (ok, _) = com.example.jiva.data.network.JivabotApi.send(
+                            number = numberRaw,
+                            type = "text",
+                            message = msg,
+                            instanceId = instanceId,
+                            accessToken = accessToken
+                        )
+                        if (!ok) {
+                            if (!invalidCredToastShown) {
+                                invalidCredToastShown = true
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(
+                                        context,
+                                        "Failed to send via Jivabot. Check connectivity or credentials.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
                                 }
                             }
                         }
-                        delay(500)
+                        // Progress update after each send
+                        sent += 1
+                        onProgress?.invoke(sent, total)
+                        // 5-second delay between each message for bulk sending
+                        delay(5000)
                     } catch (e: Exception) {
-                        Timber.e(e, "Failed to send via Green API to ${'$'}{entry.mobile}")
+                        Timber.e(e, "Failed to send via Jivabot to ${'$'}{entry.mobile}")
                     }
                 }
             }
