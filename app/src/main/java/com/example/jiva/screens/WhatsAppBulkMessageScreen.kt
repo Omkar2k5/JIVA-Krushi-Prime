@@ -46,6 +46,7 @@ data class CustomerContact(
 fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
     // State management
     var messageText by remember { mutableStateOf("") }
+    var imageUrl by remember { mutableStateOf("") }
     var selectAll by remember { mutableStateOf(false) }
     
     // Get the context and database
@@ -55,6 +56,18 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
     // Create repository and view model
     val jivaRepository = remember { JivaRepositoryImpl(database) }
     val viewModel: WhatsAppViewModel = viewModel { WhatsAppViewModel(jivaRepository) }
+
+    // On open: fetch Sundry debtors via Outstanding API
+    LaunchedEffect(Unit) {
+        val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
+        val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
+        if (userId != null) {
+            viewModel.loadCustomerContactsFromOutstanding(userId, year)
+        } else {
+            // Fallback to DB if session missing
+            viewModel.loadCustomerContacts()
+        }
+    }
     
     // Observe UI state
     val uiState by viewModel.uiState.collectAsState()
@@ -195,10 +208,31 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(150.dp),
+                                .height(120.dp),
                             shape = RoundedCornerShape(12.dp),
-                            maxLines = 8,
+                            maxLines = 6,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.Black,
+                                unfocusedTextColor = Color.Black,
+                                cursorColor = JivaColors.Purple
+                            )
+                        )
+
+                        // Image URL input
+                        Text(
+                            text = "Image URL (optional)",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = JivaColors.DeepBlue
+                        )
+                        OutlinedTextField(
+                            value = imageUrl,
+                            onValueChange = { imageUrl = it },
+                            placeholder = { Text("https://example.com/image.jpg") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = Color.Black,
                                 unfocusedTextColor = Color.Black,
@@ -427,30 +461,18 @@ private fun CustomerTableHeader() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                JivaColors.LightGray,
-                RoundedCornerShape(8.dp)
-            )
-            .padding(12.dp),
+            .background(JivaColors.LightGray, RoundedCornerShape(8.dp))
+            .padding(vertical = 12.dp, horizontal = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Checkbox column header
-        Box(
-            modifier = Modifier.width(40.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "✓",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = JivaColors.DeepBlue
-            )
+        // Checkbox column header (match Outstanding style)
+        Box(modifier = Modifier.width(50.dp), contentAlignment = Alignment.Center) {
+            Icon(imageVector = Icons.Default.Check, contentDescription = "Select", tint = JivaColors.DeepBlue, modifier = Modifier.size(16.dp))
         }
-
-        CustomerHeaderCell("Account No.", modifier = Modifier.weight(1f))
-        CustomerHeaderCell("Account Name", modifier = Modifier.weight(2f))
-        CustomerHeaderCell("Mobile Number", modifier = Modifier.weight(1.5f))
+        CustomerHeaderCell("AC ID", Modifier.width(80.dp))
+        CustomerHeaderCell("Account Name", Modifier.width(180.dp))
+        CustomerHeaderCell("Mobile", Modifier.width(140.dp))
     }
 }
 
@@ -461,7 +483,7 @@ private fun CustomerHeaderCell(text: String, modifier: Modifier = Modifier) {
         fontSize = 12.sp,
         fontWeight = FontWeight.Bold,
         color = JivaColors.DeepBlue,
-        textAlign = TextAlign.Start,
+        textAlign = TextAlign.Center,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier
@@ -473,40 +495,22 @@ private fun CustomerTableRow(
     contact: CustomerContact,
     onSelectionChanged: (Boolean) -> Unit
 ) {
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp, horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Checkbox
-            Box(
-                modifier = Modifier.width(40.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Checkbox(
-                    checked = contact.isSelected,
-                    onCheckedChange = onSelectionChanged,
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = JivaColors.Green,
-                        uncheckedColor = JivaColors.DeepBlue.copy(alpha = 0.6f)
-                    )
-                )
-            }
-
-            CustomerCell(contact.accountNumber, modifier = Modifier.weight(1f))
-            CustomerCell(contact.accountName, modifier = Modifier.weight(2f))
-            CustomerCell(contact.mobileNumber, modifier = Modifier.weight(1.5f))
-        }
-
-        HorizontalDivider(
-            color = JivaColors.LightGray,
-            thickness = 0.5.dp,
-            modifier = Modifier.padding(horizontal = 12.dp)
+    Row(
+        modifier = Modifier
+            .padding(vertical = 8.dp, horizontal = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = contact.isSelected,
+            onCheckedChange = onSelectionChanged,
+            colors = CheckboxDefaults.colors(checkedColor = JivaColors.Purple)
         )
+        CustomerCell(contact.accountNumber, Modifier.width(80.dp))
+        CustomerCell(contact.accountName, Modifier.width(180.dp))
+        CustomerCell(contact.mobileNumber, Modifier.width(140.dp))
     }
+    Divider(color = JivaColors.LightGray, thickness = 0.5.dp, modifier = Modifier.padding(horizontal = 8.dp))
 }
 
 @Composable
@@ -519,8 +523,8 @@ private fun CustomerCell(
         text = text,
         fontSize = 11.sp,
         color = color,
-        textAlign = TextAlign.Start,
-        maxLines = 2,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier
     )

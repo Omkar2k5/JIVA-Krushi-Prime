@@ -20,29 +20,55 @@ class WhatsAppViewModel(
     private val jivaRepository: JivaRepository
 ) : ViewModel() {
     
+    private val remote = com.example.jiva.data.network.RemoteDataSource()
+
     private val _uiState = MutableStateFlow(WhatsAppUiState(isLoading = true))
     val uiState: StateFlow<WhatsAppUiState> = _uiState.asStateFlow()
     
-    init {
-        loadCustomerContacts()
-    }
-    
     /**
-     * Loads customer contacts from the database
-     * Fetches account names and mobile numbers from AccountMaster table
+     * Load customer contacts from Outstanding API with default filter: under = "Sundry debtors"
+     */
+    fun loadCustomerContactsFromOutstanding(userId: Int, year: String) {
+        viewModelScope.launch {
+            try {
+                _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+                val filters = mapOf("under" to "Sundry debtors")
+                val resp = remote.getOutstanding(userId, year, filters)
+                if (resp.isSuccess) {
+                    val data = resp.getOrNull()?.data.orEmpty()
+                    val contacts = data
+                        .filter { !it.mobile.isNullOrBlank() }
+                        .map {
+                            CustomerContact(
+                                accountNumber = it.acId.ifBlank { "0" },
+                                accountName = it.accountName,
+                                mobileNumber = formatMobileNumber(it.mobile),
+                                isSelected = false
+                            )
+                        }
+                    _uiState.value = _uiState.value.copy(customerContacts = contacts, isLoading = false)
+                    Timber.d("Loaded ${contacts.size} contacts from Outstanding API")
+                } else {
+                    _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = resp.exceptionOrNull()?.message)
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Error loading contacts from Outstanding API")
+                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = e.message)
+            }
+        }
+    }
+
+    /**
+     * Fallback: Loads customer contacts from the database (AccountMaster)
      */
     fun loadCustomerContacts() {
         viewModelScope.launch {
             try {
                 _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
-                
-                // Get all accounts from the repository
                 val accountsFlow = jivaRepository.getAllAccounts()
-                
-                // Collect the accounts and map them to CustomerContact objects
                 accountsFlow.collect { accounts ->
                     val customerContacts = accounts
-                        .filter { !it.mobile.isNullOrBlank() } // Only include accounts with mobile numbers
+                        .filter { !it.mobile.isNullOrBlank() }
                         .map { account ->
                             CustomerContact(
                                 accountNumber = account.acId?.toString() ?: "0",
@@ -51,16 +77,14 @@ class WhatsAppViewModel(
                                 isSelected = false
                             )
                         }
-                    
                     _uiState.value = _uiState.value.copy(
                         customerContacts = customerContacts,
                         isLoading = false
                     )
-                    
-                    Timber.d("Loaded ${customerContacts.size} customer contacts")
+                    Timber.d("Loaded ${customerContacts.size} customer contacts from DB")
                 }
             } catch (e: Exception) {
-                Timber.e(e, "Error loading customer contacts")
+                Timber.e(e, "Error loading customer contacts from DB")
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     errorMessage = "Failed to load customer contacts: ${e.message}"
@@ -73,12 +97,7 @@ class WhatsAppViewModel(
      * Format mobile number to include country code if not present
      */
     private fun formatMobileNumber(mobile: String): String {
-        // If mobile number doesn't start with +91, add it
-        return if (mobile.startsWith("+91")) {
-            mobile
-        } else {
-            "+91 $mobile"
-        }
+        return if (mobile.startsWith("+91")) mobile else "+91 $mobile"
     }
     
     /**
@@ -87,7 +106,6 @@ class WhatsAppViewModel(
     fun updateContactSelection(accountNumber: String, isSelected: Boolean) {
         val currentContacts = _uiState.value.customerContacts.toMutableList()
         val index = currentContacts.indexOfFirst { it.accountNumber == accountNumber }
-        
         if (index != -1) {
             currentContacts[index] = currentContacts[index].copy(isSelected = isSelected)
             _uiState.value = _uiState.value.copy(customerContacts = currentContacts)
@@ -98,9 +116,7 @@ class WhatsAppViewModel(
      * Selects or deselects all customer contacts
      */
     fun selectAllContacts(selectAll: Boolean) {
-        val updatedContacts = _uiState.value.customerContacts.map { 
-            it.copy(isSelected = selectAll) 
-        }
+        val updatedContacts = _uiState.value.customerContacts.map { it.copy(isSelected = selectAll) }
         _uiState.value = _uiState.value.copy(customerContacts = updatedContacts)
     }
     
