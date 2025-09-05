@@ -8,7 +8,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ExpiryRequest(
     val userID: Int,
-    val yearString: String
+    val yearString: String,
+    val filters: Map<String, String> = emptyMap()
 )
 
 /**

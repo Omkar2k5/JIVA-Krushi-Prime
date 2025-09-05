@@ -67,7 +67,6 @@ fun ExpiryReportScreen(onBackClick: () -> Unit = {}) {
 
     // High-performance loading states
     var isScreenLoading by remember { mutableStateOf(true) }
-    var isRefreshing by remember { mutableStateOf(false) }
     var loadingProgress by remember { mutableStateOf(0) }
     var loadingMessage by remember { mutableStateOf("") }
     var dataLoadingProgress by remember { mutableStateOf(0f) }
@@ -84,19 +83,38 @@ fun ExpiryReportScreen(onBackClick: () -> Unit = {}) {
     // Get current year and user ID
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
 
-    // Handle initial screen loading with progress tracking
+    // Handle initial screen loading with progress tracking and data sync
     LaunchedEffect(Unit) {
         isScreenLoading = true
         loadingMessage = "Initializing Expiry data..."
 
+        // Check if we have data, if not, try to sync
+        val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
+        if (userId != null) {
+            loadingMessage = "Syncing Expiry data from server..."
+            dataLoadingProgress = 25f
+
+            try {
+                val result = application.repository.syncExpiry(userId, year)
+                if (result.isSuccess) {
+                    loadingMessage = "Data synced successfully"
+                    dataLoadingProgress = 75f
+                } else {
+                    loadingMessage = "Using cached data"
+                    dataLoadingProgress = 50f
+                }
+            } catch (e: Exception) {
+                loadingMessage = "Using cached data"
+                dataLoadingProgress = 50f
+            }
+        }
+
         // Simulate progressive loading for better UX
-        for (i in 0..100 step 10) {
+        for (i in 75..100 step 5) {
             loadingProgress = i
             dataLoadingProgress = i.toFloat()
             loadingMessage = when {
-                i < 30 -> "Loading Expiry data..."
-                i < 70 -> "Processing ${i}% complete..."
-                i < 100 -> "Finalizing data..."
+                i < 90 -> "Finalizing data..."
                 else -> "Complete!"
             }
             kotlinx.coroutines.delay(50) // Smooth progress animation
@@ -104,9 +122,6 @@ fun ExpiryReportScreen(onBackClick: () -> Unit = {}) {
 
         isScreenLoading = false
     }
-
-    // Re-read userId after potential initialization
-    val finalUserId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
     // Optimized data loading - only from Room DB for better performance
     val expiryEntities by viewModel.observeExpiry(year).collectAsState(initial = emptyList())
@@ -235,49 +250,12 @@ fun ExpiryReportScreen(onBackClick: () -> Unit = {}) {
             .fillMaxSize()
             .background(JivaColors.LightGray)
     ) {
-        // Responsive Header with Refresh Button
+        // Responsive Header without Refresh Button
         ResponsiveReportHeader(
             title = "Expiry Report",
             subtitle = "Item expiry tracking and alerts",
             onBackClick = onBackClick,
-            actions = {
-                // Refresh Button
-                IconButton(
-                    onClick = {
-                        if (finalUserId != null && !isRefreshing) {
-                            scope.launch {
-                                isRefreshing = true
-                                try {
-                                    val result = application.repository.syncExpiry(finalUserId, year)
-                                    if (result.isSuccess) {
-                                        Toast.makeText(context, "Expiry data refreshed successfully", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        Toast.makeText(context, "Failed to refresh data", Toast.LENGTH_SHORT).show()
-                                    }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                                } finally {
-                                    isRefreshing = false
-                                }
-                            }
-                        }
-                    }
-                ) {
-                    if (isRefreshing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = JivaColors.White,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh",
-                            tint = JivaColors.White
-                        )
-                    }
-                }
-            }
+            actions = { }
         )
 
         // Main content with filters and table
@@ -607,14 +585,6 @@ fun ExpiryReportScreen(onBackClick: () -> Unit = {}) {
                                                     color = JivaColors.DarkGray,
                                                     textAlign = TextAlign.Center
                                                 )
-                                                if (allEntries.isEmpty()) {
-                                                    Text(
-                                                        text = "Tap the refresh button to sync data",
-                                                        fontSize = 14.sp,
-                                                        color = JivaColors.Purple,
-                                                        textAlign = TextAlign.Center
-                                                    )
-                                                }
                                             }
                                         }
                                     }

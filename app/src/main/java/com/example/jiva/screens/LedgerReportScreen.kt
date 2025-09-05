@@ -36,6 +36,9 @@ import android.widget.Toast
 import java.text.SimpleDateFormat
 import java.util.*
 
+// PDF generation utils
+import com.example.jiva.utils.PDFGenerator
+
 
 
 /**
@@ -220,7 +223,49 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
             title = "Ledger Report",
             subtitle = "Ledger entries and transactions",
             onBackClick = onBackClick,
-            actions = { }
+            actions = {
+                // Share PDF action
+                IconButton(onClick = {
+                    val cols = listOf(
+                        PDFGenerator.TableColumn("Entry No", 70f) { (it as LedgerEntry).entryNo },
+                        PDFGenerator.TableColumn("Manual No", 70f) { (it as LedgerEntry).manualNo },
+                        PDFGenerator.TableColumn("Type", 80f) { (it as LedgerEntry).entryType },
+                        PDFGenerator.TableColumn("Date", 90f) { (it as LedgerEntry).entryDate },
+                        PDFGenerator.TableColumn("Ref No", 70f) { (it as LedgerEntry).refNo },
+                        PDFGenerator.TableColumn("AC ID", 70f) { (it as LedgerEntry).acId },
+                        PDFGenerator.TableColumn("DR", 80f) { (it as LedgerEntry).dr },
+                        PDFGenerator.TableColumn("CR", 80f) { (it as LedgerEntry).cr },
+                        PDFGenerator.TableColumn("Narration", 150f) { (it as LedgerEntry).narration }
+                    )
+                    val totals = mapOf(
+                        "Entry No" to "",
+                        "Manual No" to "",
+                        "Type" to "",
+                        "Date" to "",
+                        "Ref No" to "",
+                        "AC ID" to "",
+                        "DR" to "₹${String.format("%.2f", totalDr)}",
+                        "CR" to "₹${String.format("%.2f", totalCr)}",
+                        "Narration" to ""
+                    )
+                    // Launch coroutine to generate and share
+                    scope.launch {
+                        PDFGenerator.generateAndSharePDF(
+                            context = context,
+                            config = PDFGenerator.PDFConfig(
+                                title = "Ledger Report",
+                                fileName = "Ledger_Report",
+                                columns = cols,
+                                data = filteredEntries,
+                                totalRow = totals,
+                                landscape = true // A4 landscape
+                            )
+                        )
+                    }
+                }) {
+                    Icon(imageVector = Icons.Default.Share, contentDescription = "Share PDF", tint = JivaColors.White)
+                }
+            }
         )
 
         // Main content

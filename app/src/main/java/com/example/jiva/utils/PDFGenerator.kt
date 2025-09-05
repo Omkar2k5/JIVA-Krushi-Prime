@@ -27,7 +27,8 @@ object PDFGenerator {
         val fileName: String,
         val columns: List<TableColumn>,
         val data: List<Any>,
-        val totalRow: Map<String, String>? = null
+        val totalRow: Map<String, String>? = null,
+        val landscape: Boolean = false // if true, A4 landscape
     )
     
     suspend fun generateAndSharePDF(
@@ -36,9 +37,13 @@ object PDFGenerator {
     ) {
         withContext(Dispatchers.IO) {
             try {
+                // Page size (A4 portrait or landscape)
+                val pageWidth = if (config.landscape) 842 else 595
+                val pageHeight = if (config.landscape) 595 else 842
+
                 // Create PDF document
                 val pdfDocument = PdfDocument()
-                val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create() // A4 size
+                val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, 1).create()
                 val page = pdfDocument.startPage(pageInfo)
                 val canvas = page.canvas
                 
@@ -70,14 +75,18 @@ object PDFGenerator {
                 
                 // Draw title
                 val currentDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
-                canvas.drawText(config.title, 297.5f, 50f, titlePaint)
-                canvas.drawText("Generated on: $currentDate", 297.5f, 75f, cellPaint)
+                canvas.drawText(config.title, pageWidth / 2f, 50f, titlePaint)
+                canvas.drawText("Generated on: $currentDate", pageWidth / 2f, 75f, cellPaint)
                 
                 // Table dimensions
                 val startX = 30f
                 val startY = 120f
                 val rowHeight = 25f
-                val colWidths = config.columns.map { it.width }.toFloatArray()
+                val rawColWidths = config.columns.map { it.width }
+                val availableWidth = pageWidth - (startX * 2)
+                val totalRawWidth = rawColWidths.sum()
+                val scale = if (totalRawWidth > 0) minOf(1f, availableWidth / totalRawWidth) else 1f
+                val colWidths = rawColWidths.map { it * scale }
                 val totalWidth = colWidths.sum()
                 
                 // Draw table headers
@@ -93,28 +102,32 @@ object PDFGenerator {
                 
                 // Draw header text and borders
                 for (i in config.columns.indices) {
-                    val rect = RectF(currentX, currentY, currentX + colWidths[i], currentY + rowHeight)
+                    val w = colWidths[i]
+                    val rect = RectF(currentX, currentY, currentX + w, currentY + rowHeight)
                     canvas.drawRect(rect, borderPaint)
                     canvas.drawText(config.columns[i].header, currentX + 5f, currentY + 15f, headerPaint)
-                    currentX += colWidths[i]
+                    currentX += w
                 }
                 
-                // Draw data rows (limit to fit on page)
+                // Draw data rows (dynamic max rows based on page height)
                 currentY += rowHeight
-                val maxRows = minOf(config.data.size, 25) // Limit to 25 rows to fit on page
+                val footerSpace = 100f
+                val rowsFit = ((pageHeight - currentY - footerSpace) / rowHeight).toInt().coerceAtLeast(0)
+                val maxRows = minOf(config.data.size, rowsFit)
                 
                 for (i in 0 until maxRows) {
                     val item = config.data[i]
                     currentX = startX
                     
                     for (j in config.columns.indices) {
-                        val rect = RectF(currentX, currentY, currentX + colWidths[j], currentY + rowHeight)
+                        val w = colWidths[j]
+                        val rect = RectF(currentX, currentY, currentX + w, currentY + rowHeight)
                         canvas.drawRect(rect, borderPaint)
                         
                         val cellValue = config.columns[j].getValue(item)
-                        val truncatedValue = if (cellValue.length > 15) cellValue.take(12) + "..." else cellValue
+                        val truncatedValue = if (cellValue.length > 25) cellValue.take(22) + "..." else cellValue
                         canvas.drawText(truncatedValue, currentX + 5f, currentY + 15f, cellPaint)
-                        currentX += colWidths[j]
+                        currentX += w
                     }
                     currentY += rowHeight
                 }
@@ -130,12 +143,13 @@ object PDFGenerator {
                     })
                     
                     for (i in config.columns.indices) {
-                        val rect = RectF(currentX, currentY, currentX + colWidths[i], currentY + rowHeight)
+                        val w = colWidths[i]
+                        val rect = RectF(currentX, currentY, currentX + w, currentY + rowHeight)
                         canvas.drawRect(rect, borderPaint)
                         
                         val cellValue = totals[config.columns[i].header] ?: ""
                         canvas.drawText(cellValue, currentX + 5f, currentY + 15f, headerPaint)
-                        currentX += colWidths[i]
+                        currentX += w
                     }
                 }
                 
