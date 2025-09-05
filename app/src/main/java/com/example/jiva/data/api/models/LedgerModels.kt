@@ -8,7 +8,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class LedgerRequest(
     val userID: Int,
-    val yearString: String
+    val yearString: String,
+    val filters: Map<String, String>? = null // e.g., { "aC_ID": "2" }
 )
 
 /**

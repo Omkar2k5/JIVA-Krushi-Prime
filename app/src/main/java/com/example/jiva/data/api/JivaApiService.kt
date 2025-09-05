@@ -152,6 +152,13 @@ interface JivaApiService {
     suspend fun getStock(@Body request: StockRequest): StockResponse
 
     /**
+     * POST /api/JivaBusiness/Accounts (for opening balance & CR/DR)
+     */
+    @Headers("Content-Type: application/json")
+    @POST("api/JivaBusiness/Accounts")
+    suspend fun getAccountsFiltered(@Body request: com.example.jiva.data.api.models.AccountsRequest): com.example.jiva.data.api.models.AccountsResponse
+
+    /**
      * POST /api/JivaBusiness/ledger
      */
     @Headers("Content-Type: application/json")

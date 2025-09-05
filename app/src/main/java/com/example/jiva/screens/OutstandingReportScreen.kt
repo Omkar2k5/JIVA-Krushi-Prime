@@ -104,6 +104,7 @@ data class OutstandingEntry(
     val accountName: String,
     val mobile: String,
     val under: String,
+    val area: String,
     val balance: String,
     val lastDate: String,
     val days: String,
@@ -732,6 +733,7 @@ private fun OutstandingTableHeader() {
         OutstandingHeaderCell("Account Name", Modifier.width(180.dp))
         OutstandingHeaderCell("Mobile", Modifier.width(140.dp))
         OutstandingHeaderCell("Under", Modifier.width(160.dp))
+        OutstandingHeaderCell("Area", Modifier.width(120.dp))
         OutstandingHeaderCell("Balance", Modifier.width(120.dp))
         OutstandingHeaderCell("Last Date", Modifier.width(140.dp))
         OutstandingHeaderCell("Days", Modifier.width(80.dp))
@@ -775,6 +777,7 @@ private fun OutstandingTableRow(
         OutstandingCell(entry.accountName, Modifier.width(180.dp))
         OutstandingCell(entry.mobile, Modifier.width(140.dp))
         OutstandingCell(entry.under, Modifier.width(160.dp))
+        OutstandingCell(entry.area, Modifier.width(120.dp))
         OutstandingCell(entry.balance, Modifier.width(120.dp), color = if ((entry.balance.replace("₹", "").replace(",", "").toDoubleOrNull() ?: 0.0) >= 0) JivaColors.Green else JivaColors.Red)
         OutstandingCell(entry.lastDate, Modifier.width(140.dp))
         OutstandingCell(entry.days, Modifier.width(80.dp))
@@ -1026,13 +1029,13 @@ private suspend fun generateAndSharePDF(
             val startY = 90f
             val rowHeight = 18f
 
-            // 9 columns to match on-screen table
+            // 10 columns to match on-screen table
             val headers = arrayOf(
-                "AC ID", "Account Name", "Mobile", "Under", "Balance",
+                "AC ID", "Account Name", "Mobile", "Under", "Area", "Balance",
                 "Last Date", "Days", "Credit Limit Amt", "Credit Limit Days"
             )
             // Column widths as percentages of content width (sum = 1.0)
-            val colPercents = floatArrayOf(0.07f, 0.20f, 0.12f, 0.15f, 0.11f, 0.10f, 0.05f, 0.10f, 0.10f)
+            val colPercents = floatArrayOf(0.07f, 0.18f, 0.11f, 0.13f, 0.10f, 0.11f, 0.10f, 0.05f, 0.08f, 0.07f)
             val colWidths = FloatArray(headers.size) { contentWidth * colPercents[it] }
             val totalWidth = colWidths.sum()
 
@@ -1088,6 +1091,7 @@ private suspend fun generateAndSharePDF(
                         e.accountName,
                         e.mobile,
                         e.under,
+                        e.area,
                         "₹${e.balance}",
                         e.lastDate,
                         e.days,

@@ -173,10 +173,10 @@ class RemoteDataSource {
         }
     }
 
-    suspend fun getLedger(userId: Int, yearString: String): Result<com.example.jiva.data.api.models.LedgerResponse> {
+    suspend fun getLedger(userId: Int, yearString: String, filters: Map<String, String>? = null): Result<com.example.jiva.data.api.models.LedgerResponse> {
         return try {
-            Timber.d("Making Ledger API call with userId: $userId, yearString: $yearString")
-            val request = com.example.jiva.data.api.models.LedgerRequest(userID = userId, yearString = yearString)
+            Timber.d("Making Ledger API call with userId: $userId, yearString: $yearString, filters: $filters")
+            val request = com.example.jiva.data.api.models.LedgerRequest(userID = userId, yearString = yearString, filters = filters)
             Timber.d("Request body: $request")
 
             val response = apiService.getLedger(request)
@@ -185,6 +185,18 @@ class RemoteDataSource {
             Result.success(response)
         } catch (e: Exception) {
             Timber.e(e, "Ledger API call failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getAccountsFiltered(userId: Int, yearString: String, filters: Map<String, String>): Result<com.example.jiva.data.api.models.AccountsResponse> {
+        return try {
+            Timber.d("Making Accounts API call with userId: $userId, yearString: $yearString, filters: $filters")
+            val request = com.example.jiva.data.api.models.AccountsRequest(userID = userId, yearString = yearString, filters = filters)
+            val response = apiService.getAccountsFiltered(request)
+            Result.success(response)
+        } catch (e: Exception) {
+            Timber.e(e, "Accounts API call failed: ${e.message}")
             Result.failure(e)
         }
     }

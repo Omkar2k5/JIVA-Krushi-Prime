@@ -120,35 +120,58 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
     // Re-read userId after potential initialization
     val finalUserId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
-    // Optimized data loading - only from Room DB for better performance
+    // Data sources
     val ledgerEntities by viewModel.observeLedger(year).collectAsState(initial = emptyList())
+    val serverApiItems by viewModel.serverLedgerItems.collectAsState()
 
-    // Use only Ledger DB data for better performance and stability
-    val allEntries = remember(ledgerEntities) {
+    // Prefer server filtered data when present, otherwise use Room DB
+    val allEntries = remember(ledgerEntities, serverApiItems) {
         try {
-            ledgerEntities.map { entity ->
-                LedgerEntry(
-                    entryNo = entity.entryNo?.toString() ?: "",
-                    manualNo = entity.manualNo ?: "",
-                    srNo = entity.srNo?.toString() ?: "",
-                    entryType = entity.entryType ?: "",
-                    entryDate = entity.entryDate?.let {
-                        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it)
-                    } ?: "",
-                    refNo = entity.refNo ?: "",
-                    acId = entity.acId?.toString() ?: "",
-                    dr = entity.dr.toString(),
-                    cr = entity.cr.toString(),
-                    narration = entity.narration ?: "",
-                    isClere = if (entity.isClere) "True" else "False",
-                    trascType = entity.trascType ?: "",
-                    gstRate = entity.gstRate.toString(),
-                    amt = entity.amt.toString(),
-                    igst = entity.igst.toString()
-                )
+            if (serverApiItems.isNotEmpty()) {
+                serverApiItems.map { item ->
+                    LedgerEntry(
+                        entryNo = item.entryNo,
+                        manualNo = item.manualNo,
+                        srNo = item.srNO,
+                        entryType = item.entryType,
+                        entryDate = item.entryDate,
+                        refNo = item.refNo,
+                        acId = item.ac_ID,
+                        dr = item.dr,
+                        cr = item.cr,
+                        narration = item.narration,
+                        isClere = item.isClere,
+                        trascType = item.trascType,
+                        gstRate = item.gstRate,
+                        amt = item.amt,
+                        igst = item.igst
+                    )
+                }
+            } else {
+                ledgerEntities.map { entity ->
+                    LedgerEntry(
+                        entryNo = entity.entryNo?.toString() ?: "",
+                        manualNo = entity.manualNo ?: "",
+                        srNo = entity.srNo?.toString() ?: "",
+                        entryType = entity.entryType ?: "",
+                        entryDate = entity.entryDate?.let {
+                            SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it)
+                        } ?: "",
+                        refNo = entity.refNo ?: "",
+                        acId = entity.acId?.toString() ?: "",
+                        dr = entity.dr.toString(),
+                        cr = entity.cr.toString(),
+                        narration = entity.narration ?: "",
+                        isClere = if (entity.isClere) "True" else "False",
+                        trascType = entity.trascType ?: "",
+                        gstRate = entity.gstRate.toString(),
+                        amt = entity.amt.toString(),
+                        igst = entity.igst.toString()
+                    )
+                }
             }
         } catch (e: Exception) {
-            timber.log.Timber.e(e, "Error mapping ledger entities")
+            timber.log.Timber.e(e, "Error mapping ledger entries")
             emptyList()
         }
     }
@@ -198,6 +221,22 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
         filteredEntries.sumOf { it.amt.toDoubleOrNull() ?: 0.0 }
     }
 
+    // Calculate totals including account opening values
+    val openingDrValue = remember(openingDr) { openingDr.toDoubleOrNull() ?: 0.0 }
+    val openingCrValue = remember(openingCr) { openingCr.toDoubleOrNull() ?: 0.0 }
+    
+    val totalDrWithOpening = remember(totalDr, openingDrValue) {
+        totalDr + openingDrValue
+    }
+    val totalCrWithOpening = remember(totalCr, openingCrValue) {
+        totalCr + openingCrValue
+    }
+    
+    // Calculate closing balance (Total Credit - Total Debit)
+    val closingBalance = remember(totalCrWithOpening, totalDrWithOpening) {
+        totalCrWithOpening - totalDrWithOpening
+    }
+
     // Unified loading screen (matches Outstanding)
     if (isScreenLoading) {
         Box(
@@ -244,9 +283,9 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                         "Date" to "",
                         "Ref No" to "",
                         "AC ID" to "",
-                        "DR" to "₹${String.format("%.2f", totalDr)}",
-                        "CR" to "₹${String.format("%.2f", totalCr)}",
-                        "Narration" to ""
+                        "DR" to "₹${String.format("%.2f", totalDrWithOpening)}",
+                        "CR" to "₹${String.format("%.2f", totalCrWithOpening)}",
+                        "Narration" to "Closing: ₹${String.format("%.2f", closingBalance)}"
                     )
                     // Launch coroutine to generate and share
                     scope.launch {
@@ -341,12 +380,35 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                             }
                         }
 
-                        // Show button (next workflow: will trigger 2 API calls later)
+                        // Show button (triggers Accounts -> set opening, then Ledger with filter)
                         Button(
                             onClick = {
-                                // Placeholder: next step will implement the two API calls after selection
-                                if (selectedAccount == null) {
+                                val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull() ?: 1017
+                                val fy = year
+                                val acct = selectedAccount
+                                if (acct == null) {
                                     Toast.makeText(context, "Please select an account", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    scope.launch {
+                                        try {
+                                            // 1) Fetch opening balance and CR/DR for selected account
+                                            val filters = mapOf("aC_ID" to acct.id)
+                                            val accRes = viewModel.fetchAccountOpening(userId, fy, filters)
+                                            accRes?.let { (opening, crdr) ->
+                                                if (crdr.equals("DR", true)) {
+                                                    openingDr = opening
+                                                    openingCr = "0.00"
+                                                } else {
+                                                    openingCr = opening
+                                                    openingDr = "0.00"
+                                                }
+                                            }
+                                            // 2) Fetch ledger filtered by aC_ID (server) and update local display source
+                                            viewModel.loadLedgerFiltered(userId, fy, filters)
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Failed to load ledger: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
                                 }
                             },
                             shape = RoundedCornerShape(8.dp),
@@ -457,7 +519,7 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                 }
             }
 
-            // Bottom Total Card (Total Debit & Total Credit)
+            // Bottom Total Card (Total Debit, Total Credit & Closing Balance)
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -475,6 +537,8 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                             color = JivaColors.DeepBlue,
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
+                        
+                        // First row: Total Debit and Total Credit (including opening)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceEvenly
@@ -487,11 +551,19 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                                     color = JivaColors.DarkGray
                                 )
                                 Text(
-                                    text = "₹${String.format("%.2f", totalDr)}",
+                                    text = "₹${String.format("%.2f", totalDrWithOpening)}",
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = JivaColors.Red
                                 )
+                                if (openingDrValue > 0) {
+                                    Text(
+                                        text = "(Opening: ₹${String.format("%.2f", openingDrValue)})",
+                                        fontSize = 10.sp,
+                                        color = JivaColors.DarkGray,
+                                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                    )
+                                }
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
@@ -501,10 +573,52 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                                     color = JivaColors.DarkGray
                                 )
                                 Text(
-                                    text = "₹${String.format("%.2f", totalCr)}",
+                                    text = "₹${String.format("%.2f", totalCrWithOpening)}",
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = JivaColors.Green
+                                )
+                                if (openingCrValue > 0) {
+                                    Text(
+                                        text = "(Opening: ₹${String.format("%.2f", openingCrValue)})",
+                                        fontSize = 10.sp,
+                                        color = JivaColors.DarkGray,
+                                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                    )
+                                }
+                            }
+                        }
+                        
+                        // Divider
+                        HorizontalDivider(
+                            color = JivaColors.LightGray,
+                            thickness = 1.dp,
+                            modifier = Modifier.padding(vertical = 16.dp)
+                        )
+                        
+                        // Second row: Closing Balance
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "Closing Balance",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = JivaColors.DarkGray
+                                )
+                                Text(
+                                    text = "₹${String.format("%.2f", kotlin.math.abs(closingBalance))}",
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (closingBalance >= 0) JivaColors.Green else JivaColors.Red
+                                )
+                                Text(
+                                    text = if (closingBalance >= 0) "Credit Balance" else "Debit Balance",
+                                    fontSize = 12.sp,
+                                    color = if (closingBalance >= 0) JivaColors.Green else JivaColors.Red,
+                                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
                                 )
                             }
                         }
@@ -536,10 +650,6 @@ private fun LedgerTableHeader() {
         LedgerHeaderCell("DR", Modifier.width(100.dp))
         LedgerHeaderCell("CR", Modifier.width(100.dp))
         LedgerHeaderCell("Narration", Modifier.width(200.dp))
-        LedgerHeaderCell("Clear", Modifier.width(80.dp))
-        LedgerHeaderCell("GST Rate", Modifier.width(80.dp))
-        LedgerHeaderCell("Amount", Modifier.width(100.dp))
-        LedgerHeaderCell("IGST", Modifier.width(80.dp))
     }
 }
 
@@ -599,10 +709,6 @@ private fun LedgerTableRow(entry: LedgerEntry) {
             LedgerCell("₹${safeEntry.dr}", Modifier.width(100.dp), JivaColors.Red)
             LedgerCell("₹${safeEntry.cr}", Modifier.width(100.dp), JivaColors.Green)
             LedgerCell(safeEntry.narration, Modifier.width(200.dp))
-            LedgerCell(safeEntry.isClere, Modifier.width(80.dp))
-            LedgerCell("${safeEntry.gstRate}%", Modifier.width(80.dp))
-            LedgerCell("₹${safeEntry.amt}", Modifier.width(100.dp))
-            LedgerCell("₹${safeEntry.igst}", Modifier.width(80.dp))
         }
 
         HorizontalDivider(
@@ -656,7 +762,7 @@ private fun LedgerTotalRow(totalDr: Double, totalCr: Double, totalEntries: Int) 
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Empty cells to align with data columns
+            // Empty cells to align with data columns (EntryNo, ManualNo, Type, Date, RefNo, AC ID)
             repeat(6) {
                 Box(modifier = Modifier.width(80.dp))
             }
@@ -681,7 +787,7 @@ private fun LedgerTotalRow(totalDr: Double, totalCr: Double, totalEntries: Int) 
                 modifier = Modifier.width(100.dp)
             )
 
-            // Total entries cell
+            // Total entries cell (Narration column width)
             Text(
                 text = "$totalEntries entries",
                 fontSize = 11.sp,
@@ -690,11 +796,6 @@ private fun LedgerTotalRow(totalDr: Double, totalCr: Double, totalEntries: Int) 
                 textAlign = TextAlign.Center,
                 modifier = Modifier.width(200.dp)
             )
-
-            // Empty cells for remaining columns
-            repeat(4) {
-                Box(modifier = Modifier.width(80.dp))
-            }
         }
     }
 }

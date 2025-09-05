@@ -932,7 +932,7 @@ private fun ExpiryTotalRow(expiredCount: Int, expiringSoonCount: Int, totalQty: 
 }
 
 /**
- * Generate and Share PDF for Expiry Report
+ * Generate and Share PDF for Expiry Report with proper pagination
  */
 private suspend fun generateAndSharePDF(
     context: android.content.Context,
@@ -946,7 +946,7 @@ private suspend fun generateAndSharePDF(
             // Landscape A4 page: 842 x 595
             val pageWidth = 842
             val pageHeight = 595
-            val margin = 30f
+            val margin = 20f
             val contentWidth = pageWidth - (2 * margin)
             val pdfDocument = android.graphics.pdf.PdfDocument()
 
@@ -958,18 +958,18 @@ private suspend fun generateAndSharePDF(
             }
             val headerPaint = android.graphics.Paint().apply {
                 color = android.graphics.Color.BLACK
-                textSize = 11f
+                textSize = 10f
                 typeface = android.graphics.Typeface.DEFAULT_BOLD
             }
             val cellPaint = android.graphics.Paint().apply {
                 color = android.graphics.Color.BLACK
-                textSize = 9f
+                textSize = 8f
                 typeface = android.graphics.Typeface.DEFAULT
             }
             val borderPaint = android.graphics.Paint().apply {
                 color = android.graphics.Color.BLACK
                 style = android.graphics.Paint.Style.STROKE
-                strokeWidth = 1f
+                strokeWidth = 0.5f
             }
             val fillHeaderPaint = android.graphics.Paint().apply {
                 color = android.graphics.Color.LTGRAY
@@ -977,89 +977,109 @@ private suspend fun generateAndSharePDF(
             }
 
             val startX = margin
-            val startY = 90f
-            val rowHeight = 18f
+            val rowHeight = 16f
+            val headerHeight = 20f
 
-            // 8 columns to match on-screen table
+            // Calculate optimal column widths based on content
             val headers = listOf("Item ID", "Item Name", "Type", "Batch No", "Expiry Date", "Quantity", "Days Left", "Status")
-            val colWidths = floatArrayOf(80f, 180f, 120f, 100f, 120f, 100f, 100f, 100f)
+            val colWidths = calculateOptimalColumnWidths(entries, headers, contentWidth, cellPaint)
 
-            val page = pdfDocument.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(pageWidth, pageHeight, 1).create())
-            val canvas = page.canvas
+            // Calculate how many rows fit per page
+            val availableHeight = pageHeight - 120f // Reserve space for title and summary
+            val rowsPerPage = ((availableHeight - headerHeight) / rowHeight).toInt()
 
-            // Title
-            canvas.drawText("Expiry Report", (pageWidth / 2).toFloat(), 40f, titlePaint)
-            canvas.drawText("Generated on: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}", (pageWidth / 2).toFloat(), 60f, cellPaint)
+            var currentPage = 1
+            var entryIndex = 0
+            val totalPages = ((entries.size + rowsPerPage - 1) / rowsPerPage).coerceAtLeast(1)
 
-            // Summary section
-            var currentY = startY
-            canvas.drawText("Summary:", startX, currentY, headerPaint)
-            currentY += 20f
-            canvas.drawText("Total Items: ${entries.size}", startX, currentY, cellPaint)
-            currentY += 15f
-            canvas.drawText("Expired Items: $expiredCount", startX, currentY, cellPaint)
-            currentY += 15f
-            canvas.drawText("Expiring Soon: $expiringSoonCount", startX, currentY, cellPaint)
-            currentY += 15f
-            canvas.drawText("Total Quantity: ${String.format("%.2f", totalQty)}", startX, currentY, cellPaint)
-            currentY += 25f
+            while (entryIndex < entries.size) {
+                val page = pdfDocument.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(pageWidth, pageHeight, currentPage).create())
+                val canvas = page.canvas
 
-            // Table header
-            var xCursor = startX
-            for (i in headers.indices) {
-                val rect = android.graphics.RectF(xCursor, currentY - rowHeight, xCursor + colWidths[i], currentY)
-                canvas.drawRect(rect, fillHeaderPaint)
-                canvas.drawRect(rect, borderPaint)
-                canvas.drawText(headers[i], xCursor + 5f, currentY - 6f, headerPaint)
-                xCursor += colWidths[i]
-            }
-            currentY += 5f
+                var currentY = 30f
 
-            // Data rows
-            entries.take(25).forEach { entry ->
-                if (currentY > pageHeight - 50f) return@forEach
-                xCursor = startX
-                val daysLeft = entry.daysLeft.toIntOrNull() ?: 0
-                val status = when {
-                    daysLeft <= 0 -> "Expired"
-                    daysLeft <= 7 -> "Critical"
-                    daysLeft <= 30 -> "Warning"
-                    daysLeft <= 90 -> "Caution"
-                    else -> "Good"
+                // Title and page info
+                canvas.drawText("Expiry Report", (pageWidth / 2).toFloat(), currentY, titlePaint)
+                currentY += 20f
+                canvas.drawText("Generated on: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}", (pageWidth / 2).toFloat(), currentY, cellPaint)
+                currentY += 15f
+                canvas.drawText("Page $currentPage of $totalPages", (pageWidth / 2).toFloat(), currentY, cellPaint)
+                currentY += 25f
+
+                // Summary section (only on first page)
+                if (currentPage == 1) {
+                    canvas.drawText("Summary:", startX, currentY, headerPaint)
+                    currentY += 15f
+                    canvas.drawText("Total Items: ${entries.size}", startX, currentY, cellPaint)
+                    currentY += 12f
+                    canvas.drawText("Expired Items: $expiredCount", startX, currentY, cellPaint)
+                    currentY += 12f
+                    canvas.drawText("Expiring Soon: $expiringSoonCount", startX, currentY, cellPaint)
+                    currentY += 12f
+                    canvas.drawText("Total Quantity: ${String.format("%.2f", totalQty)}", startX, currentY, cellPaint)
+                    currentY += 20f
                 }
-                val data = listOf(
-                    entry.itemId,
-                    entry.itemName.take(20),
-                    entry.itemType.take(12),
-                    entry.batchNo.take(12),
-                    entry.expiryDate,
-                    entry.qty,
-                    entry.daysLeft,
-                    status
-                )
-                
-                for (i in data.indices) {
-                    val rect = android.graphics.RectF(xCursor, currentY - rowHeight, xCursor + colWidths[i], currentY)
+
+                // Table header (repeated on each page)
+                var xCursor = startX
+                for (i in headers.indices) {
+                    val rect = android.graphics.RectF(xCursor, currentY - headerHeight, xCursor + colWidths[i], currentY)
+                    canvas.drawRect(rect, fillHeaderPaint)
                     canvas.drawRect(rect, borderPaint)
-                    canvas.drawText(data[i], xCursor + 5f, currentY - 6f, cellPaint)
+                    drawTextCentered(canvas, headers[i], xCursor + colWidths[i]/2, currentY - 6f, colWidths[i] - 10f, headerPaint)
                     xCursor += colWidths[i]
                 }
-                currentY += rowHeight
+                currentY += 5f
+
+                // Data rows for this page
+                val endIndex = (entryIndex + rowsPerPage).coerceAtMost(entries.size)
+                for (i in entryIndex until endIndex) {
+                    if (currentY > pageHeight - 30f) break
+                    
+                    val entry = entries[i]
+                    xCursor = startX
+                    val daysLeft = entry.daysLeft.toIntOrNull() ?: 0
+                    val status = when {
+                        daysLeft <= 0 -> "Expired"
+                        daysLeft <= 7 -> "Critical"
+                        daysLeft <= 30 -> "Warning"
+                        daysLeft <= 90 -> "Caution"
+                        else -> "Good"
+                    }
+                    val data = listOf(
+                        entry.itemId,
+                        entry.itemName,
+                        entry.itemType,
+                        entry.batchNo,
+                        entry.expiryDate,
+                        entry.qty,
+                        entry.daysLeft,
+                        status
+                    )
+                    
+                    for (j in data.indices) {
+                        val rect = android.graphics.RectF(xCursor, currentY - rowHeight, xCursor + colWidths[j], currentY)
+                        canvas.drawRect(rect, borderPaint)
+                        drawTextCentered(canvas, data[j], xCursor + colWidths[j]/2, currentY - 4f, colWidths[j] - 10f, cellPaint)
+                        xCursor += colWidths[j]
+                    }
+                    currentY += rowHeight
+                }
+
+                // Total row on last page
+                if (currentPage == totalPages && currentY < pageHeight - 30f) {
+                    currentY += 10f
+                    xCursor = startX
+                    val totalRect = android.graphics.RectF(startX, currentY - rowHeight, startX + contentWidth, currentY)
+                    canvas.drawRect(totalRect, fillHeaderPaint)
+                    canvas.drawRect(totalRect, borderPaint)
+                    drawTextCentered(canvas, "TOTAL: ${entries.size} items | Expired: $expiredCount | Expiring Soon: $expiringSoonCount", startX + contentWidth/2, currentY - 4f, contentWidth - 10f, headerPaint)
+                }
+
+                pdfDocument.finishPage(page)
+                entryIndex = endIndex
+                currentPage++
             }
-
-            // Total row
-            if (currentY < pageHeight - 30f) {
-                currentY += 10f
-                xCursor = startX
-                val totalRect = android.graphics.RectF(startX, currentY - rowHeight, startX + contentWidth, currentY)
-                canvas.drawRect(totalRect, fillHeaderPaint)
-                canvas.drawRect(totalRect, borderPaint)
-
-                // Draw total text
-                canvas.drawText("TOTAL: ${entries.size} items | Expired: $expiredCount | Expiring Soon: $expiringSoonCount", startX + 5f, currentY - 6f, headerPaint)
-            }
-
-            pdfDocument.finishPage(page)
 
             val downloadsDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
             val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
@@ -1080,6 +1100,82 @@ private suspend fun generateAndSharePDF(
                 android.widget.Toast.makeText(context, "Error generating PDF: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
             }
         }
+    }
+}
+
+/**
+ * Calculate optimal column widths based on content for Expiry Report
+ */
+private fun calculateOptimalColumnWidths(
+    entries: List<ExpiryEntry>,
+    headers: List<String>,
+    totalWidth: Float,
+    paint: android.graphics.Paint
+): FloatArray {
+    val colWidths = FloatArray(headers.size)
+    val minWidths = FloatArray(headers.size)
+    
+    // Calculate minimum width for each column based on headers and sample data
+    for (i in headers.indices) {
+        var maxWidth = paint.measureText(headers[i])
+        
+        // Sample some entries to find the widest content
+        val sampleSize = minOf(10, entries.size)
+        for (j in 0 until sampleSize) {
+            val entry = entries[j]
+            val daysLeft = entry.daysLeft.toIntOrNull() ?: 0
+            val status = when {
+                daysLeft <= 0 -> "Expired"
+                daysLeft <= 7 -> "Critical"
+                daysLeft <= 30 -> "Warning"
+                daysLeft <= 90 -> "Caution"
+                else -> "Good"
+            }
+            val content = when (i) {
+                0 -> entry.itemId
+                1 -> entry.itemName
+                2 -> entry.itemType
+                3 -> entry.batchNo
+                4 -> entry.expiryDate
+                5 -> entry.qty
+                6 -> entry.daysLeft
+                7 -> status
+                else -> ""
+            }
+            maxWidth = maxOf(maxWidth, paint.measureText(content))
+        }
+        
+        minWidths[i] = maxWidth + 20f // Add padding
+    }
+    
+    val totalMinWidth = minWidths.sum()
+    val scaleFactor = if (totalMinWidth > totalWidth) totalWidth / totalMinWidth else 1f
+    
+    for (i in headers.indices) {
+        colWidths[i] = (minWidths[i] * scaleFactor).coerceAtLeast(60f) // Minimum 60f width
+    }
+    
+    return colWidths
+}
+
+/**
+ * Draw text centered in a cell
+ */
+private fun drawTextCentered(
+    canvas: android.graphics.Canvas,
+    text: String,
+    centerX: Float,
+    y: Float,
+    maxWidth: Float,
+    paint: android.graphics.Paint
+) {
+    val textWidth = paint.measureText(text)
+    if (textWidth <= maxWidth) {
+        canvas.drawText(text, centerX - textWidth/2, y, paint)
+    } else {
+        // Truncate text if too long
+        val truncatedText = text.takeWhile { paint.measureText(it.toString()) <= maxWidth - 10f }
+        canvas.drawText(truncatedText + "...", centerX - paint.measureText(truncatedText + "...")/2, y, paint)
     }
 }
 

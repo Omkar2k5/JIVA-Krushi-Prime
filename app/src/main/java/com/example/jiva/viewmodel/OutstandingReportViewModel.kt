@@ -88,6 +88,7 @@ class OutstandingReportViewModel(
                             accountName = it.accountName ?: "",
                             mobile = it.mobile ?: "",
                             under = it.under ?: "",
+                            area = it.area ?: "",
                             balance = it.balance ?: "0",
                             lastDate = it.lastDate ?: "",
                             days = it.days ?: "",
@@ -187,7 +188,8 @@ class OutstandingReportViewModel(
             acId = account.acId.toString(),
             accountName = account.accountName,
             mobile = account.mobile ?: "",
-            under = account.area ?: "",
+            under = account.under ?: "",
+            area = account.area ?: "",
             balance = (closingBalance?.balance?.toString() ?: account.openingBalance.toString()),
             lastDate = "", // Would need transaction data to calculate this
             days = "", // Would need transaction data to calculate this

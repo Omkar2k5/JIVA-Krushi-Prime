@@ -15,6 +15,7 @@ data class OutstandingEntity(
     val accountName: String,
     val mobile: String,
     val under: String,
+    val area: String,
     val balance: String,
     val lastDate: String,
     val days: String,

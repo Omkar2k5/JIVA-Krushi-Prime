@@ -20,7 +20,7 @@ class LedgerReportViewModel(
     private val database: JivaDatabase
 ) : ViewModel() {
 
-    // Remote data source for Account_Names API
+    // Remote data source for server APIs
     private val remote = com.example.jiva.data.network.RemoteDataSource()
 
     // Expose account options (id + name) for dropdown
@@ -31,6 +31,10 @@ class LedgerReportViewModel(
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
+
+    // Server filtered ledger items state (used when user hits SHOW)
+    private val _serverLedgerItems = MutableStateFlow<List<com.example.jiva.data.api.models.LedgerItem>>(emptyList())
+    val serverLedgerItems: StateFlow<List<com.example.jiva.data.api.models.LedgerItem>> = _serverLedgerItems.asStateFlow()
 
     /**
      * Load account names from API and expose as options
@@ -60,7 +64,46 @@ class LedgerReportViewModel(
     }
 
     /**
-     * Observe ledger entries for a specific year
+     * Fetch opening balance + CRDR for selected account via Accounts API with filters
+     * Returns Pair(openingBalance, CRDR) or null if not found
+     */
+    suspend fun fetchAccountOpening(userId: Int, year: String, filters: Map<String, String>): Pair<String, String>? {
+        return try {
+            val res = remote.getAccountsFiltered(userId, year, filters)
+            if (res.isSuccess) {
+                val first = res.getOrNull()?.data?.firstOrNull()
+                val opening = first?.openingBalance ?: "0.00"
+                val crdr = first?.crdr ?: "DR"
+                opening to crdr
+            } else null
+        } catch (e: Exception) {
+            Timber.e(e, "fetchAccountOpening failed")
+            null
+        }
+    }
+
+    /**
+     * Load server ledger filtered by aC_ID and hold in state for UI to consume
+     */
+    fun loadLedgerFiltered(userId: Int, year: String, filters: Map<String, String>) {
+        viewModelScope.launch {
+            try {
+                val res = remote.getLedger(userId, year, filters)
+                if (res.isSuccess) {
+                    _serverLedgerItems.value = res.getOrNull()?.data.orEmpty()
+                } else {
+                    _serverLedgerItems.value = emptyList()
+                    _error.value = res.exceptionOrNull()?.message
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "loadLedgerFiltered failed")
+                _serverLedgerItems.value = emptyList()
+            }
+        }
+    }
+
+    /**
+     * Observe ledger entries for a specific year (local DB)
      */
     fun observeLedger(year: String): Flow<List<LedgerEntity>> {
         return database.ledgerDao().getLedgerEntriesByYear(year)

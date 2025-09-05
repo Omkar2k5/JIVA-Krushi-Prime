@@ -26,6 +26,7 @@ data class OutstandingData(
     @SerializedName("account_Name") val accountName: String,
     @SerializedName("mobile") val mobile: String,
     @SerializedName("under") val under: String,
+    @SerializedName("area") val area: String,
     @SerializedName("balance") val balance: String,
     @SerializedName("lastDate") val lastDate: String,
     @SerializedName("days") val days: String,
