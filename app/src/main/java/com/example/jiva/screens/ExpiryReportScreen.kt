@@ -661,35 +661,6 @@ fun ExpiryReportScreen(onBackClick: () -> Unit = {}) {
                         ) {
                             Button(
                                 onClick = {
-                                    scope.launch {
-                                        try {
-                                            val pdfData = generateExpiryReportPDF(filteredEntries, expiredCount, expiringSoonCount, totalQty)
-                                            sharePDF(context, pdfData, "Expiry_Report_${System.currentTimeMillis()}.pdf")
-                                        } catch (e: Exception) {
-                                            Toast.makeText(context, "Error generating PDF: ${e.message}", Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = JivaColors.Green
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Share,
-                                    contentDescription = "Share PDF",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "SHARE PDF",
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-
-                            Button(
-                                onClick = {
                                     // Clear all filters
                                     itemTypeFilter = "All Types"
                                     itemNameSearch = ""
@@ -712,6 +683,51 @@ fun ExpiryReportScreen(onBackClick: () -> Unit = {}) {
                                 Text(
                                     text = "CLEAR FILTERS",
                                     fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Share PDF Button
+            item {
+                val tableWidth = 1302.dp
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Card(
+                        modifier = Modifier.width(tableWidth),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    generateAndSharePDF(context, filteredEntries, expiredCount, expiringSoonCount, totalQty)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = JivaColors.Purple),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PictureAsPdf,
+                                    contentDescription = "Share PDF",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "SHARE PDF REPORT",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 16.sp
                                 )
                             }
                         }
@@ -916,66 +932,93 @@ private fun ExpiryTotalRow(expiredCount: Int, expiringSoonCount: Int, totalQty: 
 }
 
 /**
- * Generate PDF for Expiry Report
+ * Generate and Share PDF for Expiry Report
  */
-private suspend fun generateExpiryReportPDF(
+private suspend fun generateAndSharePDF(
+    context: android.content.Context,
     entries: List<ExpiryEntry>,
     expiredCount: Int,
     expiringSoonCount: Int,
     totalQty: Double
-): ByteArray {
-    return withContext(Dispatchers.IO) {
+) {
+    withContext(Dispatchers.IO) {
         try {
+            // Landscape A4 page: 842 x 595
+            val pageWidth = 842
+            val pageHeight = 595
+            val margin = 30f
+            val contentWidth = pageWidth - (2 * margin)
             val pdfDocument = android.graphics.pdf.PdfDocument()
-            val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, 1).create()
-            val page = pdfDocument.startPage(pageInfo)
+
+            val titlePaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                textSize = 18f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+            val headerPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                textSize = 11f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+            }
+            val cellPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                textSize = 9f
+                typeface = android.graphics.Typeface.DEFAULT
+            }
+            val borderPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                style = android.graphics.Paint.Style.STROKE
+                strokeWidth = 1f
+            }
+            val fillHeaderPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.LTGRAY
+                style = android.graphics.Paint.Style.FILL
+            }
+
+            val startX = margin
+            val startY = 90f
+            val rowHeight = 18f
+
+            // 8 columns to match on-screen table
+            val headers = listOf("Item ID", "Item Name", "Type", "Batch No", "Expiry Date", "Quantity", "Days Left", "Status")
+            val colWidths = floatArrayOf(80f, 180f, 120f, 100f, 120f, 100f, 100f, 100f)
+
+            val page = pdfDocument.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(pageWidth, pageHeight, 1).create())
             val canvas = page.canvas
-            val paint = android.graphics.Paint().apply { textSize = 12f }
 
-            var y = 40f
-            paint.textSize = 18f
-            paint.isFakeBoldText = true
-            canvas.drawText("Expiry Report", 40f, y, paint)
-            paint.isFakeBoldText = false
-            paint.textSize = 10f
-            y += 16f
-            canvas.drawText(
-                "Generated on: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}",
-                40f,
-                y,
-                paint
-            )
+            // Title
+            canvas.drawText("Expiry Report", (pageWidth / 2).toFloat(), 40f, titlePaint)
+            canvas.drawText("Generated on: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}", (pageWidth / 2).toFloat(), 60f, cellPaint)
 
-            y += 20f
-            paint.textSize = 12f
-            paint.isFakeBoldText = true
-            canvas.drawText("Summary:", 40f, y, paint)
-            paint.isFakeBoldText = false
-            y += 16f
-            canvas.drawText("Total Items: ${entries.size}", 40f, y, paint)
-            y += 14f
-            canvas.drawText("Expired Items: $expiredCount", 40f, y, paint)
-            y += 14f
-            canvas.drawText("Expiring Soon: $expiringSoonCount", 40f, y, paint)
-            y += 14f
-            canvas.drawText("Total Quantity: ${String.format("%.2f", totalQty)}", 40f, y, paint)
-
-            y += 20f
-            paint.isFakeBoldText = true
-            canvas.drawText("Detailed Expiry Data:", 40f, y, paint)
-            paint.isFakeBoldText = false
-            y += 16f
+            // Summary section
+            var currentY = startY
+            canvas.drawText("Summary:", startX, currentY, headerPaint)
+            currentY += 20f
+            canvas.drawText("Total Items: ${entries.size}", startX, currentY, cellPaint)
+            currentY += 15f
+            canvas.drawText("Expired Items: $expiredCount", startX, currentY, cellPaint)
+            currentY += 15f
+            canvas.drawText("Expiring Soon: $expiringSoonCount", startX, currentY, cellPaint)
+            currentY += 15f
+            canvas.drawText("Total Quantity: ${String.format("%.2f", totalQty)}", startX, currentY, cellPaint)
+            currentY += 25f
 
             // Table header
-            val headers = listOf("Item ID", "Item Name", "Type", "Batch", "Expiry", "Qty", "Days", "Status")
-            val colX = floatArrayOf(40f, 100f, 260f, 320f, 370f, 430f, 470f, 510f)
-            headers.forEachIndexed { idx, h -> canvas.drawText(h, colX[idx], y, paint) }
-            y += 12f
-            canvas.drawLine(40f, y, 555f, y, paint)
-            y += 12f
+            var xCursor = startX
+            for (i in headers.indices) {
+                val rect = android.graphics.RectF(xCursor, currentY - rowHeight, xCursor + colWidths[i], currentY)
+                canvas.drawRect(rect, fillHeaderPaint)
+                canvas.drawRect(rect, borderPaint)
+                canvas.drawText(headers[i], xCursor + 5f, currentY - 6f, headerPaint)
+                xCursor += colWidths[i]
+            }
+            currentY += 5f
 
-            entries.take(40).forEach { entry ->
-                if (y > 800f) return@forEach
+            // Data rows
+            entries.take(25).forEach { entry ->
+                if (currentY > pageHeight - 50f) return@forEach
+                xCursor = startX
                 val daysLeft = entry.daysLeft.toIntOrNull() ?: 0
                 val status = when {
                     daysLeft <= 0 -> "Expired"
@@ -984,58 +1027,87 @@ private suspend fun generateExpiryReportPDF(
                     daysLeft <= 90 -> "Caution"
                     else -> "Good"
                 }
-                canvas.drawText(entry.itemId, colX[0], y, paint)
-                canvas.drawText(entry.itemName.take(20), colX[1], y, paint)
-                canvas.drawText(entry.itemType.take(12), colX[2], y, paint)
-                canvas.drawText(entry.batchNo, colX[3], y, paint)
-                canvas.drawText(entry.expiryDate, colX[4], y, paint)
-                canvas.drawText(entry.qty, colX[5], y, paint)
-                canvas.drawText(entry.daysLeft, colX[6], y, paint)
-                canvas.drawText(status, colX[7], y, paint)
-                y += 14f
+                val data = listOf(
+                    entry.itemId,
+                    entry.itemName.take(20),
+                    entry.itemType.take(12),
+                    entry.batchNo.take(12),
+                    entry.expiryDate,
+                    entry.qty,
+                    entry.daysLeft,
+                    status
+                )
+                
+                for (i in data.indices) {
+                    val rect = android.graphics.RectF(xCursor, currentY - rowHeight, xCursor + colWidths[i], currentY)
+                    canvas.drawRect(rect, borderPaint)
+                    canvas.drawText(data[i], xCursor + 5f, currentY - 6f, cellPaint)
+                    xCursor += colWidths[i]
+                }
+                currentY += rowHeight
+            }
+
+            // Total row
+            if (currentY < pageHeight - 30f) {
+                currentY += 10f
+                xCursor = startX
+                val totalRect = android.graphics.RectF(startX, currentY - rowHeight, startX + contentWidth, currentY)
+                canvas.drawRect(totalRect, fillHeaderPaint)
+                canvas.drawRect(totalRect, borderPaint)
+
+                // Draw total text
+                canvas.drawText("TOTAL: ${entries.size} items | Expired: $expiredCount | Expiring Soon: $expiringSoonCount", startX + 5f, currentY - 6f, headerPaint)
             }
 
             pdfDocument.finishPage(page)
-            val baos = java.io.ByteArrayOutputStream()
-            pdfDocument.writeTo(baos)
+
+            val downloadsDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
+            val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
+            val fileName = "Expiry_Report_$timestamp.pdf"
+            val file = java.io.File(downloadsDir, fileName)
+
+            java.io.FileOutputStream(file).use { out ->
+                pdfDocument.writeTo(out)
+            }
             pdfDocument.close()
-            baos.toByteArray()
+
+            withContext(Dispatchers.Main) {
+                android.widget.Toast.makeText(context, "PDF saved to Downloads folder", android.widget.Toast.LENGTH_LONG).show()
+                sharePDF(context, file)
+            }
         } catch (e: Exception) {
-            timber.log.Timber.e(e, "Error generating PDF")
-            throw e
+            withContext(Dispatchers.Main) {
+                android.widget.Toast.makeText(context, "Error generating PDF: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+            }
         }
     }
 }
 
-/**
- * Share PDF file
- */
-private fun sharePDF(context: android.content.Context, pdfData: ByteArray, fileName: String) {
+private fun sharePDF(context: android.content.Context, file: java.io.File) {
     try {
-        // Create a temporary file
-        val file = java.io.File(context.cacheDir, fileName)
-        file.writeBytes(pdfData)
-
-        // Create URI for the file
         val uri = androidx.core.content.FileProvider.getUriForFile(
             context,
-            "${context.packageName}.fileprovider",
+            context.packageName + ".fileprovider",
             file
         )
-
-        // Create share intent
-        val shareIntent = android.content.Intent().apply {
-            action = android.content.Intent.ACTION_SEND
+        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
             type = "application/pdf"
             putExtra(android.content.Intent.EXTRA_STREAM, uri)
             putExtra(android.content.Intent.EXTRA_SUBJECT, "Expiry Report")
-            putExtra(android.content.Intent.EXTRA_TEXT, "Please find the attached Expiry Report.")
+            putExtra(android.content.Intent.EXTRA_TEXT, "Please find the Expiry Report attached.")
             addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-
-        context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Expiry Report"))
+        // Grant URI permission to potential receivers
+        context.packageManager.queryIntentActivities(shareIntent, 0).forEach { ri ->
+            val packageName = ri.activityInfo.packageName
+            context.grantUriPermission(packageName, uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        val chooser = android.content.Intent.createChooser(shareIntent, "Share Expiry Report").apply {
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(chooser)
     } catch (e: Exception) {
-        timber.log.Timber.e(e, "Error sharing PDF")
-        android.widget.Toast.makeText(context, "Error sharing PDF: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+        android.widget.Toast.makeText(context, "Error sharing PDF: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
     }
 }

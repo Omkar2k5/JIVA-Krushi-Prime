@@ -535,35 +535,6 @@ fun PriceListReportScreen(onBackClick: () -> Unit = {}) {
                         ) {
                             Button(
                                 onClick = {
-                                    scope.launch {
-                                        try {
-                                            val pdfData = generatePriceListReportPDF(filteredEntries, avgMrp, avgCreditRate, avgCashRate, avgPurchaseRate)
-                                            sharePDF(context, pdfData, "PriceList_Report_${System.currentTimeMillis()}.pdf")
-                                        } catch (e: Exception) {
-                                            Toast.makeText(context, "Error generating PDF: ${e.message}", Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = JivaColors.Green
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Share,
-                                    contentDescription = "Share PDF",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "SHARE REPORT",
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-
-                            Button(
-                                onClick = {
                                     // Clear all filters
                                     itemNameSearch = ""
                                     sortByFilter = "Item Name"
@@ -652,6 +623,51 @@ fun PriceListReportScreen(onBackClick: () -> Unit = {}) {
                                         )
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Share PDF Button
+            item {
+                val tableWidth = 1302.dp
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Card(
+                        modifier = Modifier.width(tableWidth),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    generateAndSharePDF(context, filteredEntries, avgMrp, avgCreditRate, avgCashRate, avgPurchaseRate)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = JivaColors.Purple),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PictureAsPdf,
+                                    contentDescription = "Share PDF",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "SHARE PDF REPORT",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 16.sp
+                                )
                             }
                         }
                     }
@@ -875,79 +891,176 @@ private fun PriceListTotalRow(
 }
 
 /**
- * Generate CSV for PriceList Report (Simple alternative to PDF)
+ * Generate and Share PDF for Price List Report
  */
-private suspend fun generatePriceListReportPDF(
+private suspend fun generateAndSharePDF(
+    context: android.content.Context,
     entries: List<PriceListEntry>,
     avgMrp: Double,
     avgCreditRate: Double,
     avgCashRate: Double,
     avgPurchaseRate: Double
-): ByteArray {
-    return withContext(Dispatchers.IO) {
+) {
+    withContext(Dispatchers.IO) {
         try {
-            val csvContent = buildString {
-                // Title and metadata
-                appendLine("Price List Report")
-                appendLine("Generated on: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}")
-                appendLine()
+            // Landscape A4 page: 842 x 595
+            val pageWidth = 842
+            val pageHeight = 595
+            val margin = 30f
+            val contentWidth = pageWidth - (2 * margin)
+            val pdfDocument = android.graphics.pdf.PdfDocument()
 
-                // Summary
-                appendLine("SUMMARY")
-                appendLine("Total Items,${entries.size}")
-                appendLine("Average MRP,₹${String.format("%.2f", avgMrp)}")
-                appendLine("Average Credit Rate,₹${String.format("%.2f", avgCreditRate)}")
-                appendLine("Average Cash Rate,₹${String.format("%.2f", avgCashRate)}")
-                appendLine("Average Purchase Rate,₹${String.format("%.2f", avgPurchaseRate)}")
-                appendLine()
-
-                // Headers
-                appendLine("Item ID,Item Name,MRP,Credit Rate,Cash Rate,Wholesale Rate,Purchase Rate")
-
-                // Data rows
-                entries.forEach { entry ->
-                    appendLine("${entry.itemId},${entry.itemName},₹${entry.mrp},₹${entry.creditSaleRate},₹${entry.cashSaleRate},₹${entry.wholesaleRate},₹${entry.avgPurchaseRate}")
-                }
+            val titlePaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                textSize = 18f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+            val headerPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                textSize = 11f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+            }
+            val cellPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                textSize = 9f
+                typeface = android.graphics.Typeface.DEFAULT
+            }
+            val borderPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                style = android.graphics.Paint.Style.STROKE
+                strokeWidth = 1f
+            }
+            val fillHeaderPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.LTGRAY
+                style = android.graphics.Paint.Style.FILL
             }
 
-            csvContent.toByteArray(Charsets.UTF_8)
+            val startX = margin
+            val startY = 90f
+            val rowHeight = 18f
+
+            // 7 columns to match on-screen table
+            val headers = listOf("Item ID", "Item Name", "MRP", "Credit Rate", "Cash Rate", "Wholesale Rate", "Purchase Rate")
+            val colWidths = floatArrayOf(80f, 200f, 100f, 120f, 120f, 130f, 130f)
+
+            val page = pdfDocument.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(pageWidth, pageHeight, 1).create())
+            val canvas = page.canvas
+
+            // Title
+            canvas.drawText("Price List Report", (pageWidth / 2).toFloat(), 40f, titlePaint)
+            canvas.drawText("Generated on: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}", (pageWidth / 2).toFloat(), 60f, cellPaint)
+
+            // Summary section
+            var currentY = startY
+            canvas.drawText("Summary:", startX, currentY, headerPaint)
+            currentY += 20f
+            canvas.drawText("Total Items: ${entries.size}", startX, currentY, cellPaint)
+            currentY += 15f
+            canvas.drawText("Average MRP: ₹${String.format("%.2f", avgMrp)}", startX, currentY, cellPaint)
+            currentY += 15f
+            canvas.drawText("Average Credit Rate: ₹${String.format("%.2f", avgCreditRate)}", startX, currentY, cellPaint)
+            currentY += 15f
+            canvas.drawText("Average Cash Rate: ₹${String.format("%.2f", avgCashRate)}", startX, currentY, cellPaint)
+            currentY += 15f
+            canvas.drawText("Average Purchase Rate: ₹${String.format("%.2f", avgPurchaseRate)}", startX, currentY, cellPaint)
+            currentY += 25f
+
+            // Table header
+            var xCursor = startX
+            for (i in headers.indices) {
+                val rect = android.graphics.RectF(xCursor, currentY - rowHeight, xCursor + colWidths[i], currentY)
+                canvas.drawRect(rect, fillHeaderPaint)
+                canvas.drawRect(rect, borderPaint)
+                canvas.drawText(headers[i], xCursor + 5f, currentY - 6f, headerPaint)
+                xCursor += colWidths[i]
+            }
+            currentY += 5f
+
+            // Data rows
+            entries.take(25).forEach { entry ->
+                if (currentY > pageHeight - 50f) return@forEach
+                xCursor = startX
+                val data = listOf(
+                    entry.itemId,
+                    entry.itemName.take(25),
+                    "₹${entry.mrp}",
+                    "₹${entry.creditSaleRate}",
+                    "₹${entry.cashSaleRate}",
+                    "₹${entry.wholesaleRate}",
+                    "₹${entry.avgPurchaseRate}"
+                )
+                
+                for (i in data.indices) {
+                    val rect = android.graphics.RectF(xCursor, currentY - rowHeight, xCursor + colWidths[i], currentY)
+                    canvas.drawRect(rect, borderPaint)
+                    canvas.drawText(data[i], xCursor + 5f, currentY - 6f, cellPaint)
+                    xCursor += colWidths[i]
+                }
+                currentY += rowHeight
+            }
+
+            // Total row
+            if (currentY < pageHeight - 30f) {
+                currentY += 10f
+                xCursor = startX
+                val totalRect = android.graphics.RectF(startX, currentY - rowHeight, startX + contentWidth, currentY)
+                canvas.drawRect(totalRect, fillHeaderPaint)
+                canvas.drawRect(totalRect, borderPaint)
+
+                // Draw total text
+                canvas.drawText("TOTAL: ${entries.size} items", startX + 5f, currentY - 6f, headerPaint)
+            }
+
+            pdfDocument.finishPage(page)
+
+            val downloadsDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
+            val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
+            val fileName = "PriceList_Report_$timestamp.pdf"
+            val file = java.io.File(downloadsDir, fileName)
+
+            java.io.FileOutputStream(file).use { out ->
+                pdfDocument.writeTo(out)
+            }
+            pdfDocument.close()
+
+            withContext(Dispatchers.Main) {
+                android.widget.Toast.makeText(context, "PDF saved to Downloads folder", android.widget.Toast.LENGTH_LONG).show()
+                sharePDF(context, file)
+            }
         } catch (e: Exception) {
-            timber.log.Timber.e(e, "Error generating CSV")
-            throw e
+            withContext(Dispatchers.Main) {
+                android.widget.Toast.makeText(context, "Error generating PDF: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+            }
         }
     }
 }
 
-/**
- * Share CSV file
- */
-private fun sharePDF(context: android.content.Context, csvData: ByteArray, fileName: String) {
+private fun sharePDF(context: android.content.Context, file: java.io.File) {
     try {
-        // Create a temporary file with CSV extension
-        val csvFileName = fileName.replace(".pdf", ".csv")
-        val file = java.io.File(context.cacheDir, csvFileName)
-        file.writeBytes(csvData)
-
-        // Create URI for the file
         val uri = androidx.core.content.FileProvider.getUriForFile(
             context,
-            "${context.packageName}.fileprovider",
+            context.packageName + ".fileprovider",
             file
         )
-
-        // Create share intent
-        val shareIntent = android.content.Intent().apply {
-            action = android.content.Intent.ACTION_SEND
-            type = "text/csv"
+        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "application/pdf"
             putExtra(android.content.Intent.EXTRA_STREAM, uri)
             putExtra(android.content.Intent.EXTRA_SUBJECT, "Price List Report")
-            putExtra(android.content.Intent.EXTRA_TEXT, "Please find the attached Price List Report in CSV format.")
+            putExtra(android.content.Intent.EXTRA_TEXT, "Please find the Price List Report attached.")
             addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-
-        context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Price List Report"))
+        // Grant URI permission to potential receivers
+        context.packageManager.queryIntentActivities(shareIntent, 0).forEach { ri ->
+            val packageName = ri.activityInfo.packageName
+            context.grantUriPermission(packageName, uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        val chooser = android.content.Intent.createChooser(shareIntent, "Share Price List Report").apply {
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(chooser)
     } catch (e: Exception) {
-        timber.log.Timber.e(e, "Error sharing CSV")
-        android.widget.Toast.makeText(context, "Error sharing report: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+        android.widget.Toast.makeText(context, "Error sharing PDF: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
     }
 }
