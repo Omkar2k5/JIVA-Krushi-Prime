@@ -239,48 +239,10 @@ fun PriceListReportScreen(onBackClick: () -> Unit = {}) {
     ) {
         // Responsive Header with Refresh Button
         ResponsiveReportHeader(
-            title = "Price List Report",
+            title = "Price Report",
             subtitle = "Item pricing and rate management",
             onBackClick = onBackClick,
-            actions = {
-                // Refresh Button
-                IconButton(
-                    onClick = {
-                        if (finalUserId != null && !isRefreshing) {
-                            scope.launch {
-                                isRefreshing = true
-                                try {
-                                    val result = application.repository.syncPriceList(finalUserId, year)
-                                    if (result.isSuccess) {
-                                        Toast.makeText(context, "✅ Price list data refreshed successfully", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        val error = result.exceptionOrNull()?.message ?: "Unknown error"
-                                        Toast.makeText(context, "❌ Failed to refresh: $error", Toast.LENGTH_LONG).show()
-                                    }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "❌ Network error: ${e.message}", Toast.LENGTH_LONG).show()
-                                } finally {
-                                    isRefreshing = false
-                                }
-                            }
-                        }
-                    }
-                ) {
-                    if (isRefreshing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = JivaColors.White,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh",
-                            tint = JivaColors.White
-                        )
-                    }
-                }
-            }
+            actions = { }
         )
 
         // Main content

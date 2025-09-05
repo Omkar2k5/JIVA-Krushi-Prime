@@ -480,7 +480,17 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                 color = JivaColors.DeepBlue
                             )
 
-                            
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Checkbox(
+                                    checked = selectAll,
+                                    onCheckedChange = { isChecked -> selectAll = isChecked },
+                                    colors = CheckboxDefaults.colors(checkedColor = JivaColors.Purple)
+                                )
+                                Text("Select all contacts")
+                            }
 
                             Button(
                                 onClick = {
@@ -527,7 +537,7 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                                 isBulkSending = true
                                                 bulkTotal = selectedEntries.size
                                                 bulkSent = 0
-                                                etaLeftSec = bulkTotal * 5
+                                                etaLeftSec = bulkTotal * 10
                                                 sendWhatsAppMessages(
                                                     context = context,
                                                     entries = finalEntries,
@@ -538,13 +548,13 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                                 ) { sentCount, totalCount ->
                                                     bulkSent = sentCount
                                                     bulkTotal = totalCount
-                                                    etaLeftSec = (totalCount - sentCount) * 5
+                                                    etaLeftSec = (totalCount - sentCount) * 10
                                                     if (sentCount == totalCount) {
                                                         isBulkSending = false
                                                         scope.launch(kotlinx.coroutines.Dispatchers.Main) {
                                                             Toast.makeText(
                                                                 context,
-                                                                "Bulk messages sent",
+                                                                "Message Sent Successfully",
                                                                 Toast.LENGTH_LONG
                                                             ).show()
                                                         }
@@ -572,6 +582,18 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                     text = "Send WhatsApp",
                                     fontWeight = FontWeight.SemiBold
                                 )
+                            }
+
+                            if (isBulkSending) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                androidx.compose.material3.LinearProgressIndicator(
+                                    progress = if (bulkTotal > 0) bulkSent.toFloat() / bulkTotal.toFloat() else 0f,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = JivaColors.DeepBlue,
+                                    trackColor = JivaColors.LightGray
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                               
                             }
                         }
                     }
@@ -655,8 +677,8 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                             modifier = Modifier.heightIn(min = 240.dp, max = 600.dp)
                                         ) {
                                             itemsIndexed(
-                                                items = finalEntries as List<OutstandingEntry>,
-                                                key = { index: Int, item: OutstandingEntry -> item.acId.ifBlank { index.toString() } }
+                                                items = finalEntries,
+                                                key = { index: Int, item: OutstandingEntry -> "${index}_${item.acId}" }
                                             ) { _: Int, entry: OutstandingEntry ->
                                                 OutstandingTableRow(
                                                     entry = entry,
@@ -947,8 +969,8 @@ private suspend fun sendWhatsAppMessages(
                         // Progress update after each send
                         sent += 1
                         onProgress?.invoke(sent, total)
-                        // 5-second delay between each message for bulk sending
-                        delay(5000)
+                        // 10-second delay between each message for bulk sending
+                        delay(10_000)
                     } catch (e: Exception) {
                         Timber.e(e, "Failed to send via Jivabot to ${'$'}{entry.mobile}")
                     }
@@ -967,22 +989,27 @@ private suspend fun generateAndSharePDF(
 ) {
     withContext(Dispatchers.IO) {
         try {
+            // Landscape A4 page: 842 x 595
+            val pageWidth = 842
+            val pageHeight = 595
+            val margin = 30f
+            val contentWidth = pageWidth - (2 * margin)
             val pdfDocument = PdfDocument()
 
             val titlePaint = android.graphics.Paint().apply {
                 color = android.graphics.Color.BLACK
-                textSize = 20f
+                textSize = 18f
                 typeface = Typeface.DEFAULT_BOLD
                 textAlign = android.graphics.Paint.Align.CENTER
             }
             val headerPaint = android.graphics.Paint().apply {
                 color = android.graphics.Color.BLACK
-                textSize = 12f
+                textSize = 11f
                 typeface = Typeface.DEFAULT_BOLD
             }
             val cellPaint = android.graphics.Paint().apply {
                 color = android.graphics.Color.BLACK
-                textSize = 10f
+                textSize = 9f
                 typeface = Typeface.DEFAULT
             }
             val borderPaint = android.graphics.Paint().apply {
@@ -990,77 +1017,113 @@ private suspend fun generateAndSharePDF(
                 style = android.graphics.Paint.Style.STROKE
                 strokeWidth = 1f
             }
+            val fillHeaderPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.LTGRAY
+                style = android.graphics.Paint.Style.FILL
+            }
 
-            val startX = 30f
-            val startY = 120f
-            val rowHeight = 25f
-            val colWidths = floatArrayOf(60f, 140f, 100f, 90f, 100f)
+            val startX = margin
+            val startY = 90f
+            val rowHeight = 18f
+
+            // 9 columns to match on-screen table
+            val headers = arrayOf(
+                "AC ID", "Account Name", "Mobile", "Under", "Balance",
+                "Last Date", "Days", "Credit Limit Amt", "Credit Limit Days"
+            )
+            // Column widths as percentages of content width (sum = 1.0)
+            val colPercents = floatArrayOf(0.07f, 0.20f, 0.12f, 0.15f, 0.11f, 0.10f, 0.05f, 0.10f, 0.10f)
+            val colWidths = FloatArray(headers.size) { contentWidth * colPercents[it] }
             val totalWidth = colWidths.sum()
-            val headers = arrayOf("AC ID", "Account Name", "Mobile", "Balance", "Area")
 
-            val maxRowsPerPage = 25
+            // Helper to clamp text within a cell width
+            fun drawClampedText(canvas: android.graphics.Canvas, text: String, x: Float, y: Float, width: Float, paint: android.graphics.Paint) {
+                val ellipsis = "…"
+                val maxLen = paint.breakText(text, true, width - 6f, null)
+                val toDraw = if (maxLen < text.length && maxLen > 1) text.substring(0, maxLen - 1) + ellipsis else text
+                canvas.drawText(toDraw, x + 5f, y, paint)
+            }
+
+            // Compute rows per page for available height
+            val footerReserve = 60f
+            val availableHeight = pageHeight - startY - footerReserve
+            val maxRowsPerPage = kotlin.math.floor(availableHeight / rowHeight).toInt().coerceAtLeast(1)
+
             val totalPages = kotlin.math.ceil(entries.size.toDouble() / maxRowsPerPage).toInt().coerceAtLeast(1)
             var entryIndex = 0
 
             for (pageNum in 1..totalPages) {
-                val pageInfo = PdfDocument.PageInfo.Builder(595, 842, pageNum).create()
+                val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNum).create()
                 val page = pdfDocument.startPage(pageInfo)
                 val canvas = page.canvas
 
                 val currentDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
-                canvas.drawText("Outstanding Report", 297.5f, 50f, titlePaint)
-                canvas.drawText("Generated on: ${'$'}currentDate", 297.5f, 75f, cellPaint)
-                canvas.drawText("Page ${'$'}pageNum of ${'$'}totalPages", 297.5f, 95f, cellPaint)
+                canvas.drawText("Outstanding Report", pageWidth / 2f, 40f, titlePaint)
+                canvas.drawText("Generated on: ${currentDate}", pageWidth / 2f, 60f, cellPaint)
+                canvas.drawText("Page ${pageNum} of ${totalPages}", pageWidth / 2f, 75f, cellPaint)
 
                 var currentX = startX
                 var currentY = startY
 
-                val headerRect = RectF(startX, currentY, startX + totalWidth, currentY + rowHeight)
-                canvas.drawRect(headerRect, android.graphics.Paint().apply { color = android.graphics.Color.LTGRAY; style = android.graphics.Paint.Style.FILL })
-
+                // Header background and text
+                val headerRect = RectF(startX, currentY - rowHeight + 2f, startX + totalWidth, currentY + 2f)
+                canvas.drawRect(headerRect, fillHeaderPaint)
                 for (i in headers.indices) {
-                    val rect = RectF(currentX, currentY, currentX + colWidths[i], currentY + rowHeight)
+                    val rect = RectF(currentX, currentY - rowHeight, currentX + colWidths[i], currentY)
                     canvas.drawRect(rect, borderPaint)
-                    canvas.drawText(headers[i], currentX + 5f, currentY + 15f, headerPaint)
+                    drawClampedText(canvas, headers[i], currentX, currentY - 6f, colWidths[i], headerPaint)
                     currentX += colWidths[i]
                 }
 
-                currentY += rowHeight
+                // Rows
+                var rowsDrawn = 0
                 val endIndex = kotlin.math.min(entryIndex + maxRowsPerPage, entries.size)
-                for (i in entryIndex until endIndex) {
-                    val entry = entries[i]
+                while (entryIndex < endIndex) {
+                    val e = entries[entryIndex]
                     currentX = startX
-                    val rowData = arrayOf(
-                        entry.acId,
-                        entry.accountName.take(20),
-                        entry.mobile,
-                        "₹${'$'}{entry.balance}",
-                        entry.under.take(12)
-                    )
-                    for (j in rowData.indices) {
-                        val rect = RectF(currentX, currentY, currentX + colWidths[j], currentY + rowHeight)
-                        canvas.drawRect(rect, borderPaint)
-                        canvas.drawText(rowData[j], currentX + 5f, currentY + 15f, cellPaint)
-                        currentX += colWidths[j]
-                    }
                     currentY += rowHeight
-                }
 
-                entryIndex = endIndex
-
-                if (pageNum == totalPages) {
-                    currentX = startX
-                    val totalRect = RectF(startX, currentY, startX + totalWidth, currentY + rowHeight)
-                    canvas.drawRect(totalRect, android.graphics.Paint().apply { color = android.graphics.Color.CYAN; style = android.graphics.Paint.Style.FILL; alpha = 100 })
-                    val totalData = arrayOf("TOTAL", "", "", "₹" + String.format("%.0f", totalBalance), "")
-                    for (i in totalData.indices) {
-                        val rect = RectF(currentX, currentY, currentX + colWidths[i], currentY + rowHeight)
+                    val rowData = arrayOf(
+                        e.acId,
+                        e.accountName,
+                        e.mobile,
+                        e.under,
+                        "₹${e.balance}",
+                        e.lastDate,
+                        e.days,
+                        e.creditLimitAmount,
+                        e.creditLimitDays
+                    )
+                    for (i in rowData.indices) {
+                        val rect = RectF(currentX, currentY - rowHeight, currentX + colWidths[i], currentY)
                         canvas.drawRect(rect, borderPaint)
-                        canvas.drawText(totalData[i], currentX + 5f, currentY + 15f, headerPaint)
+                        drawClampedText(canvas, rowData[i], currentX, currentY - 6f, colWidths[i], cellPaint)
                         currentX += colWidths[i]
                     }
-                    canvas.drawText("Total Entries: ${'$'}{entries.size}", startX, currentY + 50f, cellPaint)
-                    canvas.drawText("Generated by JIVA App", startX, currentY + 70f, cellPaint)
+                    rowsDrawn++
+                    entryIndex++
+                }
+
+                // Footer totals on last page
+                if (pageNum == totalPages) {
+                    currentX = startX
+                    currentY += rowHeight
+                    val totalRect = RectF(startX, currentY - rowHeight, startX + totalWidth, currentY)
+                    val totalFill = android.graphics.Paint().apply { color = android.graphics.Color.CYAN; style = android.graphics.Paint.Style.FILL; alpha = 60 }
+                    canvas.drawRect(totalRect, totalFill)
+
+                    // Draw cells and put total under Balance column
+                    var xCursor = startX
+                    for (i in headers.indices) {
+                        val rect = RectF(xCursor, currentY - rowHeight, xCursor + colWidths[i], currentY)
+                        canvas.drawRect(rect, borderPaint)
+                        if (headers[i] == "Balance") {
+                            drawClampedText(canvas, "₹" + String.format(Locale.getDefault(), "%.2f", totalBalance), xCursor, currentY - 6f, colWidths[i], headerPaint)
+                        } else if (i == 0) {
+                            drawClampedText(canvas, "TOTAL", xCursor, currentY - 6f, colWidths[i], headerPaint)
+                        }
+                        xCursor += colWidths[i]
+                    }
                 }
 
                 pdfDocument.finishPage(page)
@@ -1071,9 +1134,9 @@ private suspend fun generateAndSharePDF(
             val fileName = "Outstanding_Report_" + timestamp + ".pdf"
             val file = File(downloadsDir, fileName)
 
-            val out = FileOutputStream(file)
-            pdfDocument.writeTo(out)
-            out.close()
+            FileOutputStream(file).use { out ->
+                pdfDocument.writeTo(out)
+            }
             pdfDocument.close()
 
             withContext(Dispatchers.Main) {
@@ -1082,7 +1145,7 @@ private suspend fun generateAndSharePDF(
             }
         } catch (e: Exception) {
             withContext(Dispatchers.Main) {
-                Toast.makeText(context, "Error generating PDF: ${'$'}{e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "Error generating PDF: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -1092,21 +1155,28 @@ private fun sharePDF(context: Context, file: File) {
     try {
         val uri = FileProvider.getUriForFile(
             context,
-            "${'$'}{context.packageName}.fileprovider",
+            context.packageName + ".fileprovider",
             file
         )
-        val shareIntent = Intent().apply {
-            action = Intent.ACTION_SEND
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = "application/pdf"
             putExtra(Intent.EXTRA_STREAM, uri)
             putExtra(Intent.EXTRA_SUBJECT, "Outstanding Report")
             putExtra(Intent.EXTRA_TEXT, "Please find the Outstanding Report attached.")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        val chooser = Intent.createChooser(shareIntent, "Share Outstanding Report")
+        // Grant URI permission to potential receivers
+        context.packageManager.queryIntentActivities(shareIntent, 0).forEach { ri ->
+            val packageName = ri.activityInfo.packageName
+            context.grantUriPermission(packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        val chooser = Intent.createChooser(shareIntent, "Share Outstanding Report").apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
         context.startActivity(chooser)
     } catch (e: Exception) {
-        Toast.makeText(context, "Error sharing PDF: ${'$'}{e.message}", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, "Error sharing PDF: ${e.message}", Toast.LENGTH_LONG).show()
     }
 }
 
