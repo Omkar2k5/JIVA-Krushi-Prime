@@ -174,7 +174,7 @@ fun HomeScreen(
             ),
             MenuItem(
                 id = "price_screen",
-                title = "Price Report",
+                title = "Price List",
                 icon = Icons.Default.Star,
                 color = JivaColors.DeepBlue,
                 description = "Item pricing and rate management"

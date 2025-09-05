@@ -239,7 +239,7 @@ fun PriceListReportScreen(onBackClick: () -> Unit = {}) {
     ) {
         // Responsive Header with Refresh Button
         ResponsiveReportHeader(
-            title = "Price Report",
+            title = "Price List",
             subtitle = "Item pricing and rate management",
             onBackClick = onBackClick,
             actions = { }

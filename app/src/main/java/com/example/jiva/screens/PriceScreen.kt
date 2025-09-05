@@ -90,7 +90,7 @@ private fun PriceScreenImpl(onBackClick: () -> Unit = {}) {
     ) {
         // Header
         ResponsiveReportHeader(
-            title = "Price Report",
+            title = "Price List",
             subtitle = "Item pricing and rate management",
             onBackClick = onBackClick
         )
