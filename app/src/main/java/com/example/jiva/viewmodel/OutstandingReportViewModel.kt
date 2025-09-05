@@ -88,7 +88,7 @@ class OutstandingReportViewModel(
                             accountName = it.accountName ?: "",
                             mobile = it.mobile ?: "",
                             under = it.under ?: "",
-                            area = it.area ?: "",
+                            area = it.area,
                             balance = it.balance ?: "0",
                             lastDate = it.lastDate ?: "",
                             days = it.days ?: "",
@@ -177,6 +177,7 @@ class OutstandingReportViewModel(
     fun filterByArea(area: String) {
         // Implementation for area filtering
         // You can add this to the DAO queries
+        // TODO: Implement area filtering logic
     }
     
     // Helper function to convert database entities to UI model

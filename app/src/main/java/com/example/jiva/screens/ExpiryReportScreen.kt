@@ -948,6 +948,7 @@ private suspend fun generateAndSharePDF(
             val pageHeight = 595
             val margin = 20f
             val contentWidth = pageWidth - (2 * margin)
+            val bottomY = pageHeight - margin
             val pdfDocument = android.graphics.pdf.PdfDocument()
 
             val titlePaint = android.graphics.Paint().apply {
@@ -977,16 +978,18 @@ private suspend fun generateAndSharePDF(
             }
 
             val startX = margin
-            val rowHeight = 16f
-            val headerHeight = 20f
+            val rowHeight = 18f
+            val headerHeight = 24f
 
             // Calculate optimal column widths based on content
             val headers = listOf("Item ID", "Item Name", "Type", "Batch No", "Expiry Date", "Quantity", "Days Left", "Status")
             val colWidths = calculateOptimalColumnWidths(entries, headers, contentWidth, cellPaint)
 
-            // Calculate how many rows fit per page
-            val availableHeight = pageHeight - 120f // Reserve space for title and summary
-            val rowsPerPage = ((availableHeight - headerHeight) / rowHeight).toInt()
+            // Calculate how many rows fit per page (reserve top + bottom margins and header block)
+            val titleBlockHeight = 30f + 20f + 15f + 25f // title + generated + page + spacing
+            val summaryBlockHeight = 0f // we will add only on first page dynamically
+            val availableHeightBase = pageHeight - titleBlockHeight - headerHeight - margin - margin
+            val rowsPerPage = (availableHeightBase / rowHeight).toInt().coerceAtLeast(1)
 
             var currentPage = 1
             var entryIndex = 0
@@ -1022,19 +1025,21 @@ private suspend fun generateAndSharePDF(
 
                 // Table header (repeated on each page)
                 var xCursor = startX
+                val headerTop = currentY
+                val headerBottom = currentY + headerHeight
                 for (i in headers.indices) {
-                    val rect = android.graphics.RectF(xCursor, currentY - headerHeight, xCursor + colWidths[i], currentY)
+                    val rect = android.graphics.RectF(xCursor, headerTop, xCursor + colWidths[i], headerBottom)
                     canvas.drawRect(rect, fillHeaderPaint)
                     canvas.drawRect(rect, borderPaint)
-                    drawTextCentered(canvas, headers[i], xCursor + colWidths[i]/2, currentY - 6f, colWidths[i] - 10f, headerPaint)
+                    drawTextCentered(canvas, headers[i], xCursor + colWidths[i]/2, headerBottom - 6f, colWidths[i] - 10f, headerPaint)
                     xCursor += colWidths[i]
                 }
-                currentY += 5f
+                currentY = headerBottom
 
                 // Data rows for this page
                 val endIndex = (entryIndex + rowsPerPage).coerceAtMost(entries.size)
                 for (i in entryIndex until endIndex) {
-                    if (currentY > pageHeight - 30f) break
+                    if (currentY + rowHeight > bottomY) break
                     
                     val entry = entries[i]
                     xCursor = startX
@@ -1057,23 +1062,26 @@ private suspend fun generateAndSharePDF(
                         status
                     )
                     
+                    val rowTop = currentY
+                    val rowBottom = currentY + rowHeight
                     for (j in data.indices) {
-                        val rect = android.graphics.RectF(xCursor, currentY - rowHeight, xCursor + colWidths[j], currentY)
+                        val rect = android.graphics.RectF(xCursor, rowTop, xCursor + colWidths[j], rowBottom)
                         canvas.drawRect(rect, borderPaint)
-                        drawTextCentered(canvas, data[j], xCursor + colWidths[j]/2, currentY - 4f, colWidths[j] - 10f, cellPaint)
+                        drawTextCentered(canvas, data[j], xCursor + colWidths[j]/2, rowBottom - 4f, colWidths[j] - 10f, cellPaint)
                         xCursor += colWidths[j]
                     }
-                    currentY += rowHeight
+                    currentY = rowBottom
                 }
 
                 // Total row on last page
-                if (currentPage == totalPages && currentY < pageHeight - 30f) {
-                    currentY += 10f
+                if (currentPage == totalPages && currentY + rowHeight <= bottomY) {
+                    val totalTop = currentY + 8f
+                    val totalBottom = totalTop + rowHeight
                     xCursor = startX
-                    val totalRect = android.graphics.RectF(startX, currentY - rowHeight, startX + contentWidth, currentY)
+                    val totalRect = android.graphics.RectF(startX, totalTop, startX + contentWidth, totalBottom)
                     canvas.drawRect(totalRect, fillHeaderPaint)
                     canvas.drawRect(totalRect, borderPaint)
-                    drawTextCentered(canvas, "TOTAL: ${entries.size} items | Expired: $expiredCount | Expiring Soon: $expiringSoonCount", startX + contentWidth/2, currentY - 4f, contentWidth - 10f, headerPaint)
+                    drawTextCentered(canvas, "TOTAL: ${entries.size} items | Expired: $expiredCount | Expiring Soon: $expiringSoonCount", startX + contentWidth/2, totalBottom - 4f, contentWidth - 10f, headerPaint)
                 }
 
                 pdfDocument.finishPage(page)
@@ -1113,48 +1121,28 @@ private fun calculateOptimalColumnWidths(
     paint: android.graphics.Paint
 ): FloatArray {
     val colWidths = FloatArray(headers.size)
-    val minWidths = FloatArray(headers.size)
-    
-    // Calculate minimum width for each column based on headers and sample data
+
+    // Base weights for columns to stabilize layout on A4 landscape
+    val weights = floatArrayOf(
+        0.10f, // Item ID
+        0.28f, // Item Name
+        0.10f, // Type
+        0.12f, // Batch No
+        0.12f, // Expiry Date
+        0.10f, // Quantity
+        0.08f, // Days Left
+        0.10f  // Status
+    )
+
+    // Normalize weights in case of drift
+    val weightSum = weights.sum()
+    val normalized = weights.map { it / weightSum }
+
+    // Compute target widths by weights
     for (i in headers.indices) {
-        var maxWidth = paint.measureText(headers[i])
-        
-        // Sample some entries to find the widest content
-        val sampleSize = minOf(10, entries.size)
-        for (j in 0 until sampleSize) {
-            val entry = entries[j]
-            val daysLeft = entry.daysLeft.toIntOrNull() ?: 0
-            val status = when {
-                daysLeft <= 0 -> "Expired"
-                daysLeft <= 7 -> "Critical"
-                daysLeft <= 30 -> "Warning"
-                daysLeft <= 90 -> "Caution"
-                else -> "Good"
-            }
-            val content = when (i) {
-                0 -> entry.itemId
-                1 -> entry.itemName
-                2 -> entry.itemType
-                3 -> entry.batchNo
-                4 -> entry.expiryDate
-                5 -> entry.qty
-                6 -> entry.daysLeft
-                7 -> status
-                else -> ""
-            }
-            maxWidth = maxOf(maxWidth, paint.measureText(content))
-        }
-        
-        minWidths[i] = maxWidth + 20f // Add padding
+        colWidths[i] = (totalWidth * normalized[i]).coerceAtLeast(60f)
     }
-    
-    val totalMinWidth = minWidths.sum()
-    val scaleFactor = if (totalMinWidth > totalWidth) totalWidth / totalMinWidth else 1f
-    
-    for (i in headers.indices) {
-        colWidths[i] = (minWidths[i] * scaleFactor).coerceAtLeast(60f) // Minimum 60f width
-    }
-    
+
     return colWidths
 }
 
@@ -1169,14 +1157,16 @@ private fun drawTextCentered(
     maxWidth: Float,
     paint: android.graphics.Paint
 ) {
-    val textWidth = paint.measureText(text)
-    if (textWidth <= maxWidth) {
-        canvas.drawText(text, centerX - textWidth/2, y, paint)
-    } else {
-        // Truncate text if too long
-        val truncatedText = text.takeWhile { paint.measureText(it.toString()) <= maxWidth - 10f }
-        canvas.drawText(truncatedText + "...", centerX - paint.measureText(truncatedText + "...")/2, y, paint)
+    // Ellipsize by measuring progressively
+    var display = text
+    while (paint.measureText(display) > maxWidth && display.isNotEmpty()) {
+        // Remove a chunk to speed up shrinking
+        val remove = ((paint.measureText(display) - maxWidth) / (paint.textSize / 1.8f)).toInt().coerceAtLeast(1)
+        val newLen = (display.length - remove).coerceAtLeast(0)
+        display = if (newLen > 3) display.substring(0, newLen - 3) + "..." else "..."
     }
+    val x = centerX - paint.measureText(display) / 2
+    canvas.drawText(display, x, y, paint)
 }
 
 private fun sharePDF(context: android.content.Context, file: java.io.File) {

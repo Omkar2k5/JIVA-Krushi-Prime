@@ -428,6 +428,7 @@ class JivaRepositoryImpl(
                             accountName = it.accountName,
                             mobile = it.mobile,
                             under = it.under,
+                            area = it.area,
                             balance = it.balance,
                             lastDate = it.lastDate,
                             days = it.days,
