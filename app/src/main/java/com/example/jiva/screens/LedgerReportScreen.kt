@@ -87,27 +87,30 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
     var narrationSearch by remember { mutableStateOf("") }
     var isEntryTypeDropdownExpanded by remember { mutableStateOf(false) }
 
+    // Account Opening fields (static for now; will be set via API later)
+    var openingDr by remember { mutableStateOf("0") }
+    var openingCr by remember { mutableStateOf("0") }
+
     // Get current year and user ID
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
 
-    // Handle initial screen loading with progress tracking
+    // Handle initial screen loading: fetch Account Names on open
     LaunchedEffect(Unit) {
         isScreenLoading = true
-        loadingMessage = "Initializing Ledger data..."
+        loadingMessage = "Fetching account names..."
 
-        // Simulate progressive loading for better UX
-        for (i in 0..100 step 10) {
+        val userId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull() ?: 1017
+        try {
+            viewModel.loadAccountNames(userId, year)
+        } catch (_: Exception) { }
+
+        // Smooth progress animation (brief)
+        for (i in 0..100 step 25) {
             loadingProgress = i
             dataLoadingProgress = i.toFloat()
-            loadingMessage = when {
-                i < 30 -> "Loading Ledger data..."
-                i < 70 -> "Processing ${i}% complete..."
-                i < 100 -> "Finalizing data..."
-                else -> "Complete!"
-            }
-            kotlinx.coroutines.delay(50) // Smooth progress animation
+            loadingMessage = if (i < 100) "Preparing data..." else "Complete!"
+            kotlinx.coroutines.delay(40)
         }
-
         isScreenLoading = false
     }
 
@@ -212,49 +215,12 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
             .fillMaxSize()
             .background(JivaColors.LightGray)
     ) {
-        // Responsive Header with Refresh Button
+        // Header (refresh removed)
         ResponsiveReportHeader(
             title = "Ledger Report",
             subtitle = "Ledger entries and transactions",
             onBackClick = onBackClick,
-            actions = {
-                // Refresh Button
-                IconButton(
-                    onClick = {
-                        if (finalUserId != null && !isRefreshing) {
-                            scope.launch {
-                                isRefreshing = true
-                                try {
-                                    val result = application.repository.syncLedger(finalUserId, year)
-                                    if (result.isSuccess) {
-                                        Toast.makeText(context, "Ledger data refreshed successfully", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        Toast.makeText(context, "Failed to refresh data", Toast.LENGTH_SHORT).show()
-                                    }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                                } finally {
-                                    isRefreshing = false
-                                }
-                            }
-                        }
-                    }
-                ) {
-                    if (isRefreshing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = JivaColors.White,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh",
-                            tint = JivaColors.White
-                        )
-                    }
-                }
-            }
+            actions = { }
         )
 
         // Main content
@@ -282,10 +248,14 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                             color = JivaColors.DeepBlue
                         )
 
-                        // Entry Type Filter
+                        // Account Name (from API)
+                        val accountOptions by viewModel.accountOptions.collectAsState()
+                        var isAccountDropdownExpanded by remember { mutableStateOf(false) }
+                        var selectedAccount by remember { mutableStateOf<com.example.jiva.viewmodel.LedgerReportViewModel.AccountOption?>(null) }
+
                         Column {
                             Text(
-                                text = "Entry Type",
+                                text = "Account Name",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = JivaColors.DeepBlue,
@@ -293,15 +263,15 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                             )
 
                             ExposedDropdownMenuBox(
-                                expanded = isEntryTypeDropdownExpanded,
-                                onExpandedChange = { isEntryTypeDropdownExpanded = it }
+                                expanded = isAccountDropdownExpanded,
+                                onExpandedChange = { isAccountDropdownExpanded = it }
                             ) {
                                 OutlinedTextField(
-                                    value = entryTypeFilter,
+                                    value = selectedAccount?.name ?: "Select account",
                                     onValueChange = {},
                                     readOnly = true,
                                     trailingIcon = {
-                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = isEntryTypeDropdownExpanded)
+                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = isAccountDropdownExpanded)
                                     },
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -310,15 +280,15 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                                 )
 
                                 ExposedDropdownMenu(
-                                    expanded = isEntryTypeDropdownExpanded,
-                                    onDismissRequest = { isEntryTypeDropdownExpanded = false }
+                                    expanded = isAccountDropdownExpanded,
+                                    onDismissRequest = { isAccountDropdownExpanded = false }
                                 ) {
-                                    listOf("All Types", "Cash Sale", "Credit Sale", "Purchase", "Payment", "Receipt").forEach { type ->
+                                    accountOptions.forEach { option ->
                                         DropdownMenuItem(
-                                            text = { Text(type) },
+                                            text = { Text(option.name) },
                                             onClick = {
-                                                entryTypeFilter = type
-                                                isEntryTypeDropdownExpanded = false
+                                                selectedAccount = option
+                                                isAccountDropdownExpanded = false
                                             }
                                         )
                                     }
@@ -326,36 +296,26 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                             }
                         }
 
-                        // Narration Search
-                        Column {
-                            Text(
-                                text = "Search in Narration",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = JivaColors.DeepBlue,
-                                modifier = Modifier.padding(bottom = 4.dp)
-                            )
-                            OutlinedTextField(
-                                value = narrationSearch,
-                                onValueChange = { narrationSearch = it },
-                                placeholder = { Text("Search in descriptions...") },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.Search,
-                                        contentDescription = "Search",
-                                        tint = JivaColors.Purple
-                                    )
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp),
-                                singleLine = true
-                            )
+                        // Show button (next workflow: will trigger 2 API calls later)
+                        Button(
+                            onClick = {
+                                // Placeholder: next step will implement the two API calls after selection
+                                if (selectedAccount == null) {
+                                    Toast.makeText(context, "Please select an account", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = JivaColors.Purple)
+                        ) {
+                            Icon(imageVector = Icons.Default.Visibility, contentDescription = "Show")
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("SHOW")
                         }
                     }
                 }
             }
 
-            // Summary Card
+            // Account Opening Card (CR/DR only)
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -363,55 +323,49 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                     colors = CardDefaults.cardColors(containerColor = JivaColors.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "Total Debit",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = JivaColors.DarkGray
-                            )
-                            Text(
-                                text = "₹${String.format("%.2f", totalDr)}",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = JivaColors.Red
-                            )
-                        }
-
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "Total Credit",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = JivaColors.DarkGray
-                            )
-                            Text(
-                                text = "₹${String.format("%.2f", totalCr)}",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = JivaColors.Green
-                            )
-                        }
-
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "Entries",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = JivaColors.DarkGray
-                            )
-                            Text(
-                                text = "${filteredEntries.size}",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = JivaColors.DeepBlue
-                            )
+                        Text(
+                            text = "Account Opening",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = JivaColors.DeepBlue
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "DR",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = JivaColors.DarkGray
+                                )
+                                Text(
+                                    text = "₹${String.format("%.2f", (openingDr.toDoubleOrNull() ?: 0.0))}",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = JivaColors.Red
+                                )
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "CR",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = JivaColors.DarkGray
+                                )
+                                Text(
+                                    text = "₹${String.format("%.2f", (openingCr.toDoubleOrNull() ?: 0.0))}",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = JivaColors.Green
+                                )
+                            }
                         }
                     }
                 }
@@ -452,15 +406,61 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                                 items(filteredEntries) { entry ->
                                     LedgerTableRow(entry = entry)
                                 }
+                            }
+                        }
+                    }
+                }
+            }
 
-                                // Total row like Outstanding Report
-                                item {
-                                    LedgerTotalRow(
-                                        totalDr = totalDr,
-                                        totalCr = totalCr,
-                                        totalEntries = filteredEntries.size
-                                    )
-                                }
+            // Bottom Total Card (Total Debit & Total Credit)
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp)
+                    ) {
+                        Text(
+                            text = "Total",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = JivaColors.DeepBlue,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "Total Debit",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = JivaColors.DarkGray
+                                )
+                                Text(
+                                    text = "₹${String.format("%.2f", totalDr)}",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = JivaColors.Red
+                                )
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "Total Credit",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = JivaColors.DarkGray
+                                )
+                                Text(
+                                    text = "₹${String.format("%.2f", totalCr)}",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = JivaColors.Green
+                                )
                             }
                         }
                     }

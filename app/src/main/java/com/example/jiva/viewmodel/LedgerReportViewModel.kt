@@ -6,6 +6,9 @@ import androidx.lifecycle.viewModelScope
 import com.example.jiva.data.database.JivaDatabase
 import com.example.jiva.data.database.entities.LedgerEntity
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -16,6 +19,45 @@ import timber.log.Timber
 class LedgerReportViewModel(
     private val database: JivaDatabase
 ) : ViewModel() {
+
+    // Remote data source for Account_Names API
+    private val remote = com.example.jiva.data.network.RemoteDataSource()
+
+    // Expose account options (id + name) for dropdown
+    data class AccountOption(val id: String, val name: String)
+
+    private val _accountOptions = MutableStateFlow<List<AccountOption>>(emptyList())
+    val accountOptions: StateFlow<List<AccountOption>> = _accountOptions.asStateFlow()
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
+    /**
+     * Load account names from API and expose as options
+     */
+    fun loadAccountNames(userId: Int, year: String) {
+        viewModelScope.launch {
+            try {
+                val res = remote.getAccountNames(userId, year)
+                if (res.isSuccess) {
+                    val data = res.getOrNull()?.data.orEmpty()
+                    _accountOptions.value = data.mapNotNull { item ->
+                        val name = (item.accountName ?: item.items)?.trim()
+                        val id = item.acId?.trim()
+                        if (!name.isNullOrBlank() && !id.isNullOrBlank()) AccountOption(id = id, name = name) else null
+                    }.distinctBy { it.id }.sortedBy { it.name }
+                    _error.value = null
+                } else {
+                    _error.value = res.exceptionOrNull()?.message
+                    _accountOptions.value = emptyList()
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to load account names")
+                _error.value = e.message
+                _accountOptions.value = emptyList()
+            }
+        }
+    }
 
     /**
      * Observe ledger entries for a specific year
