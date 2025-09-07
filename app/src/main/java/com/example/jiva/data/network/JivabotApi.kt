@@ -23,7 +23,7 @@ object JivabotApi {
     private val emptyBody = ByteArray(0).toRequestBody("application/x-www-form-urlencoded".toMediaType())
 
     private fun buildUrl(pathSegment: String, params: Map<String, String?>): HttpUrl {
-        // jivabot requires HTTP (not HTTPS) and accepts application/x-www-form-urlencoded style encoding
+        // Build HTTPS URL and accept application/x-www-form-urlencoded style encoding
         val builder = HttpUrl.Builder()
             .scheme("http")
             .host(HOST)

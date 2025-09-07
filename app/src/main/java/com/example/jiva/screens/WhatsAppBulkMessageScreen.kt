@@ -49,6 +49,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
+import timber.log.Timber
 
 // Data model for Customer contact information
 data class CustomerContact(
@@ -613,8 +614,48 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
                                 android.widget.Toast.LENGTH_SHORT
                             ).show()
                             
-                            // TODO: In real implementation, this would send messages via WhatsApp Business API
-                            // The messageData contains all necessary information for the API call
+                                // Send via Jivabot API (type=media when image present)
+                            scope.launch {
+                                val json = com.example.jiva.utils.UserEnv.getMsgTemplatesJson(context)
+                                val gson = com.google.gson.Gson()
+                                val items = if (!json.isNullOrBlank()) gson.fromJson(
+                                    json,
+                                    Array<com.example.jiva.data.api.models.MsgTemplateItem>::class.java
+                                )?.toList() ?: emptyList() else emptyList()
+                                val outTemplate = items.firstOrNull { it.category.equals("OutStandingReport", true) }
+                                val instanceId = outTemplate?.instanceID.orEmpty()
+                                val accessToken = outTemplate?.accessToken.orEmpty()
+
+                                val mediaUrl = uploadedImageUrl
+                                val fileName = mediaUrl?.substringAfterLast('/') ?: "image.jpg"
+
+                                val recipients = selectedCustomers.map { it.mobileNumber.filter { ch -> ch.isDigit() } }
+
+                                recipients.forEach { raw ->
+                                    val number = when (raw.length) {
+                                        10 -> "91$raw"
+                                        12 -> raw
+                                        else -> raw
+                                    }
+                                    val type = if (!mediaUrl.isNullOrBlank()) "media" else "text"
+                                    val (ok, _) = com.example.jiva.data.network.JivabotApi.send(
+                                        number = number,
+                                        type = type,
+                                        message = messageText,
+                                        mediaUrl = mediaUrl,
+                                        filename = if (!mediaUrl.isNullOrBlank()) fileName else null,
+                                        instanceId = instanceId,
+                                        accessToken = accessToken
+                                    )
+                                    Timber.d("WA send to $number ok=$ok")
+                                }
+
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Messages queued to ${selectedCustomers.size} recipients",
+                                    android.widget.Toast.LENGTH_LONG
+                                ).show()
+                            }
                         },
                         enabled = selectedCount > 0 && messageText.isNotBlank(),
                         colors = ButtonDefaults.buttonColors(

@@ -224,4 +224,12 @@ interface JivaApiService {
     @Multipart
     @POST("api/upload-image")
     suspend fun uploadImage(@Part image: MultipartBody.Part): ImageUploadResponse
+
+    /**
+     * POST /api/JivaBusiness/UploadImage
+     * Upload image file (field name: file) and get imageUrl back
+     */
+    @Multipart
+    @POST("api/JivaBusiness/UploadImage")
+    suspend fun uploadImageJivaBusiness(@Part file: MultipartBody.Part): ImageUploadResponse
 }

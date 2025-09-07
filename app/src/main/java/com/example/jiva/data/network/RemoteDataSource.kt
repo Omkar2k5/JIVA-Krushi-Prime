@@ -15,6 +15,8 @@ import timber.log.Timber
 import java.io.IOException
 import android.net.Uri
 import okhttp3.MultipartBody
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -293,19 +295,24 @@ class RemoteDataSource {
      */
     suspend fun uploadImage(imageUri: Uri): Result<ImageUploadResponse> {
         return try {
-            // For now, simulate a successful upload
-            // In real implementation, you would:
-            // 1. Convert URI to actual file using ContentResolver
-            // 2. Create proper MultipartBody.Part
-            // 3. Make actual API call
-            
-            val mockResponse = ImageUploadResponse(
-                success = true,
-                message = "Image uploaded successfully",
-                imageUrl = "https://example.com/uploaded-image-${System.currentTimeMillis()}.jpg"
-            )
-            
-            Result.success(mockResponse)
+            // Convert URI to temp file and upload via Retrofit multipart
+            val ctx = com.example.jiva.JivaApplication.getInstance().applicationContext
+            val contentResolver = ctx.contentResolver
+            val fileName = "upload_${System.currentTimeMillis()}.jpg"
+            val tempFile = File(ctx.cacheDir, fileName)
+            contentResolver.openInputStream(imageUri)?.use { input: InputStream ->
+                FileOutputStream(tempFile).use { output ->
+                    input.copyTo(output)
+                }
+            } ?: throw IOException("Failed to open input stream for URI")
+
+            // OkHttp 4.x: use extension functions instead of deprecated parse/create
+            val mediaType = "image/*".toMediaType()
+            val requestFile = tempFile.asRequestBody(mediaType)
+            val part = MultipartBody.Part.createFormData("file", tempFile.name, requestFile)
+
+            val response = apiService.uploadImageJivaBusiness(part)
+            Result.success(response)
         } catch (e: Exception) {
             Timber.e(e, "Image upload failed: ${e.message}")
             Result.failure(e)
