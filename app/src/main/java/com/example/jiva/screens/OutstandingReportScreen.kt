@@ -978,8 +978,9 @@ private suspend fun sendWhatsAppMessages(
                         // Progress update after each send
                         sent += 1
                         onProgress?.invoke(sent, total)
-                        // 10-second delay between each message for bulk sending
-                        delay(10_000)
+                        // Random delay 8-15 seconds between each message
+                        val delayMs = (8..15).random() * 1000L
+                        delay(delayMs)
                     } catch (e: Exception) {
                         Timber.e(e, "Failed to send via Jivabot to ${'$'}{entry.mobile}")
                     }

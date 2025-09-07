@@ -136,10 +136,14 @@ object DataMapper {
     
     // Convert AccountMasterEntity to CustomerContact for WhatsApp Marketing
     fun AccountMasterEntity.toCustomerContact(): CustomerContact {
+        // Sanitize mobile for UI: remove country code and non-digits; keep last 10 digits
+        val raw = this.mobile ?: ""
+        val digits = raw.filter { it.isDigit() }
+        val displayMobile = if (digits.length >= 10) digits.takeLast(10) else digits
         return CustomerContact(
             accountNumber = this.acId?.toString() ?: this.srno.toString(),
             accountName = this.accountName,
-            mobileNumber = this.mobile ?: "",
+            mobileNumber = displayMobile,
             isSelected = false
         )
     }

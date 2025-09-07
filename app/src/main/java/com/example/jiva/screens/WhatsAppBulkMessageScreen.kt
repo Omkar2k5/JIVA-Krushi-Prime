@@ -56,7 +56,6 @@ data class CustomerContact(
     val accountNumber: String,
     val accountName: String,
     val mobileNumber: String,
-    val messageStatus: String = "Pending",
     var isSelected: Boolean = false
 )
 
@@ -74,6 +73,11 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
     var uploadProgress by remember { mutableStateOf(0f) }
     var uploadError by remember { mutableStateOf<String?>(null) }
     var uploadedImageUrl by remember { mutableStateOf<String?>(null) }
+
+    // Sending progress state
+    var isSending by remember { mutableStateOf(false) }
+    var sendProgress by remember { mutableStateOf(0) }
+    var sendTotal by remember { mutableStateOf(0) }
     
     // Get the context and database
     val context = LocalContext.current
@@ -157,9 +161,21 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
     val uiState by viewModel.uiState.collectAsState()
     val customerContacts = uiState.customerContacts
     
-    // Calculate selected count
-    val selectedCount = customerContacts.count { it.isSelected }
-    val totalCount = customerContacts.size
+    // Search filter state for contacts
+    var searchQuery by remember { mutableStateOf("") }
+
+    // Filtered contacts list based on search (by name or mobile)
+    val filteredContacts = remember(searchQuery, customerContacts) {
+        val q = searchQuery.trim()
+        if (q.isBlank()) customerContacts else customerContacts.filter { c ->
+            (c.accountName.isNotBlank() && c.accountName.contains(q, ignoreCase = true)) ||
+            (c.mobileNumber.isNotBlank() && c.mobileNumber.contains(q, ignoreCase = true))
+        }
+    }
+
+    // Calculate selected count from filtered list for UI labeling; use full for send
+    val selectedCount = remember(filteredContacts) { filteredContacts.count { it.isSelected } }
+    val totalCount = remember(filteredContacts) { filteredContacts.size }
     
     // Show toast for error messages
     LaunchedEffect(uiState.errorMessage) {
@@ -417,57 +433,111 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
                 }
             }
 
+            // Search Card (below Compose Message and above Recipients Selected)
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text(
+                            text = "Search by Name or Mobile",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = JivaColors.DeepBlue
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Type name or mobile...") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            leadingIcon = {
+                                Icon(imageVector = Icons.Default.Search, contentDescription = "Search")
+                            },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.Black,
+                                unfocusedTextColor = Color.Black,
+                                cursorColor = JivaColors.Purple
+                            )
+                        )
+                    }
+                }
+            }
+
             // Selection Summary Card
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = JivaColors.Teal
+                        containerColor = if (isSending) JivaColors.Purple else JivaColors.Teal
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "Recipients Selected",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = JivaColors.White
-                            )
-                            Text(
-                                text = "$selectedCount of $totalCount customers",
-                                fontSize = 14.sp,
-                                color = JivaColors.White.copy(alpha = 0.8f)
-                            )
-                        }
-                        
+                    Column(modifier = Modifier.padding(20.dp)) {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Select All Button
-                            Button(
-                                onClick = { 
-                                    selectAll = !selectAll
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = JivaColors.White.copy(alpha = 0.2f)
-                                ),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
+                            Column {
                                 Text(
-                                    text = if (selectAll) "Deselect All" else "Select All",
-                                    color = JivaColors.White,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 12.sp
+                                    text = "Recipients Selected",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = JivaColors.White
+                                )
+                                Text(
+                                    text = "$selectedCount of $totalCount customers",
+                                    fontSize = 14.sp,
+                                    color = JivaColors.White.copy(alpha = 0.8f)
                                 )
                             }
+                            
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // Select All Button
+                                Button(
+                                    onClick = { 
+                                        selectAll = !selectAll
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = JivaColors.White.copy(alpha = 0.2f)
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        text = if (selectAll) "Deselect All" else "Select All",
+                                        color = JivaColors.White,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        // Visible progress bar when sending
+                        if (isSending) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            LinearProgressIndicator(
+                                progress = if (sendTotal > 0) (sendProgress.toFloat() / sendTotal.toFloat()) else 0f,
+                                modifier = Modifier.fillMaxWidth(),
+                                color = JivaColors.White,
+                                trackColor = JivaColors.White.copy(alpha = 0.3f)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Sending $sendProgress of $sendTotal...",
+                                color = JivaColors.White,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 12.sp
+                            )
                         }
                     }
                 }
@@ -494,7 +564,7 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
                                 color = JivaColors.DeepBlue
                             )
                             Text(
-                                text = "${customerContacts.size} customers",
+                                text = "${filteredContacts.size} customers",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = JivaColors.DarkGray
@@ -509,7 +579,7 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
                                 .height(400.dp)
                                 .horizontalScroll(rememberScrollState())
                         ) {
-                            // Header
+                            // Header only
                             CustomerTableHeader()
 
                             // Content
@@ -557,7 +627,7 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
                                 else -> {
                                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                                         items(
-                                            items = customerContacts,
+                                            items = filteredContacts,
                                             key = { it.accountNumber }
                                         ) { contact ->
                                             Card(
@@ -610,11 +680,14 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
                             val imageStatus = if (uploadedImageUrl != null) " with image" else " without image"
                             android.widget.Toast.makeText(
                                 context,
-                                "Sending message to ${selectedCustomers.size} customers$imageStatus",
+                                "Starting send: ${selectedCustomers.size} recipients$imageStatus",
                                 android.widget.Toast.LENGTH_SHORT
                             ).show()
-                            
-                                // Send via Jivabot API (type=media when image present)
+
+                            // Initialize progress state and send via Jivabot
+                            isSending = true
+                            sendTotal = selectedCustomers.size
+                            sendProgress = 0
                             scope.launch {
                                 val json = com.example.jiva.utils.UserEnv.getMsgTemplatesJson(context)
                                 val gson = com.google.gson.Gson()
@@ -631,12 +704,8 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
 
                                 val recipients = selectedCustomers.map { it.mobileNumber.filter { ch -> ch.isDigit() } }
 
-                                recipients.forEach { raw ->
-                                    val number = when (raw.length) {
-                                        10 -> "91$raw"
-                                        12 -> raw
-                                        else -> raw
-                                    }
+                                for ((index, raw) in recipients.withIndex()) {
+                                    val number = if (raw.length == 12 && raw.startsWith("91")) raw else "91" + raw.takeLast(10)
                                     val type = if (!mediaUrl.isNullOrBlank()) "media" else "text"
                                     val (ok, _) = com.example.jiva.data.network.JivabotApi.send(
                                         number = number,
@@ -647,12 +716,22 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
                                         instanceId = instanceId,
                                         accessToken = accessToken
                                     )
+                                    sendProgress = index + 1
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "Sent $sendProgress of $sendTotal",
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
                                     Timber.d("WA send to $number ok=$ok")
+                                    // Random delay 8-15 seconds between each message
+                                    val delayMs = (8..15).random() * 1000L
+                                    kotlinx.coroutines.delay(delayMs)
                                 }
 
+                                isSending = false
                                 android.widget.Toast.makeText(
                                     context,
-                                    "Messages queued to ${selectedCustomers.size} recipients",
+                                    "Finished sending to ${selectedCustomers.size} recipients",
                                     android.widget.Toast.LENGTH_LONG
                                 ).show()
                             }
@@ -708,7 +787,6 @@ private fun CustomerTableHeader() {
         CustomerHeaderCell("AC ID", Modifier.width(80.dp))
         CustomerHeaderCell("Account Name", Modifier.width(180.dp))
         CustomerHeaderCell("Mobile", Modifier.width(140.dp))
-        CustomerHeaderCell("Message Status", Modifier.width(140.dp))
     }
 }
 
@@ -745,7 +823,6 @@ private fun CustomerTableRow(
         CustomerCell(contact.accountNumber, Modifier.width(80.dp))
         CustomerCell(contact.accountName, Modifier.width(180.dp))
         CustomerCell(contact.mobileNumber, Modifier.width(140.dp))
-        CustomerCell(contact.messageStatus, Modifier.width(140.dp))
     }
     Divider(color = JivaColors.LightGray, thickness = 0.5.dp, modifier = Modifier.padding(horizontal = 8.dp))
 }

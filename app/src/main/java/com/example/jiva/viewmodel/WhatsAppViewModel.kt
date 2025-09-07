@@ -41,7 +41,7 @@ class WhatsAppViewModel(
                         .map {
                             CustomerContact(
                                 accountNumber = it.acId.ifBlank { "0" },
-                                accountName = it.accountName,
+                                accountName = (it.accountName ?: ""),
                                 mobileNumber = formatMobileNumber(it.mobile),
                                 isSelected = false
                             )
@@ -97,7 +97,9 @@ class WhatsAppViewModel(
      * Format mobile number to include country code if not present
      */
     private fun formatMobileNumber(mobile: String): String {
-        return if (mobile.startsWith("+91")) mobile else "+91 $mobile"
+        // For UI: show 10-digit local number without +91
+        val digits = mobile.filter { it.isDigit() }
+        return if (digits.length >= 10) digits.takeLast(10) else digits
     }
     
     /**

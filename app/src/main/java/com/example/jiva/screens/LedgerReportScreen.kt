@@ -522,8 +522,17 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
 
                         // Account Name (from API)
                         val accountOptions by viewModel.accountOptions.collectAsState()
+                        var accountNameSearch by remember { mutableStateOf("") }
                         var isAccountDropdownExpanded by remember { mutableStateOf(false) }
                         var selectedAccount by remember { mutableStateOf<com.example.jiva.viewmodel.LedgerReportViewModel.AccountOption?>(null) }
+
+                        val filteredAccountOptions = remember(accountNameSearch, accountOptions) {
+                            if (accountNameSearch.isBlank()) {
+                                accountOptions
+                            } else {
+                                accountOptions.filter { it.name.contains(accountNameSearch, ignoreCase = true) }
+                            }
+                        }
 
                         Column {
                             Text(
@@ -539,30 +548,31 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                                 onExpandedChange = { isAccountDropdownExpanded = it }
                             ) {
                                 OutlinedTextField(
-                                    value = selectedAccount?.name ?: "Select account",
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    trailingIcon = {
-                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = isAccountDropdownExpanded)
+                                    value = accountNameSearch,
+                                    onValueChange = {
+                                        accountNameSearch = it
+                                        isAccountDropdownExpanded = true
                                     },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                                    placeholder = { Text("Type to search account") },
+                                    modifier = Modifier.fillMaxWidth().menuAnchor(),
                                     shape = RoundedCornerShape(8.dp)
                                 )
 
-                                ExposedDropdownMenu(
-                                    expanded = isAccountDropdownExpanded,
-                                    onDismissRequest = { isAccountDropdownExpanded = false }
-                                ) {
-                                    accountOptions.forEach { option ->
-                                        DropdownMenuItem(
-                                            text = { Text(option.name) },
-                                            onClick = {
-                                                selectedAccount = option
-                                                isAccountDropdownExpanded = false
-                                            }
-                                        )
+                                if (filteredAccountOptions.isNotEmpty()) {
+                                    ExposedDropdownMenu(
+                                        expanded = isAccountDropdownExpanded,
+                                        onDismissRequest = { isAccountDropdownExpanded = false }
+                                    ) {
+                                        filteredAccountOptions.forEach { option ->
+                                            DropdownMenuItem(
+                                                text = { Text(option.name) },
+                                                onClick = {
+                                                    selectedAccount = option
+                                                    accountNameSearch = option.name
+                                                    isAccountDropdownExpanded = false
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
