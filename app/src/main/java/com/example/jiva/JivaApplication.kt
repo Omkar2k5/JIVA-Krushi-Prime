@@ -88,6 +88,19 @@ class JivaApplication : MultiDexApplication() {
                             resp.data?.companyName?.let { name ->
                                 com.example.jiva.utils.UserEnv.setCompanyName(ctx, name)
                             }
+                            // Store owner and addresses if available
+                            resp.data?.ownerName?.let { owner ->
+                                com.example.jiva.utils.UserEnv.setOwnerName(ctx, owner)
+                            }
+                            resp.data?.address1?.let { v ->
+                                com.example.jiva.utils.UserEnv.setAddress1(ctx, v)
+                            }
+                            resp.data?.address2?.let { v ->
+                                com.example.jiva.utils.UserEnv.setAddress2(ctx, v)
+                            }
+                            resp.data?.address3?.let { v ->
+                                com.example.jiva.utils.UserEnv.setAddress3(ctx, v)
+                            }
                         }
                     }
                 }.onFailure { e -> Timber.w(e, "CompanyInfo fetch failed") }

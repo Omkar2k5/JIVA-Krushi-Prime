@@ -5,9 +5,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -30,18 +33,33 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.jiva.JivaApplication
 import com.example.jiva.JivaColors
 import com.example.jiva.R
+import com.example.jiva.components.ResponsiveReportHeader
 import com.example.jiva.data.repository.JivaRepositoryImpl
 import com.example.jiva.viewmodel.WhatsAppViewModel
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
+import java.io.InputStream
 
 // Data model for Customer contact information
 data class CustomerContact(
     val accountNumber: String,
     val accountName: String,
     val mobileNumber: String,
+    val messageStatus: String = "Pending",
     var isSelected: Boolean = false
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
     // State management
@@ -49,13 +67,78 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
     var imageUrl by remember { mutableStateOf("") }
     var selectAll by remember { mutableStateOf(false) }
     
+    // File selection and upload states
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var isUploading by remember { mutableStateOf(false) }
+    var uploadProgress by remember { mutableStateOf(0f) }
+    var uploadError by remember { mutableStateOf<String?>(null) }
+    var uploadedImageUrl by remember { mutableStateOf<String?>(null) }
+    
     // Get the context and database
     val context = LocalContext.current
     val database = (context.applicationContext as JivaApplication).database
+    val scope = rememberCoroutineScope()
     
     // Create repository and view model
     val jivaRepository = remember { JivaRepositoryImpl(database) }
     val viewModel: WhatsAppViewModel = viewModel { WhatsAppViewModel(jivaRepository) }
+    
+    // File picker launcher
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        selectedImageUri = uri
+        uploadError = null
+        uploadedImageUrl = null
+    }
+    
+    // Upload function
+    fun uploadImage(uri: Uri) {
+        scope.launch {
+            try {
+                isUploading = true
+                uploadProgress = 0f
+                uploadError = null
+                
+                // Simulate upload progress
+                for (i in 1..10) {
+                    uploadProgress = i * 0.1f
+                    kotlinx.coroutines.delay(200)
+                }
+                
+                // Call actual API through repository
+                val result = jivaRepository.uploadImage(uri)
+                if (result.isSuccess) {
+                    uploadedImageUrl = result.getOrNull()
+                    imageUrl = uploadedImageUrl ?: ""
+                    
+                    android.widget.Toast.makeText(
+                        context,
+                        "Image uploaded successfully!",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    val error = result.exceptionOrNull()?.message ?: "Upload failed"
+                    uploadError = error
+                    android.widget.Toast.makeText(
+                        context,
+                        "Upload failed: $error",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+                
+            } catch (e: Exception) {
+                uploadError = e.message ?: "Upload failed"
+                android.widget.Toast.makeText(
+                    context,
+                    "Upload failed: ${e.message}",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            } finally {
+                isUploading = false
+            }
+        }
+    }
 
     // On open: fetch Sundry debtors via Outstanding API
     LaunchedEffect(Unit) {
@@ -99,84 +182,19 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
             .fillMaxSize()
             .background(JivaColors.LightGray)
     ) {
-        // Header with gradient background
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(JivaColors.DeepBlue, JivaColors.Purple)
-                    )
-                )
-                .padding(20.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    IconButton(
-                        onClick = onBackClick,
-                        modifier = Modifier
-                            .background(
-                                JivaColors.White.copy(alpha = 0.2f),
-                                RoundedCornerShape(8.dp)
-                            )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = JivaColors.White
-                        )
-                    }
-                    
-                    // App Logo
-                    Image(
-                        painter = painterResource(id = R.drawable.logo),
-                        contentDescription = "JIVA Logo",
-                        modifier = Modifier.size(32.dp)
-                    )
-                    
-                    Column {
-                        Text(
-                            text = "WhatsApp Bulk Message",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.SansSerif,
-                            color = JivaColors.White
-                        )
-                        Text(
-                            text = "Send messages to multiple customers",
-                            fontSize = 14.sp,
-                            fontFamily = FontFamily.SansSerif,
-                            color = JivaColors.White.copy(alpha = 0.8f)
-                        )
-                    }
-                }
-                
-                // WhatsApp icon
-                Icon(
-                    imageVector = Icons.Default.Send,
-                    contentDescription = "WhatsApp",
-                    tint = JivaColors.Green,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(
-                            JivaColors.White,
-                            CircleShape
-                        )
-                        .padding(8.dp)
-                )
-            }
-        }
+        // Report-style header (like Price List)
+        ResponsiveReportHeader(
+            title = "WhatsApp Bulk Messaging",
+            subtitle = "Send messages to multiple customers",
+            onBackClick = onBackClick,
+            actions = { }
+        )
 
-        // Main content with performance optimizations
+        // Main content with performance optimizations and sticky header
+        val listState = rememberLazyListState()
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
+            state = listState,
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             userScrollEnabled = true
@@ -219,26 +237,172 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
                             )
                         )
 
-                        // Image URL input
+                        // Image selection and upload section
                         Text(
-                            text = "Image URL (optional)",
+                            text = "Attach Image (optional)",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
                             color = JivaColors.DeepBlue
                         )
-                        OutlinedTextField(
-                            value = imageUrl,
-                            onValueChange = { imageUrl = it },
-                            placeholder = { Text("https://example.com/image.jpg") },
-                            modifier = Modifier.fillMaxWidth(),
+                        
+                        // Image preview and file selection
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp)
+                                .clickable { filePickerLauncher.launch("image/*") },
                             shape = RoundedCornerShape(12.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.Black,
-                                unfocusedTextColor = Color.Black,
-                                cursorColor = JivaColors.Purple
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (selectedImageUri != null) JivaColors.LightBlue.copy(alpha = 0.1f) else JivaColors.LightGray.copy(alpha = 0.3f)
+                            ),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp, 
+                                if (selectedImageUri != null) JivaColors.Purple else JivaColors.DarkGray.copy(alpha = 0.3f)
                             )
-                        )
+                        ) {
+                            if (selectedImageUri != null) {
+                                // Show selected image preview
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context)
+                                        .data(selectedImageUri)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = "Selected Image",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(12.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                // Show placeholder
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Image,
+                                        contentDescription = "Select Image",
+                                        tint = JivaColors.DarkGray,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Tap to select an image",
+                                        fontSize = 12.sp,
+                                        color = JivaColors.DarkGray,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+                        
+                        // Upload button and progress
+                        if (selectedImageUri != null) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Button(
+                                    onClick = { uploadImage(selectedImageUri!!) },
+                                    enabled = !isUploading,
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = JivaColors.Purple
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    if (isUploading) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(16.dp),
+                                                color = JivaColors.White,
+                                                strokeWidth = 2.dp
+                                            )
+                                            Text(
+                                                text = "Uploading...",
+                                                color = JivaColors.White,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                    } else {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.CloudUpload,
+                                                contentDescription = "Upload",
+                                                tint = JivaColors.White,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                text = "Upload Image",
+                                                color = JivaColors.White,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                    }
+                                }
+                                
+                                Button(
+                                    onClick = { 
+                                        selectedImageUri = null
+                                        uploadedImageUrl = null
+                                        imageUrl = ""
+                                        uploadError = null
+                                    },
+                                    enabled = !isUploading,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = JivaColors.Red.copy(alpha = 0.1f)
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Remove",
+                                        tint = JivaColors.Red,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                            
+                            // Upload progress bar
+                            if (isUploading) {
+                                LinearProgressIndicator(
+                                    progress = uploadProgress,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = JivaColors.Purple,
+                                    trackColor = JivaColors.LightGray
+                                )
+                            }
+                            
+                            // Upload error message
+                            uploadError?.let { error ->
+                                Text(
+                                    text = "Upload failed: $error",
+                                    fontSize = 12.sp,
+                                    color = JivaColors.Red,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                            
+                            // Success message
+                            if (uploadedImageUrl != null) {
+                                Text(
+                                    text = "✓ Image uploaded successfully!",
+                                    fontSize = 12.sp,
+                                    color = JivaColors.Green,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
 
                         // Character count
                         Text(
@@ -308,93 +472,114 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
                 }
             }
 
-            // Customer Table Header Card
+            // Customer Contacts Table (header + rows in single component)
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = JivaColors.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Text(
-                            text = "Customer Contacts",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = JivaColors.DeepBlue,
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        )
-
-                        // Table Header
-                        CustomerTableHeader()
-                    }
-                }
-            }
-            
-            // Loading indicator
-            if (uiState.isLoading) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            CircularProgressIndicator(
-                                color = JivaColors.DeepBlue,
-                                modifier = Modifier.size(48.dp)
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "Loading customer contacts...",
-                                style = MaterialTheme.typography.bodyLarge,
+                                text = "Customer Contacts",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
                                 color = JivaColors.DeepBlue
                             )
+                            Text(
+                                text = "${customerContacts.size} customers",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = JivaColors.DarkGray
+                            )
                         }
-                    }
-                }
-            } else if (customerContacts.isEmpty()) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "No customer contacts found with mobile numbers",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color.Gray
-                        )
-                    }
-                }
-            }
 
-            // Customer Table Data Items with keys for performance
-            items(
-                items = customerContacts.withIndex().toList(),
-                key = { (_, contact) -> contact.accountNumber }
-            ) { (index, contact) ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RectangleShape,
-                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                ) {
-                    CustomerTableRow(
-                        contact = contact,
-                        onSelectionChanged = { isSelected ->
-                            viewModel.updateContactSelection(contact.accountNumber, isSelected)
-                            // Update selectAll state based on current selections
-                            selectAll = customerContacts.all { it.isSelected }
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Table container with horizontal scroll and fixed height (like Price screen)
+                        Column(
+                            modifier = Modifier
+                                .height(400.dp)
+                                .horizontalScroll(rememberScrollState())
+                        ) {
+                            // Header
+                            CustomerTableHeader()
+
+                            // Content
+                            when {
+                                uiState.isLoading -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(200.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            CircularProgressIndicator(
+                                                color = JivaColors.DeepBlue,
+                                                modifier = Modifier.size(48.dp)
+                                            )
+                                            Spacer(modifier = Modifier.height(16.dp))
+                                            Text(
+                                                text = "Loading customer contacts...",
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                color = JivaColors.DeepBlue
+                                            )
+                                        }
+                                    }
+                                }
+
+                                customerContacts.isEmpty() -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(200.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "No customer contacts found with mobile numbers",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = Color.Gray
+                                        )
+                                    }
+                                }
+
+                                else -> {
+                                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                                        items(
+                                            items = customerContacts,
+                                            key = { it.accountNumber }
+                                        ) { contact ->
+                                            Card(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = RoundedCornerShape(0.dp),
+                                                colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+                                                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                                            ) {
+                                                CustomerTableRow(
+                                                    contact = contact,
+                                                    onSelectionChanged = { isSelected ->
+                                                        viewModel.updateContactSelection(contact.accountNumber, isSelected)
+                                                        // Update selectAll state based on current selections
+                                                        selectAll = customerContacts.all { it.isSelected }
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
-                    )
+                    }
                 }
             }
 
@@ -413,14 +598,23 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
                             // Get selected customers from the ViewModel
                             val selectedCustomers = customerContacts.filter { it.isSelected }
                             
-                            // Show toast with selected customers count
+                            // Prepare message data
+                            val messageData = mapOf(
+                                "message" to messageText,
+                                "imageUrl" to (uploadedImageUrl ?: ""),
+                                "recipients" to selectedCustomers.map { it.mobileNumber }
+                            )
+                            
+                            // Show toast with selected customers count and image status
+                            val imageStatus = if (uploadedImageUrl != null) " with image" else " without image"
                             android.widget.Toast.makeText(
                                 context,
-                                "Sending message to ${selectedCustomers.size} customers",
+                                "Sending message to ${selectedCustomers.size} customers$imageStatus",
                                 android.widget.Toast.LENGTH_SHORT
                             ).show()
                             
-                            // In real implementation, this would send messages via WhatsApp Business API
+                            // TODO: In real implementation, this would send messages via WhatsApp Business API
+                            // The messageData contains all necessary information for the API call
                         },
                         enabled = selectedCount > 0 && messageText.isNotBlank(),
                         colors = ButtonDefaults.buttonColors(
@@ -473,6 +667,7 @@ private fun CustomerTableHeader() {
         CustomerHeaderCell("AC ID", Modifier.width(80.dp))
         CustomerHeaderCell("Account Name", Modifier.width(180.dp))
         CustomerHeaderCell("Mobile", Modifier.width(140.dp))
+        CustomerHeaderCell("Message Status", Modifier.width(140.dp))
     }
 }
 
@@ -509,6 +704,7 @@ private fun CustomerTableRow(
         CustomerCell(contact.accountNumber, Modifier.width(80.dp))
         CustomerCell(contact.accountName, Modifier.width(180.dp))
         CustomerCell(contact.mobileNumber, Modifier.width(140.dp))
+        CustomerCell(contact.messageStatus, Modifier.width(140.dp))
     }
     Divider(color = JivaColors.LightGray, thickness = 0.5.dp, modifier = Modifier.padding(horizontal = 8.dp))
 }

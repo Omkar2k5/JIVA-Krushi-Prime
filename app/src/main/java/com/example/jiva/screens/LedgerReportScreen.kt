@@ -35,6 +35,7 @@ import kotlinx.coroutines.launch
 import android.widget.Toast
 import java.text.SimpleDateFormat
 import java.util.*
+import timber.log.Timber
 
 // PDF generation utils
 import com.example.jiva.utils.PDFGenerator
@@ -61,6 +62,208 @@ data class LedgerEntry(
     val amt: String,
     val igst: String
 )
+
+// Top-level PDF helpers for Ledger report
+private fun drawTextCentered(
+    canvas: android.graphics.Canvas,
+    text: String,
+    centerX: Float,
+    y: Float,
+    maxWidth: Float,
+    paint: android.graphics.Paint
+) {
+    val ellipsis = "…"
+    val maxLen = paint.breakText(text, true, maxWidth - 6f, null)
+    val toDraw = if (maxLen < text.length && maxLen > 1) text.substring(0, maxLen - 1) + ellipsis else text
+    canvas.drawText(toDraw, centerX - paint.measureText(toDraw) / 2, y, paint)
+}
+
+private fun shareLedgerPDF(context: android.content.Context, file: java.io.File) {
+    try {
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            context,
+            context.packageName + ".fileprovider",
+            file
+        )
+        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+            putExtra(android.content.Intent.EXTRA_SUBJECT, com.example.jiva.utils.UserEnv.getCompanyName(context) ?: "Ledger Report")
+            putExtra(android.content.Intent.EXTRA_TEXT, "Please find the Ledger Report attached.")
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.packageManager.queryIntentActivities(shareIntent, 0).forEach { ri ->
+            val packageName = ri.activityInfo.packageName
+            context.grantUriPermission(packageName, uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        val chooser = android.content.Intent.createChooser(shareIntent, "Share Ledger Report").apply {
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(chooser)
+    } catch (e: Exception) {
+        android.widget.Toast.makeText(context, "Error sharing PDF: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+    }
+}
+
+@Suppress("FunctionName")
+private suspend fun generateAndShareLedgerPDF(
+    context: android.content.Context,
+    entries: List<LedgerEntry>,
+    totalDr: Double,
+    totalCr: Double,
+    closingBalance: Double
+) {
+    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        try {
+            val pageWidth = 842
+            val pageHeight = 595
+            val margin = 20f
+            val contentWidth = pageWidth - (2 * margin)
+            val bottomY = pageHeight - margin
+
+            val pdfDocument = android.graphics.pdf.PdfDocument()
+
+            val titlePaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                textSize = 18f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+            val headerPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                textSize = 10f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+            }
+            val cellPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                textSize = 8f
+                typeface = android.graphics.Typeface.DEFAULT
+            }
+            val borderPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                style = android.graphics.Paint.Style.STROKE
+                strokeWidth = 0.5f
+            }
+            val fillHeaderPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.LTGRAY
+                style = android.graphics.Paint.Style.FILL
+            }
+
+            val headers = listOf("Entry No", "Manual No", "Type", "Date", "Ref No", "AC ID", "DR", "CR", "Narration")
+            val weights = floatArrayOf(0.08f, 0.08f, 0.10f, 0.10f, 0.08f, 0.08f, 0.10f, 0.10f, 0.28f)
+            val weightSum = weights.sum()
+            val normalized = weights.map { it / weightSum }
+            val colWidths = FloatArray(headers.size) { i -> (contentWidth * normalized[i]).coerceAtLeast(60f) }
+
+            val titleBlockHeight = 30f + 20f + 15f + 25f
+            val headerHeight = 24f
+            val rowHeight = 18f
+            val availableHeightBase = pageHeight - titleBlockHeight - headerHeight - margin - margin
+            val rowsPerPage = (availableHeightBase / rowHeight).toInt().coerceAtLeast(1)
+
+            var currentPage = 1
+            var entryIndex = 0
+            val totalPages = ((entries.size + rowsPerPage - 1) / rowsPerPage).coerceAtLeast(1)
+
+            val companyName = com.example.jiva.utils.UserEnv.getCompanyName(context) ?: "Ledger Report"
+
+            while (entryIndex < entries.size || (entries.isEmpty() && currentPage == 1)) {
+                val page = pdfDocument.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(pageWidth, pageHeight, currentPage).create())
+                val canvas = page.canvas
+                var currentY = 30f
+
+                canvas.drawText(companyName, (pageWidth / 2).toFloat(), currentY, titlePaint)
+                currentY += 20f
+                canvas.drawText(
+                    "Generated on: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}",
+                    (pageWidth / 2).toFloat(), currentY, cellPaint
+                )
+                currentY += 15f
+                canvas.drawText("Page $currentPage of $totalPages", (pageWidth / 2).toFloat(), currentY, cellPaint)
+                currentY += 25f
+
+                var xCursor = margin
+                val headerTop = currentY
+                val headerBottom = currentY + headerHeight
+                for (i in headers.indices) {
+                    val rect = android.graphics.RectF(xCursor, headerTop, xCursor + colWidths[i], headerBottom)
+                    canvas.drawRect(rect, fillHeaderPaint)
+                    canvas.drawRect(rect, borderPaint)
+                    drawTextCentered(canvas, headers[i], xCursor + colWidths[i] / 2, headerBottom - 6f, colWidths[i] - 10f, headerPaint)
+                    xCursor += colWidths[i]
+                }
+                currentY = headerBottom
+
+                val endIndex = (entryIndex + rowsPerPage).coerceAtMost(entries.size)
+                for (i in entryIndex until endIndex) {
+                    if (currentY + rowHeight > bottomY) break
+                    val e = entries[i]
+                    xCursor = margin
+                    val rowTop = currentY
+                    val rowBottom = currentY + rowHeight
+                    val cells = listOf(
+                        e.entryNo,
+                        e.manualNo,
+                        e.entryType,
+                        e.entryDate,
+                        e.refNo,
+                        e.acId,
+                        "₹${e.dr}",
+                        "₹${e.cr}",
+                        e.narration
+                    )
+                    for (j in cells.indices) {
+                        val rect = android.graphics.RectF(xCursor, rowTop, xCursor + colWidths[j], rowBottom)
+                        canvas.drawRect(rect, borderPaint)
+                        drawTextCentered(canvas, cells[j], xCursor + colWidths[j] / 2, rowBottom - 4f, colWidths[j] - 10f, cellPaint)
+                        xCursor += colWidths[j]
+                    }
+                    currentY = rowBottom
+                }
+
+                if (currentPage == totalPages && currentY + rowHeight <= bottomY) {
+                    val totalTop = currentY + 8f
+                    val totalBottom = totalTop + rowHeight
+                    val totalRect = android.graphics.RectF(margin, totalTop, margin + contentWidth, totalBottom)
+                    canvas.drawRect(totalRect, fillHeaderPaint)
+                    canvas.drawRect(totalRect, borderPaint)
+                    drawTextCentered(
+                        canvas,
+                        "Totals — DR: ₹${String.format("%.2f", totalDr)}  CR: ₹${String.format("%.2f", totalCr)}  Closing: ₹${String.format("%.2f", closingBalance)}",
+                        margin + contentWidth / 2,
+                        totalBottom - 4f,
+                        contentWidth - 10f,
+                        headerPaint
+                    )
+                }
+
+                pdfDocument.finishPage(page)
+                entryIndex = endIndex
+                currentPage++
+            }
+
+            val downloadsDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
+            val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
+            val fileName = "Ledger_Report_$timestamp.pdf"
+            val file = java.io.File(downloadsDir, fileName)
+
+            java.io.FileOutputStream(file).use { out ->
+                pdfDocument.writeTo(out)
+            }
+            pdfDocument.close()
+
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                android.widget.Toast.makeText(context, "PDF saved to Downloads folder", android.widget.Toast.LENGTH_LONG).show()
+                shareLedgerPDF(context, file)
+            }
+        } catch (e: Exception) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                android.widget.Toast.makeText(context, "Error generating PDF: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -171,7 +374,7 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                 }
             }
         } catch (e: Exception) {
-            timber.log.Timber.e(e, "Error mapping ledger entries")
+            Timber.e(e, "Error mapping ledger entries")
             emptyList()
         }
     }
@@ -199,13 +402,13 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
 
                         entryTypeMatch && dateMatch && narrationMatch
                     } catch (e: Exception) {
-                        timber.log.Timber.e(e, "Error filtering entry: ${entry.entryNo}")
+                        Timber.e(e, "Error filtering entry: ${entry.entryNo}")
                         false
                     }
                 }
             }
         } catch (e: Exception) {
-            timber.log.Timber.e(e, "Error during filtering")
+            Timber.e(e, "Error during filtering")
             emptyList()
         }
     }
@@ -265,40 +468,14 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
             actions = {
                 // Share PDF action
                 IconButton(onClick = {
-                    val cols = listOf(
-                        PDFGenerator.TableColumn("Entry No", 70f) { (it as LedgerEntry).entryNo },
-                        PDFGenerator.TableColumn("Manual No", 70f) { (it as LedgerEntry).manualNo },
-                        PDFGenerator.TableColumn("Type", 80f) { (it as LedgerEntry).entryType },
-                        PDFGenerator.TableColumn("Date", 90f) { (it as LedgerEntry).entryDate },
-                        PDFGenerator.TableColumn("Ref No", 70f) { (it as LedgerEntry).refNo },
-                        PDFGenerator.TableColumn("AC ID", 70f) { (it as LedgerEntry).acId },
-                        PDFGenerator.TableColumn("DR", 80f) { (it as LedgerEntry).dr },
-                        PDFGenerator.TableColumn("CR", 80f) { (it as LedgerEntry).cr },
-                        PDFGenerator.TableColumn("Narration", 150f) { (it as LedgerEntry).narration }
-                    )
-                    val totals = mapOf(
-                        "Entry No" to "",
-                        "Manual No" to "",
-                        "Type" to "",
-                        "Date" to "",
-                        "Ref No" to "",
-                        "AC ID" to "",
-                        "DR" to "₹${String.format("%.2f", totalDrWithOpening)}",
-                        "CR" to "₹${String.format("%.2f", totalCrWithOpening)}",
-                        "Narration" to "Closing: ₹${String.format("%.2f", closingBalance)}"
-                    )
-                    // Launch coroutine to generate and share
+                    // Launch coroutine to generate and share using paginated PDF similar to Price List
                     scope.launch {
-                        PDFGenerator.generateAndSharePDF(
+                        generateAndShareLedgerPDF(
                             context = context,
-                            config = PDFGenerator.PDFConfig(
-                                title = "Ledger Report",
-                                fileName = "Ledger_Report",
-                                columns = cols,
-                                data = filteredEntries,
-                                totalRow = totals,
-                                landscape = true // A4 landscape
-                            )
+                            entries = filteredEntries,
+                            totalDr = totalDrWithOpening,
+                            totalCr = totalCrWithOpening,
+                            closingBalance = closingBalance
                         )
                     }
                 }) {
@@ -306,6 +483,7 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                 }
             }
         )
+
 
         // Main content
         LazyColumn(
@@ -688,7 +866,7 @@ private fun LedgerTableRow(entry: LedgerEntry) {
                 igst = entry.igst.takeIf { it.isNotBlank() } ?: "0.00"
             )
         } catch (e: Exception) {
-            timber.log.Timber.e(e, "Error processing entry: ${entry.entryNo}")
+            Timber.e(e, "Error processing entry: ${entry.entryNo}")
             LedgerEntry("Error", "Error loading data", "", "", "", "", "", "", "", "", "", "", "", "", "")
         }
     }
@@ -730,7 +908,7 @@ private fun LedgerCell(
         try {
             text.takeIf { it.isNotBlank() } ?: ""
         } catch (e: Exception) {
-            timber.log.Timber.e(e, "Error processing text: $text")
+            Timber.e(e, "Error processing text: $text")
             "Error"
         }
     }

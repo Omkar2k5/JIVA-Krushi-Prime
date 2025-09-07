@@ -10,8 +10,14 @@ import com.example.jiva.data.api.models.ExpiryRequest
 import com.example.jiva.data.api.models.ExpiryResponse
 import com.example.jiva.data.api.models.PriceListRequest
 import com.example.jiva.data.api.models.PriceListResponse
+import com.example.jiva.data.api.models.ImageUploadResponse
 import timber.log.Timber
 import java.io.IOException
+import android.net.Uri
+import okhttp3.MultipartBody
+import java.io.File
+import java.io.FileOutputStream
+import java.io.InputStream
 
 /**
  * Remote data source for API calls
@@ -268,5 +274,41 @@ class RemoteDataSource {
      */
     suspend fun syncAllData(): Result<SyncDataResponse> {
         return safeApiCall { apiService.syncAllData() }
+    }
+    
+    /**
+     * Upload image and get URL back
+     * 
+     * API Structure for Image Upload:
+     * - Endpoint: POST /api/upload-image
+     * - Content-Type: multipart/form-data
+     * - Body: image file (MultipartBody.Part)
+     * - Response: ImageUploadResponse
+     * 
+     * Note: This is a simplified implementation. In production, you would:
+     * 1. Use ContentResolver to get the actual file from URI
+     * 2. Handle different image formats (JPEG, PNG, etc.)
+     * 3. Add proper error handling for file operations
+     * 4. Implement actual API call instead of mock response
+     */
+    suspend fun uploadImage(imageUri: Uri): Result<ImageUploadResponse> {
+        return try {
+            // For now, simulate a successful upload
+            // In real implementation, you would:
+            // 1. Convert URI to actual file using ContentResolver
+            // 2. Create proper MultipartBody.Part
+            // 3. Make actual API call
+            
+            val mockResponse = ImageUploadResponse(
+                success = true,
+                message = "Image uploaded successfully",
+                imageUrl = "https://example.com/uploaded-image-${System.currentTimeMillis()}.jpg"
+            )
+            
+            Result.success(mockResponse)
+        } catch (e: Exception) {
+            Timber.e(e, "Image upload failed: ${e.message}")
+            Result.failure(e)
+        }
     }
 }

@@ -136,6 +136,9 @@ dependencies {
     // UI Enhancements
     implementation(libs.accompanist.systemuicontroller)
     implementation(libs.androidx.core.splashscreen)
+    
+    // Image loading
+    implementation("io.coil-kt:coil-compose:2.5.0")
 
     // Testing
     testImplementation(libs.junit)

@@ -74,9 +74,7 @@ object PDFGenerator {
                 }
                 
                 // Draw title
-                val currentDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
                 canvas.drawText(config.title, pageWidth / 2f, 50f, titlePaint)
-                canvas.drawText("Generated on: $currentDate", pageWidth / 2f, 75f, cellPaint)
                 
                 // Table dimensions
                 val startX = 30f

@@ -18,11 +18,15 @@ import com.example.jiva.data.api.models.ExpiryRequest
 import com.example.jiva.data.api.models.ExpiryResponse
 import com.example.jiva.data.api.models.PriceListRequest
 import com.example.jiva.data.api.models.PriceListResponse
+import com.example.jiva.data.api.models.ImageUploadResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
 import retrofit2.http.Headers
+import retrofit2.http.Multipart
+import retrofit2.http.Part
+import okhttp3.MultipartBody
 
 /**
  * Retrofit API service interface for JIVA server endpoints
@@ -212,4 +216,12 @@ interface JivaApiService {
     
     @GET("api/expiries")
     suspend fun getExpiriesByCompany(@Query("cmpCode") cmpCode: Int): List<ExpiryEntity>
+    
+    /**
+     * POST /api/upload-image
+     * Upload image file and get URL back
+     */
+    @Multipart
+    @POST("api/upload-image")
+    suspend fun uploadImage(@Part image: MultipartBody.Part): ImageUploadResponse
 }

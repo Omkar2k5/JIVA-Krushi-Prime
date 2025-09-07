@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.flowOf
 import timber.log.Timber
 import java.math.BigDecimal
 import java.util.Date
+import android.net.Uri
 
 /**
  * Implementation of JivaRepository that uses local database and remote API
@@ -897,6 +898,30 @@ class JivaRepositoryImpl(
             }
         } catch (e: Exception) {
             Timber.e(e, "Error during data synchronization")
+            Result.failure(e)
+        }
+    }
+    
+    override suspend fun uploadImage(imageUri: Uri): Result<String> {
+        return try {
+            val response = remoteDataSource.uploadImage(imageUri)
+            if (response.isSuccess) {
+                val uploadResponse = response.getOrNull()
+                if (uploadResponse?.success == true && !uploadResponse.imageUrl.isNullOrBlank()) {
+                    Timber.d("Image uploaded successfully: ${uploadResponse.imageUrl}")
+                    Result.success(uploadResponse.imageUrl)
+                } else {
+                    val errorMsg = uploadResponse?.error ?: "Upload failed"
+                    Timber.e("Image upload failed: $errorMsg")
+                    Result.failure(Exception(errorMsg))
+                }
+            } else {
+                val error = response.exceptionOrNull() ?: Exception("Unknown upload error")
+                Timber.e(error, "Image upload failed")
+                Result.failure(error)
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error uploading image")
             Result.failure(e)
         }
     }

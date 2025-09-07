@@ -153,11 +153,14 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                 )?.toList() ?: emptyList()
                 val outTemplate = items.firstOrNull { it.category.equals("OutStandingReport", true) }
                 val rawMsg = outTemplate?.msg ?: ""
+                val add1 = UserEnv.getAddress1(context) ?: ""
+                val add2 = UserEnv.getAddress2(context) ?: ""
+                val add3 = UserEnv.getAddress3(context) ?: ""
                 val preview = rawMsg
                     .replace("{CmpName}", companyName)
-                    .replace("{add1}", "Shop Address 1")
-                    .replace("{add2}", "Shop Address 2")
-                    .replace("{add3}", "Shop Address 3")
+                    .replace("{add1}", add1)
+                    .replace("{add2}", add2)
+                    .replace("{add3}", add3)
                 Triple(preview, outTemplate?.instanceID.orEmpty(), outTemplate?.accessToken.orEmpty())
             } else Triple("", "", "")
         } catch (e: Exception) {
@@ -509,11 +512,14 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                                         else -> entry.mobile.trim()
                                                     }
                                                     val companyName = UserEnv.getCompanyName(context) ?: ""
+                                                    val add1 = UserEnv.getAddress1(context) ?: ""
+                                                    val add2 = UserEnv.getAddress2(context) ?: ""
+                                                    val add3 = UserEnv.getAddress3(context) ?: ""
                                                     val msg = whatsappTemplate
                                                         .replace("{CmpName}", companyName)
-                                                        .replace("{add1}", "Shop Address 1")
-                                                        .replace("{add2}", "Shop Address 2")
-                                                        .replace("{add3}", "Shop Address 3")
+                                                        .replace("{add1}", add1)
+                                                        .replace("{add2}", add2)
+                                                        .replace("{add3}", add3)
                                                         .replace("[customer]", entry.accountName)
                                                         .replace("[TM]", entry.balance)
                                                         .replace("[Mobile]", entry.mobile)
@@ -905,9 +911,9 @@ private suspend fun sendWhatsAppMessages(
     try {
         val selectedEntries = entries.filter { it.acId in selectedIds }
         val companyName = UserEnv.getCompanyName(context) ?: ""
-        val staticAdd1 = "Shop Address 1"
-        val staticAdd2 = "Shop Address 2"
-        val staticAdd3 = "Shop Address 3"
+        val staticAdd1 = UserEnv.getAddress1(context) ?: ""
+        val staticAdd2 = UserEnv.getAddress2(context) ?: ""
+        val staticAdd3 = UserEnv.getAddress3(context) ?: ""
 
         // Validate credentials once before sending; show toast and return if invalid
         if (instanceId.isBlank() || accessToken.isBlank()) {

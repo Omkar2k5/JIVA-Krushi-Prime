@@ -4,6 +4,7 @@ import com.example.jiva.data.database.entities.*
 import kotlinx.coroutines.flow.Flow
 import java.math.BigDecimal
 import java.util.Date
+import android.net.Uri
 
 /**
  * Main repository interface for JIVA business data
@@ -92,4 +93,7 @@ interface JivaRepository {
 
     // Sync all data from server
     suspend fun syncAllData(): Result<Unit>
+    
+    // Image upload operations
+    suspend fun uploadImage(imageUri: Uri): Result<String>
 }
