@@ -239,7 +239,7 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
 
                         // Image selection and upload section
                         Text(
-                            text = "Attach Image (optional)",
+                            text = "Attach Image",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
                             color = JivaColors.DeepBlue

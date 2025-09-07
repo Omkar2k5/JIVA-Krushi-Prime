@@ -156,7 +156,7 @@ private suspend fun generateAndShareLedgerPDF(
             val normalized = weights.map { it / weightSum }
             val colWidths = FloatArray(headers.size) { i -> (contentWidth * normalized[i]).coerceAtLeast(60f) }
 
-            val titleBlockHeight = 30f + 20f + 15f + 25f
+            val titleBlockHeight = 30f + 20f + 15f + 15f + 25f  // Added 15f for owner name
             val headerHeight = 24f
             val rowHeight = 18f
             val availableHeightBase = pageHeight - titleBlockHeight - headerHeight - margin - margin
@@ -167,6 +167,7 @@ private suspend fun generateAndShareLedgerPDF(
             val totalPages = ((entries.size + rowsPerPage - 1) / rowsPerPage).coerceAtLeast(1)
 
             val companyName = com.example.jiva.utils.UserEnv.getCompanyName(context) ?: "Ledger Report"
+            val ownerName = com.example.jiva.utils.UserEnv.getOwnerName(context)
 
             while (entryIndex < entries.size || (entries.isEmpty() && currentPage == 1)) {
                 val page = pdfDocument.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(pageWidth, pageHeight, currentPage).create())
@@ -175,10 +176,19 @@ private suspend fun generateAndShareLedgerPDF(
 
                 canvas.drawText(companyName, (pageWidth / 2).toFloat(), currentY, titlePaint)
                 currentY += 20f
-                canvas.drawText(
-                    "Generated on: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}",
-                    (pageWidth / 2).toFloat(), currentY, cellPaint
-                )
+                
+                // Add owner name below company name with medium font size
+                if (!ownerName.isNullOrBlank()) {
+                    val ownerPaint = android.graphics.Paint().apply {
+                        color = android.graphics.Color.BLACK
+                        textSize = 12f  // Medium font size (between company name 18f and table data 8f)
+                        typeface = android.graphics.Typeface.DEFAULT
+                        textAlign = android.graphics.Paint.Align.CENTER
+                    }
+                    canvas.drawText(ownerName, (pageWidth / 2).toFloat(), currentY, ownerPaint)
+                    currentY += 15f
+                }
+
                 currentY += 15f
                 canvas.drawText("Page $currentPage of $totalPages", (pageWidth / 2).toFloat(), currentY, cellPaint)
                 currentY += 25f
