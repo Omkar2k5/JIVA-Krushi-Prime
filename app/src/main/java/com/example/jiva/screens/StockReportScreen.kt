@@ -796,17 +796,17 @@ private suspend fun generateAndShareStockPDF(context: Context, entries: List<Sto
             val weights = floatArrayOf(
                 0.06f, // Item ID
                 0.15f, // Item Name
-                0.06f, // Opening
-                0.06f, // Inward
-                0.06f, // Outward
+                0.07f, // Opening
+                0.07f, // Inward
+                0.07f, // Outward
                 0.07f, // Closing
                 0.08f, // Avg Rate
                 0.09f, // Valuation
-                0.15f, // Type (increased)
-                0.10f, // Company
-                0.05f, // CGST
-                0.05f, // SGST
-                0.05f  // IGST
+                0.11f, // Type (increased)
+                0.09f, // Company
+                0.06f, // CGST
+                0.06f, // SGST
+                0.06f  // IGST
             )
             val weightSum = weights.sum()
             val normalized = weights.map { it / weightSum }

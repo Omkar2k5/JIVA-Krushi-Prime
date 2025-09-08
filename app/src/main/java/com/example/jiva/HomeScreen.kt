@@ -106,7 +106,7 @@ fun HomeScreen(
         actualViewModel.loadUserSession()
     }
     
-    // Show toast for sync status
+    // Show toast for sync status (suppress "No active session found")
     LaunchedEffect(uiState.isSyncing, uiState.syncSuccess, uiState.errorMessage) {
         when {
             uiState.syncSuccess -> {
@@ -116,7 +116,7 @@ fun HomeScreen(
                     android.widget.Toast.LENGTH_SHORT
                 ).show()
             }
-            uiState.errorMessage != null -> {
+            uiState.errorMessage != null && uiState.errorMessage != "No active session found" -> {
                 android.widget.Toast.makeText(
                     context,
                     uiState.errorMessage,
@@ -333,39 +333,7 @@ private fun ModernHeader(
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Sync button
-                IconButton(
-                    onClick = { viewModel.syncData() },
-                    enabled = !uiState.isSyncing,
-                    modifier = Modifier
-                        .background(
-                            JivaColors.White.copy(alpha = 0.2f),
-                            CircleShape
-                        )
-                        .size(iconSize + 12.dp)
-                ) {
-                    if (uiState.isSyncing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(iconSize),
-                            color = Color.White,
-                            strokeWidth = 2.dp
-                        )
-                    } else if (uiState.syncSuccess) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = "Sync Successful",
-                            tint = JivaColors.White,
-                            modifier = Modifier.size(iconSize)
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Sync Data",
-                            tint = JivaColors.White,
-                            modifier = Modifier.size(iconSize)
-                        )
-                    }
-                }
+
                 
                 // Logout button
                 IconButton(

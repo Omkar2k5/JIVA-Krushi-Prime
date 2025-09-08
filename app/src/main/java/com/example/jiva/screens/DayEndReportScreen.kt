@@ -344,33 +344,26 @@ private fun DayEndReportContent(uiState: DayEndReportUiState, currencyFormatter:
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Cash & Bank opening/closing — single-line responsive pills
-            // On very small screens, allow wrap using FlowRow if available; else keep horizontal scroll
+            // Cash & Bank opening/closing
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                MetricPill(
-                    label = "Cash Opening",
-                    value = currencyFormatter.format(uiState.dayEndCashOpening),
-                    color = JivaColors.Purple
+                BalanceCard(
+                    title = "Cash Balance",
+                    openingValue = currencyFormatter.format(uiState.dayEndCashOpening),
+                    closingValue = currencyFormatter.format(uiState.dayEndCashClosing),
+                    icon = Icons.Default.AccountBalanceWallet,
+                    color = JivaColors.Purple,
+                    modifier = Modifier.weight(1f)
                 )
-                MetricPill(
-                    label = "Cash Closing",
-                    value = currencyFormatter.format(uiState.dayEndCashClosing),
-                    color = JivaColors.Purple
-                )
-                MetricPill(
-                    label = "Bank Opening",
-                    value = currencyFormatter.format(uiState.dayEndBankOpening),
-                    color = JivaColors.Teal
-                )
-                MetricPill(
-                    label = "Bank Closing",
-                    value = currencyFormatter.format(uiState.dayEndBankClosing),
-                    color = JivaColors.Teal
+                BalanceCard(
+                    title = "Bank Balance",
+                    openingValue = currencyFormatter.format(uiState.dayEndBankOpening),
+                    closingValue = currencyFormatter.format(uiState.dayEndBankClosing),
+                    icon = Icons.Default.AccountBalance,
+                    color = JivaColors.Teal,
+                    modifier = Modifier.weight(1f)
                 )
             }
 
@@ -480,31 +473,44 @@ private fun SummaryCard(
 }
 
 @Composable
-private fun MetricPill(label: String, value: String, color: Color) {
+private fun BalanceCard(
+    title: String,
+    openingValue: String,
+    closingValue: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
     Card(
-        shape = RoundedCornerShape(50),
+        modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(color)
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(text = "$label:", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(icon, contentDescription = null, tint = color)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Opening:", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+                Text(openingValue, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+            }
+            Spacer(Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Closing:", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+                Text(closingValue, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+            }
         }
     }
 }
