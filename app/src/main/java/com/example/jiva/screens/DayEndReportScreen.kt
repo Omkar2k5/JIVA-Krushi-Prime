@@ -334,14 +334,15 @@ private fun DayEndReportContent(uiState: DayEndReportUiState, currencyFormatter:
                     backgroundColor = JivaColors.Red,
                     modifier = Modifier.weight(1f)
                 )
-                SummaryCard(
-                    title = "Expenses",
-                    value = currencyFormatter.format(uiState.dayEndExpenses),
-                    icon = Icons.Default.Receipt,
-                    backgroundColor = Color(0xFF795548),
-                    modifier = Modifier.weight(1f)
-                )
             }
+
+            SummaryCard(
+                title = "Expenses",
+                value = currencyFormatter.format(uiState.dayEndExpenses),
+                icon = Icons.Default.Receipt,
+                backgroundColor = Color(0xFF795548),
+                modifier = Modifier.fillMaxWidth()
+            )
 
             // Cash & Bank opening/closing — single-line responsive pills
             // On very small screens, allow wrap using FlowRow if available; else keep horizontal scroll

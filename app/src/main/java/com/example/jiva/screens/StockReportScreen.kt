@@ -744,7 +744,6 @@ private fun StockTotalRow(totalValuation: Double, totalEntries: Int) {
     }
 }
 
-// Tabular PDF generation copied from Price Report, adapted for Stock data
 private suspend fun generateAndShareStockPDF(context: Context, entries: List<StockEntry>) {
     withContext(Dispatchers.IO) {
         try {
@@ -762,14 +761,14 @@ private suspend fun generateAndShareStockPDF(context: Context, entries: List<Sto
                 typeface = android.graphics.Typeface.DEFAULT_BOLD
                 textAlign = android.graphics.Paint.Align.CENTER
             }
-            val headerPaint = android.graphics.Paint().apply {
+            val headerPaint = android.text.TextPaint().apply {
                 color = android.graphics.Color.BLACK
-                textSize = 10f
+                textSize = 9f   // reduced
                 typeface = android.graphics.Typeface.DEFAULT_BOLD
             }
-            val cellPaint = android.graphics.Paint().apply {
+            val cellPaint = android.text.TextPaint().apply {
                 color = android.graphics.Color.BLACK
-                textSize = 8f
+                textSize = 7f   // reduced
                 typeface = android.graphics.Typeface.DEFAULT
             }
             val borderPaint = android.graphics.Paint().apply {
@@ -787,15 +786,33 @@ private suspend fun generateAndShareStockPDF(context: Context, entries: List<Sto
             val headerHeight = 24f
 
             // Headers for Stock data
-            val headers = listOf("Item ID", "Item Name", "Opening", "InWard", "OutWard", "Closing", "Avg Rate", "Valuation", "Type", "Company", "CGST%", "SGST%", "IGST%")
+            val headers = listOf(
+                "Item ID", "Item Name", "Opening", "InWard", "OutWard",
+                "Closing", "Avg Rate", "Valuation", "Type", "Company",
+                "CGST%", "SGST%", "IGST%"
+            )
 
-            // Compute column widths by weights similar to Price report
-            val weights = floatArrayOf(0.08f, 0.16f, 0.07f, 0.07f, 0.07f, 0.07f, 0.08f, 0.10f, 0.08f, 0.07f, 0.05f, 0.05f, 0.05f)
+            // Adjusted column widths to give more space to the 'Type' column
+            val weights = floatArrayOf(
+                0.06f, // Item ID
+                0.15f, // Item Name
+                0.06f, // Opening
+                0.06f, // Inward
+                0.06f, // Outward
+                0.07f, // Closing
+                0.08f, // Avg Rate
+                0.09f, // Valuation
+                0.15f, // Type (increased)
+                0.10f, // Company
+                0.05f, // CGST
+                0.05f, // SGST
+                0.05f  // IGST
+            )
             val weightSum = weights.sum()
             val normalized = weights.map { it / weightSum }
             val colWidths = FloatArray(headers.size) { i -> (contentWidth * normalized[i]) }
 
-            // Calculate rows per page
+            // Rows per page
             val titleBlockHeight = 30f + 20f + 15f + 25f
             val availableHeightBase = pageHeight - titleBlockHeight - headerHeight - margin - margin
             val rowsPerPage = (availableHeightBase / rowHeight).toInt().coerceAtLeast(1)
@@ -805,11 +822,13 @@ private suspend fun generateAndShareStockPDF(context: Context, entries: List<Sto
             val totalPages = ((entries.size + rowsPerPage - 1) / rowsPerPage).coerceAtLeast(1)
 
             while (entryIndex < entries.size) {
-                val page = pdfDocument.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(pageWidth, pageHeight, currentPage).create())
+                val page = pdfDocument.startPage(
+                    android.graphics.pdf.PdfDocument.PageInfo.Builder(pageWidth, pageHeight, currentPage).create()
+                )
                 val canvas = page.canvas
                 var currentY = 30f
 
-                // Title and page info
+                // Title
                 canvas.drawText("Stock Report", (pageWidth / 2).toFloat(), currentY, titlePaint)
                 currentY += 20f
                 canvas.drawText("Page $currentPage of $totalPages", (pageWidth / 2).toFloat(), currentY, cellPaint)
@@ -823,7 +842,11 @@ private suspend fun generateAndShareStockPDF(context: Context, entries: List<Sto
                     val rect = android.graphics.RectF(xCursor, headerTop, xCursor + colWidths[i], headerBottom)
                     canvas.drawRect(rect, fillHeaderPaint)
                     canvas.drawRect(rect, borderPaint)
-                    drawTextCentered(canvas, headers[i], xCursor + colWidths[i]/2, headerBottom - 6f, colWidths[i] - 10f, headerPaint)
+                    drawTrimmedText(
+                        canvas, headers[i],
+                        xCursor + 4f, headerBottom - 8f,
+                        colWidths[i] - 8f, headerPaint
+                    )
                     xCursor += colWidths[i]
                 }
                 currentY = headerBottom
@@ -834,15 +857,22 @@ private suspend fun generateAndShareStockPDF(context: Context, entries: List<Sto
                     if (currentY + rowHeight > bottomY) break
                     val e = entries[i]
                     xCursor = startX
+                    val opening = e.opening.toDoubleOrNull() ?: 0.0
+                    val inWard = e.inWard.toDoubleOrNull() ?: 0.0
+                    val outWard = e.outWard.toDoubleOrNull() ?: 0.0
+                    val closingStock = e.closingStock.toDoubleOrNull() ?: 0.0
+                    val avgRate = e.avgRate.replace("₹", "").replace(",", "").trim().toDoubleOrNull() ?: 0.0
+                    val valuation = e.valuation.replace("₹", "").replace(",", "").trim().toDoubleOrNull() ?: 0.0
+
                     val data = listOf(
                         e.itemId,
                         e.itemName,
-                        e.opening,
-                        e.inWard,
-                        e.outWard,
-                        e.closingStock,
-                        "₹${e.avgRate}",
-                        "₹${e.valuation}",
+                        String.format("%.2f", opening),
+                        String.format("%.2f", inWard),
+                        String.format("%.2f", outWard),
+                        String.format("%.2f", closingStock),
+                        "₹${String.format("%.2f", avgRate)}",
+                        "₹${String.format("%.2f", valuation)}",
                         e.itemType,
                         e.company,
                         "${e.cgst}%",
@@ -854,7 +884,11 @@ private suspend fun generateAndShareStockPDF(context: Context, entries: List<Sto
                     for (j in data.indices) {
                         val rect = android.graphics.RectF(xCursor, rowTop, xCursor + colWidths[j], rowBottom)
                         canvas.drawRect(rect, borderPaint)
-                        drawTextCentered(canvas, data[j], xCursor + colWidths[j]/2, rowBottom - 4f, colWidths[j] - 10f, cellPaint)
+                        drawTrimmedText(
+                            canvas, data[j],
+                            xCursor + 4f, rowBottom - 5f,
+                            colWidths[j] - 8f, cellPaint
+                        )
                         xCursor += colWidths[j]
                     }
                     currentY = rowBottom
@@ -865,7 +899,7 @@ private suspend fun generateAndShareStockPDF(context: Context, entries: List<Sto
                 currentPage++
             }
 
-            // Save and share
+            // Save + share
             val downloadsDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
             val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
             val fileName = "Stock_Report_$timestamp.pdf"
@@ -884,6 +918,13 @@ private suspend fun generateAndShareStockPDF(context: Context, entries: List<Sto
         }
     }
 }
+
+// Helper function for ellipsis text drawing
+private fun drawTrimmedText(canvas: android.graphics.Canvas, text: String, x: Float, y: Float, maxWidth: Float, paint: android.text.TextPaint) {
+    val ellipsized = android.text.TextUtils.ellipsize(text, paint, maxWidth, android.text.TextUtils.TruncateAt.END).toString()
+    canvas.drawText(ellipsized, x, y, paint)
+}
+
 
 // Reuse Price screen's helpers
 private fun drawTextCentered(
