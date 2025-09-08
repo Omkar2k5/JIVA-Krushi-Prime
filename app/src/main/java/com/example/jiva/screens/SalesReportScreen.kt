@@ -78,12 +78,8 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
     var dataLoadingProgress by remember { mutableStateOf(0f) }
 
     // State management for filters
-    var transactionTypeFilter by remember { mutableStateOf("All Types") }
     var partyNameSearch by remember { mutableStateOf("") }
     var itemNameSearch by remember { mutableStateOf("") }
-    var categoryFilter by remember { mutableStateOf("All Categories") }
-    var isTransactionTypeDropdownExpanded by remember { mutableStateOf(false) }
-    var isCategoryDropdownExpanded by remember { mutableStateOf(false) }
 
     // Get current year and user ID
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
@@ -163,19 +159,13 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
     }
 
     // Optimized filtering with error handling
-    val filteredEntries = remember(transactionTypeFilter, partyNameSearch, itemNameSearch, categoryFilter, allSalesEntries) {
+    val filteredEntries = remember(partyNameSearch, itemNameSearch, allSalesEntries) {
         try {
             if (allSalesEntries.isEmpty()) {
                 emptyList()
             } else {
                 allSalesEntries.filter { entry ->
                     try {
-                        // Transaction Type Filter
-                        val typeMatch = when (transactionTypeFilter) {
-                            "All Types" -> true
-                            else -> entry.entryType.equals(transactionTypeFilter, ignoreCase = true)
-                        }
-
                         // Party Name Search Filter
                         val partyMatch = if (partyNameSearch.isBlank()) true else
                             entry.partyName.contains(partyNameSearch, ignoreCase = true)
@@ -184,13 +174,7 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
                         val itemMatch = if (itemNameSearch.isBlank()) true else
                             entry.itemName.contains(itemNameSearch, ignoreCase = true)
 
-                        // Category Filter
-                        val categoryMatch = when (categoryFilter) {
-                            "All Categories" -> true
-                            else -> entry.itemType.equals(categoryFilter, ignoreCase = true)
-                        }
-
-                        typeMatch && partyMatch && itemMatch && categoryMatch
+                        partyMatch && itemMatch
                     } catch (e: Exception) {
                         timber.log.Timber.e(e, "Error filtering entry: ${entry.refNo}")
                         false
@@ -250,50 +234,11 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
             .fillMaxSize()
             .background(JivaColors.LightGray)
     ) {
-        // Responsive Header with Refresh Button
+        // Responsive Header
         ResponsiveReportHeader(
             title = "Sales Report",
             subtitle = "Transaction history and sales data",
-            onBackClick = onBackClick,
-            actions = {
-                // Refresh Button
-                IconButton(
-                    onClick = {
-                        if (finalUserId != null && !isRefreshing) {
-                            scope.launch {
-                                isRefreshing = true
-                                try {
-                                    val result = application.repository.syncSalePurchase(finalUserId, year)
-                                    if (result.isSuccess) {
-                                        Toast.makeText(context, "✅ Sales data refreshed successfully", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        val error = result.exceptionOrNull()?.message ?: "Unknown error"
-                                        Toast.makeText(context, "❌ Failed to refresh: $error", Toast.LENGTH_LONG).show()
-                                    }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "❌ Network error: ${e.message}", Toast.LENGTH_LONG).show()
-                                } finally {
-                                    isRefreshing = false
-                                }
-                            }
-                        }
-                    }
-                ) {
-                    if (isRefreshing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = JivaColors.White,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh",
-                            tint = JivaColors.White
-                        )
-                    }
-                }
-            }
+            onBackClick = onBackClick
         )
 
         // Main content with filters and table
@@ -321,156 +266,56 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
                             color = JivaColors.DeepBlue
                         )
 
-                        // First row: Transaction Type and Category
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            // Transaction Type Filter
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Transaction Type",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-
-                                ExposedDropdownMenuBox(
-                                    expanded = isTransactionTypeDropdownExpanded,
-                                    onExpandedChange = { isTransactionTypeDropdownExpanded = it }
-                                ) {
-                                    OutlinedTextField(
-                                        value = transactionTypeFilter,
-                                        onValueChange = {},
-                                        readOnly = true,
-                                        trailingIcon = {
-                                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = isTransactionTypeDropdownExpanded)
-                                        },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .menuAnchor(MenuAnchorType.PrimaryNotEditable),
-                                        shape = RoundedCornerShape(8.dp)
+                        // Party Name Search - First line
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "Search Party Name",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = JivaColors.DeepBlue,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                            OutlinedTextField(
+                                value = partyNameSearch,
+                                onValueChange = { partyNameSearch = it },
+                                placeholder = { Text("Search party...") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Person,
+                                        contentDescription = "Party",
+                                        tint = JivaColors.Purple
                                     )
-
-                                    ExposedDropdownMenu(
-                                        expanded = isTransactionTypeDropdownExpanded,
-                                        onDismissRequest = { isTransactionTypeDropdownExpanded = false }
-                                    ) {
-                                        listOf("All Types", "Cash Sale", "Credit Sale", "Cash Purchase", "Credit Purchase").forEach { type ->
-                                            DropdownMenuItem(
-                                                text = { Text(type) },
-                                                onClick = {
-                                                    transactionTypeFilter = type
-                                                    isTransactionTypeDropdownExpanded = false
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Category Filter
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Category",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-
-                                ExposedDropdownMenuBox(
-                                    expanded = isCategoryDropdownExpanded,
-                                    onExpandedChange = { isCategoryDropdownExpanded = it }
-                                ) {
-                                    OutlinedTextField(
-                                        value = categoryFilter,
-                                        onValueChange = {},
-                                        readOnly = true,
-                                        trailingIcon = {
-                                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = isCategoryDropdownExpanded)
-                                        },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .menuAnchor(MenuAnchorType.PrimaryNotEditable),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-
-                                    ExposedDropdownMenu(
-                                        expanded = isCategoryDropdownExpanded,
-                                        onDismissRequest = { isCategoryDropdownExpanded = false }
-                                    ) {
-                                        listOf("All Categories", "Pesticides", "Fertilizers", "Seeds", "Tools", "Others").forEach { category ->
-                                            DropdownMenuItem(
-                                                text = { Text(category) },
-                                                onClick = {
-                                                    categoryFilter = category
-                                                    isCategoryDropdownExpanded = false
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp),
+                                singleLine = true
+                            )
                         }
 
-                        // Second row: Party Name and Item Name Search
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            // Party Name Search
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Search Party Name",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                                OutlinedTextField(
-                                    value = partyNameSearch,
-                                    onValueChange = { partyNameSearch = it },
-                                    placeholder = { Text("Search party...") },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.Person,
-                                            contentDescription = "Party",
-                                            tint = JivaColors.Purple
-                                        )
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(8.dp),
-                                    singleLine = true
-                                )
-                            }
-
-                            // Item Name Search
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Search Item Name",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = JivaColors.DeepBlue,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                                OutlinedTextField(
-                                    value = itemNameSearch,
-                                    onValueChange = { itemNameSearch = it },
-                                    placeholder = { Text("Search item...") },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.Search,
-                                            contentDescription = "Search",
-                                            tint = JivaColors.Purple
-                                        )
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(8.dp),
-                                    singleLine = true
-                                )
-                            }
+                        // Item Name Search - Second line
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "Search Item Name",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = JivaColors.DeepBlue,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                            OutlinedTextField(
+                                value = itemNameSearch,
+                                onValueChange = { itemNameSearch = it },
+                                placeholder = { Text("Search item...") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = "Search",
+                                        tint = JivaColors.Purple
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp),
+                                singleLine = true
+                            )
                         }
                     }
                 }
@@ -654,65 +499,34 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // Action Buttons
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        try {
-                                            val pdfData = generateSalesReportPDF(filteredEntries, totalAmount, totalQty, totalDiscount)
-                                            sharePDF(context, pdfData, "Sales_Report_${System.currentTimeMillis()}.pdf")
-                                        } catch (e: Exception) {
-                                            Toast.makeText(context, "Error generating PDF: ${e.message}", Toast.LENGTH_SHORT).show()
-                                        }
+                        // Action Button
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    try {
+                                        val pdfData = generateSalesReportPDF(filteredEntries, totalAmount, totalQty, totalDiscount)
+                                        sharePDF(context, pdfData, "Sales_Report_${System.currentTimeMillis()}.pdf")
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Error generating PDF: ${e.message}", Toast.LENGTH_SHORT).show()
                                     }
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = JivaColors.Green
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Share,
-                                    contentDescription = "Share PDF",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "SHARE PDF",
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-
-                            Button(
-                                onClick = {
-                                    // Clear all filters
-                                    transactionTypeFilter = "All Types"
-                                    partyNameSearch = ""
-                                    itemNameSearch = ""
-                                    categoryFilter = "All Categories"
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = JivaColors.Orange
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Clear,
-                                    contentDescription = "Clear Filters",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "CLEAR FILTERS",
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = JivaColors.Green
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Share PDF",
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "SHARE PDF",
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
                 }
