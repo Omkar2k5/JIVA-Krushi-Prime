@@ -48,6 +48,15 @@ import coil.request.ImageRequest
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.telephony.SmsManager
+import androidx.core.content.ContextCompat
+import android.widget.Toast
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import java.io.InputStream
 import timber.log.Timber
 
@@ -62,24 +71,7 @@ data class CustomerContact(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
-    // State management
-    var messageText by remember { mutableStateOf("") }
-    var imageUrl by remember { mutableStateOf("") }
-    var selectAll by remember { mutableStateOf(false) }
-    
-    // File selection and upload states
-    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
-    var isUploading by remember { mutableStateOf(false) }
-    var uploadProgress by remember { mutableStateOf(0f) }
-    var uploadError by remember { mutableStateOf<String?>(null) }
-    var uploadedImageUrl by remember { mutableStateOf<String?>(null) }
-
-    // Sending progress state
-    var isSending by remember { mutableStateOf(false) }
-    var sendProgress by remember { mutableStateOf(0) }
-    var sendTotal by remember { mutableStateOf(0) }
-    
-    // Get the context and database
+    // Get the context and database first
     val context = LocalContext.current
     val database = (context.applicationContext as JivaApplication).database
     val scope = rememberCoroutineScope()
@@ -87,6 +79,32 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
     // Create repository and view model
     val jivaRepository = remember { JivaRepositoryImpl(database) }
     val viewModel: WhatsAppViewModel = viewModel { WhatsAppViewModel(jivaRepository) }
+    
+    // State management
+    var messageText by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf("") }
+    var selectAll by remember { mutableStateOf(false) }
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var uploadedImageUrl by remember { mutableStateOf<String?>(null) }
+    var isUploading by remember { mutableStateOf(false) }
+    var uploadError by remember { mutableStateOf<String?>(null) }
+    var isSending by remember { mutableStateOf(false) }
+    var sendProgress by remember { mutableStateOf(0) }
+    var sendTotal by remember { mutableStateOf(0) }
+    var isSendingSMS by remember { mutableStateOf(false) }
+    var smsProgress by remember { mutableStateOf(0) }
+    var smsTotal by remember { mutableStateOf(0) }
+    var uploadProgress by remember { mutableStateOf(0f) }
+    var imageUrl by remember { mutableStateOf("") }
+    
+    // SMS Permission launcher
+    val smsPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (!isGranted) {
+            Toast.makeText(context, "SMS permission is required to send messages", Toast.LENGTH_LONG).show()
+        }
+    }
     
     // File picker launcher
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -161,8 +179,7 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
     val uiState by viewModel.uiState.collectAsState()
     val customerContacts = uiState.customerContacts
     
-    // Search filter state for contacts
-    var searchQuery by remember { mutableStateOf("") }
+    // Search filter state for contacts (removed duplicate declaration)
 
     // Filtered contacts list based on search (by name or mobile)
     val filteredContacts = remember(searchQuery, customerContacts) {
@@ -654,117 +671,265 @@ fun WhatsAppBulkMessageScreenImpl(onBackClick: () -> Unit = {}) {
                 }
             }
 
-            // Send Button Card
+            // Send Buttons Card
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = JivaColors.Green
+                        containerColor = JivaColors.White
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
-                    Button(
-                        onClick = { 
-                            // Get selected customers from the ViewModel
-                            val selectedCustomers = customerContacts.filter { it.isSelected }
-                            
-                            // Prepare message data
-                            val messageData = mapOf(
-                                "message" to messageText,
-                                "imageUrl" to (uploadedImageUrl ?: ""),
-                                "recipients" to selectedCustomers.map { it.mobileNumber }
-                            )
-                            
-                            // Show toast with selected customers count and image status
-                            val imageStatus = if (uploadedImageUrl != null) " with image" else " without image"
-                            android.widget.Toast.makeText(
-                                context,
-                                "Starting send: ${selectedCustomers.size} recipients$imageStatus",
-                                android.widget.Toast.LENGTH_SHORT
-                            ).show()
-
-                            // Initialize progress state and send via Jivabot
-                            isSending = true
-                            sendTotal = selectedCustomers.size
-                            sendProgress = 0
-                            scope.launch {
-                                val json = com.example.jiva.utils.UserEnv.getMsgTemplatesJson(context)
-                                val gson = com.google.gson.Gson()
-                                val items = if (!json.isNullOrBlank()) gson.fromJson(
-                                    json,
-                                    Array<com.example.jiva.data.api.models.MsgTemplateItem>::class.java
-                                )?.toList() ?: emptyList() else emptyList()
-                                val outTemplate = items.firstOrNull { it.category.equals("OutStandingReport", true) }
-                                val instanceId = outTemplate?.instanceID.orEmpty()
-                                val accessToken = outTemplate?.accessToken.orEmpty()
-
-                                val mediaUrl = uploadedImageUrl
-                                val fileName = mediaUrl?.substringAfterLast('/') ?: "image.jpg"
-
-                                val recipients = selectedCustomers.map { it.mobileNumber.filter { ch -> ch.isDigit() } }
-
-                                for ((index, raw) in recipients.withIndex()) {
-                                    val number = if (raw.length == 12 && raw.startsWith("91")) raw else "91" + raw.takeLast(10)
-                                    val type = if (!mediaUrl.isNullOrBlank()) "media" else "text"
-                                    val (ok, _) = com.example.jiva.data.network.JivabotApi.send(
-                                        number = number,
-                                        type = type,
-                                        message = messageText,
-                                        mediaUrl = mediaUrl,
-                                        filename = if (!mediaUrl.isNullOrBlank()) fileName else null,
-                                        instanceId = instanceId,
-                                        accessToken = accessToken
-                                    )
-                                    sendProgress = index + 1
-                                    android.widget.Toast.makeText(
-                                        context,
-                                        "Sent $sendProgress of $sendTotal",
-                                        android.widget.Toast.LENGTH_SHORT
-                                    ).show()
-                                    Timber.d("WA send to $number ok=$ok")
-                                    // Random delay 8-15 seconds between each message
-                                    val delayMs = (8..15).random() * 1000L
-                                    kotlinx.coroutines.delay(delayMs)
-                                }
-
-                                isSending = false
-                                android.widget.Toast.makeText(
-                                    context,
-                                    "Finished sending to ${selectedCustomers.size} recipients",
-                                    android.widget.Toast.LENGTH_LONG
-                                ).show()
-                            }
-                        },
-                        enabled = selectedCount > 0 && messageText.isNotBlank(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent,
-                            disabledContainerColor = Color.Transparent
-                        ),
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(60.dp)
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        Text(
+                            text = "Send Messages",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = JivaColors.DeepBlue
+                        )
+                        
+                        // WhatsApp Button
+                        Button(
+                            onClick = { 
+                                val selectedCustomers = customerContacts.filter { it.isSelected }
+                                val imageStatus = if (uploadedImageUrl != null) " with image" else " without image"
+                                Toast.makeText(
+                                    context,
+                                    "Starting WhatsApp send: ${selectedCustomers.size} recipients$imageStatus",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+
+                                isSending = true
+                                sendTotal = selectedCustomers.size
+                                sendProgress = 0
+                                scope.launch {
+                                    val json = com.example.jiva.utils.UserEnv.getMsgTemplatesJson(context)
+                                    val gson = com.google.gson.Gson()
+                                    val items = if (!json.isNullOrBlank()) gson.fromJson(
+                                        json,
+                                        Array<com.example.jiva.data.api.models.MsgTemplateItem>::class.java
+                                    )?.toList() ?: emptyList() else emptyList()
+                                    val outTemplate = items.firstOrNull { it.category.equals("OutStandingReport", true) }
+                                    val instanceId = outTemplate?.instanceID.orEmpty()
+                                    val accessToken = outTemplate?.accessToken.orEmpty()
+
+                                    val mediaUrl = uploadedImageUrl
+                                    val fileName = mediaUrl?.substringAfterLast('/') ?: "image.jpg"
+                                    val recipients = selectedCustomers.map { it.mobileNumber.filter { ch -> ch.isDigit() } }
+
+                                    for ((index, raw) in recipients.withIndex()) {
+                                        val number = if (raw.length == 12 && raw.startsWith("91")) raw else "91" + raw.takeLast(10)
+                                        val type = if (!mediaUrl.isNullOrBlank()) "media" else "text"
+                                        val (ok, _) = com.example.jiva.data.network.JivabotApi.send(
+                                            number = number,
+                                            type = type,
+                                            message = messageText,
+                                            mediaUrl = mediaUrl,
+                                            filename = if (!mediaUrl.isNullOrBlank()) fileName else null,
+                                            instanceId = instanceId,
+                                            accessToken = accessToken
+                                        )
+                                        sendProgress = index + 1
+                                        Timber.d("WA send to $number ok=$ok")
+                                        val delayMs = (8..15).random() * 1000L
+                                        kotlinx.coroutines.delay(delayMs)
+                                    }
+
+                                    isSending = false
+                                    withContext(Dispatchers.Main) {
+                                        Toast.makeText(
+                                            context,
+                                            "WhatsApp messages sent to ${selectedCustomers.size} recipients",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                }
+                            },
+                            enabled = selectedCount > 0 && messageText.isNotBlank() && !isSending && !isSendingSMS,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF25D366),
+                                disabledContainerColor = JivaColors.LightGray
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Send,
-                                contentDescription = "Send WhatsApp",
-                                tint = JivaColors.White,
-                                modifier = Modifier.size(24.dp)
+                                contentDescription = "WhatsApp",
+                                modifier = Modifier.size(18.dp)
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = if (selectedCount > 0) "Send WhatsApp to $selectedCount Recipients" else "Select Recipients to Send",
-                                color = JivaColors.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
+                                text = "Send WhatsApp (${selectedCount})",
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        // SMS Button
+                        Button(
+                            onClick = {
+                                if (selectedCount > 0) {
+                                    when (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS)) {
+                                        PackageManager.PERMISSION_GRANTED -> {
+                                            val selectedCustomers = customerContacts.filter { it.isSelected }
+                                            scope.launch {
+                                                sendBulkSMS(
+                                                    context = context,
+                                                    customers = selectedCustomers,
+                                                    message = messageText,
+                                                    onProgress = { sent, total ->
+                                                        smsProgress = sent
+                                                        smsTotal = total
+                                                    },
+                                                    onStart = { isSendingSMS = true },
+                                                    onComplete = { 
+                                                        isSendingSMS = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                        else -> {
+                                            smsPermissionLauncher.launch(Manifest.permission.SEND_SMS)
+                                        }
+                                    }
+                                } else {
+                                    Toast.makeText(context, "Please select customers first", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            enabled = selectedCount > 0 && messageText.isNotBlank() && !isSending && !isSendingSMS,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = JivaColors.Orange,
+                                disabledContainerColor = JivaColors.LightGray
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Sms,
+                                contentDescription = "SMS",
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Send SMS (${selectedCount})",
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        // SMS Progress indicator
+                        if (isSendingSMS) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LinearProgressIndicator(
+                                progress = if (smsTotal > 0) smsProgress.toFloat() / smsTotal.toFloat() else 0f,
+                                modifier = Modifier.fillMaxWidth(),
+                                color = JivaColors.Orange,
+                                trackColor = JivaColors.LightGray
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Sending SMS: $smsProgress/$smsTotal",
+                                fontSize = 12.sp,
+                                color = JivaColors.Orange,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Send SMS to multiple customers with random delay between messages
+ */
+private suspend fun sendBulkSMS(
+    context: Context,
+    customers: List<CustomerContact>,
+    message: String,
+    onProgress: (sent: Int, total: Int) -> Unit,
+    onStart: () -> Unit,
+    onComplete: () -> Unit
+) {
+    withContext(Dispatchers.IO) {
+        onStart()
+        
+        val validCustomers = customers.filter { customer ->
+            val hasValidMobile = customer.mobileNumber.isNotBlank() && customer.mobileNumber.any { it.isDigit() }
+            Timber.d("Customer ${customer.accountName}: mobile='${customer.mobileNumber}', valid=$hasValidMobile")
+            hasValidMobile
+        }
+        
+        Timber.d("Filtered to ${validCustomers.size} valid customers for SMS")
+        
+        val total = validCustomers.size
+        var sent = 0
+        
+        // Show initial progress
+        withContext(Dispatchers.Main) {
+            onProgress(0, total)
+        }
+        
+        try {
+            for ((index, customer) in validCustomers.withIndex()) {
+                try {
+                    // Clean phone number
+                    val phoneNumber = customer.mobileNumber.filter { it.isDigit() }
+                    
+                    // Send SMS using SmsManager
+                    try {
+                        val smsManager = SmsManager.getDefault()
+                        
+                        // Split long messages if needed
+                        val messageParts = smsManager.divideMessage(message)
+                        
+                        if (messageParts.size == 1) {
+                            smsManager.sendTextMessage(phoneNumber, null, message, null, null)
+                        } else {
+                            smsManager.sendMultipartTextMessage(phoneNumber, null, messageParts, null, null)
+                        }
+                        
+                        Timber.d("SMS sent to ${customer.accountName} - $phoneNumber")
+                        
+                    } catch (e: Exception) {
+                        Timber.e(e, "Failed to send SMS to ${customer.accountName}")
+                    }
+                    
+                    sent++
+                    
+                    withContext(Dispatchers.Main) {
+                        onProgress(sent, total)
+                    }
+                    
+                    // Random delay between 8-15 seconds
+                    if (index < validCustomers.size - 1) {
+                        val delayMs = (8000..15000).random().toLong()
+                        delay(delayMs)
+                    }
+                    
+                } catch (e: Exception) {
+                    Timber.e(e, "Error sending SMS to ${customer.accountName}")
+                    sent++
+                    withContext(Dispatchers.Main) {
+                        onProgress(sent, total)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Bulk SMS sending failed")
+        } finally {
+            withContext(Dispatchers.Main) {
+                onComplete()
+                Toast.makeText(
+                    context,
+                    "SMS sending completed. $sent/$total messages processed.",
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
     }

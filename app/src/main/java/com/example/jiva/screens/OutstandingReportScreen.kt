@@ -1,13 +1,21 @@
 package com.example.jiva.screens
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import android.os.Environment
+import android.telephony.SmsManager
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import com.google.gson.Gson
+import com.example.jiva.data.database.entities.TemplateEntity
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -34,10 +42,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Button
@@ -140,19 +151,24 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
     var selectedEntries by remember { mutableStateOf(setOf<String>()) }
     var selectAll by remember { mutableStateOf(false) }
 
+    // SMS Permission launcher
+    val smsPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (!isGranted) {
+            Toast.makeText(context, "SMS permission is required to send messages", Toast.LENGTH_LONG).show()
+        }
+    }
+
     // WhatsApp template config from UserEnv
     val (whatsappTemplate, waInstanceId, waAccessToken) = remember {
         try {
-            val json = UserEnv.getMsgTemplatesJson(context)
-            val companyName = UserEnv.getCompanyName(context) ?: ""
-            if (!json.isNullOrBlank()) {
-                val gson = com.google.gson.Gson()
-                val items = gson.fromJson(
-                    json,
-                    Array<com.example.jiva.data.api.models.MsgTemplateItem>::class.java
-                )?.toList() ?: emptyList()
-                val outTemplate = items.firstOrNull { it.category.equals("OutStandingReport", true) }
-                val rawMsg = outTemplate?.msg ?: ""
+            val templateJson = UserEnv.getMsgTemplatesJson(context)
+            val templates = Gson().fromJson(templateJson, Array<TemplateEntity>::class.java)
+            val outTemplate = templates.firstOrNull()
+            if (outTemplate != null) {
+                val rawMsg = outTemplate.msg ?: "test message"
+                val companyName = UserEnv.getCompanyName(context) ?: ""
                 val add1 = UserEnv.getAddress1(context) ?: ""
                 val add2 = UserEnv.getAddress2(context) ?: ""
                 val add3 = UserEnv.getAddress3(context) ?: ""
@@ -161,11 +177,11 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                     .replace("{add1}", add1)
                     .replace("{add2}", add2)
                     .replace("{add3}", add3)
-                Triple(preview, outTemplate?.instanceID.orEmpty(), outTemplate?.accessToken.orEmpty())
-            } else Triple("", "", "")
+                Triple(preview, outTemplate.instanceId.orEmpty(), outTemplate.accessToken.orEmpty())
+            } else Triple("test message", "", "")
         } catch (e: Exception) {
-            Timber.w(e, "Failed to load WhatsApp template from env")
-            Triple("", "", "")
+            Timber.e(e, "Failed to load WhatsApp template")
+            Triple("test message", "", "")
         }
     }
 
@@ -496,6 +512,7 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                 Text("Select all contacts")
                             }
 
+                            // WhatsApp Button
                             Button(
                                 onClick = {
                                     if (selectedEntries.isNotEmpty()) {
@@ -591,6 +608,62 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                 )
                             }
 
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // SMS Button
+                            Button(
+                                onClick = {
+                                    if (selectedEntries.isNotEmpty()) {
+                                        // Check SMS permission
+                                        when (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS)) {
+                                            PackageManager.PERMISSION_GRANTED -> {
+                                                val selectedCustomers = finalEntries.filter { selectedEntries.contains(it.acId) }
+                                                scope.launch {
+                                                    sendBulkSMS(
+                                                        context = context,
+                                                        customers = selectedCustomers,
+                                                        template = whatsappTemplate,
+                                                        onProgress = { sent, total, eta ->
+                                                            bulkSent = sent
+                                                            bulkTotal = total
+                                                            etaLeftSec = eta
+                                                        },
+                                                        onStart = { isBulkSending = true },
+                                                        onComplete = { 
+                                                            isBulkSending = false
+                                                            selectedEntries = emptySet()
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                            else -> {
+                                                smsPermissionLauncher.launch(Manifest.permission.SEND_SMS)
+                                            }
+                                        }
+                                    } else {
+                                        Toast.makeText(context, "Please select customers first", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                enabled = selectedEntries.isNotEmpty() && !isBulkSending,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = JivaColors.Orange,
+                                    disabledContainerColor = JivaColors.LightGray
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Sms,
+                                    contentDescription = "SMS",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Send SMS (${selectedEntries.size})",
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
                             if (isBulkSending) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 androidx.compose.material3.LinearProgressIndicator(
@@ -600,52 +673,6 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                     trackColor = JivaColors.LightGray
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
-                               
-                            }
-                        }
-                    }
-                }
-
-                // Share PDF Button
-                item {
-                    val tableWidth = 1302.dp
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Card(
-                            modifier = Modifier.width(tableWidth),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = JivaColors.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                        ) {
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        generateAndSharePDF(context, finalEntries, totalBalance)
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = JivaColors.Purple),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Share,
-                                        contentDescription = "Share",
-                                        tint = JivaColors.White
-                                    )
-                                    Text(
-                                        text = "SHARE REPORT",
-                                        color = JivaColors.White,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
                             }
                         }
                     }
@@ -1188,6 +1215,175 @@ private fun sharePDF(context: Context, file: File) {
         context.startActivity(chooser)
     } catch (e: Exception) {
         Toast.makeText(context, "Error sharing PDF: ${e.message}", Toast.LENGTH_LONG).show()
+    }
+}
+
+/**
+ * Send SMS to multiple customers with random delay between messages
+ */
+private suspend fun sendBulkSMS(
+    context: Context,
+    customers: List<OutstandingEntry>,
+    template: String,
+    onProgress: (sent: Int, total: Int, eta: Int) -> Unit,
+    onStart: () -> Unit,
+    onComplete: () -> Unit
+) {
+    withContext(Dispatchers.IO) {
+        onStart()
+        
+        Timber.d("sendBulkSMS called with ${customers.size} customers")
+        
+        val validCustomers = customers.filter { customer ->
+            val hasValidMobile = customer.mobile.isNotBlank() && customer.mobile.any { it.isDigit() }
+            Timber.d("Customer ${customer.accountName}: mobile='${customer.mobile}', valid=$hasValidMobile")
+            hasValidMobile
+        }
+        
+        Timber.d("Filtered to ${validCustomers.size} valid customers")
+        
+        val total = validCustomers.size
+        var sent = 0
+        
+        // Show initial progress
+        withContext(Dispatchers.Main) {
+            onProgress(0, total, total * 12)
+        }
+        
+        try {
+            for ((index, customer) in validCustomers.withIndex()) {
+                try {
+                    // Generate SMS message using template
+                    val companyName = UserEnv.getCompanyName(context) ?: ""
+                    val add1 = UserEnv.getAddress1(context) ?: ""
+                    val add2 = UserEnv.getAddress2(context) ?: ""
+                    val add3 = UserEnv.getAddress3(context) ?: ""
+                    
+                    val smsMessage = template
+                        .replace("{CmpName}", companyName)
+                        .replace("{add1}", add1)
+                        .replace("{add2}", add2)
+                        .replace("{add3}", add3)
+                        .replace("[customer]", customer.accountName)
+                        .replace("[TM]", customer.balance)
+                        .replace("[Mobile]", customer.mobile)
+                        .ifBlank { 
+                            "Dear ${customer.accountName}, your outstanding balance is ${customer.balance}. Please contact us for payment. - $companyName"
+                        }
+                    
+                    // Clean phone number
+                    val phoneNumber = customer.mobile.filter { it.isDigit() }
+                    
+                    // Send SMS using SmsManager
+                    try {
+                        val smsManager = SmsManager.getDefault()
+                        
+                        // Split long messages if needed
+                        val messageParts = smsManager.divideMessage(smsMessage)
+                        
+                        if (messageParts.size == 1) {
+                            smsManager.sendTextMessage(phoneNumber, null, smsMessage, null, null)
+                        } else {
+                            smsManager.sendMultipartTextMessage(phoneNumber, null, messageParts, null, null)
+                        }
+                        
+                        Timber.d("SMS sent to ${customer.accountName} - $phoneNumber")
+                        
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(context, "SMS sent to ${customer.accountName}", Toast.LENGTH_SHORT).show()
+                        }
+                        
+                    } catch (e: Exception) {
+                        Timber.e(e, "Failed to send SMS to ${customer.accountName}")
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(context, "Failed to send SMS to ${customer.accountName}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    
+                    sent++
+                    val remaining = total - sent
+                    val eta = remaining * 12 // Average 12 seconds per message
+                    
+                    withContext(Dispatchers.Main) {
+                        onProgress(sent, total, eta)
+                    }
+                    
+                    // Random delay between 8-15 seconds
+                    if (index < validCustomers.size - 1) {
+                        val delayMs = (8000..15000).random().toLong()
+                        delay(delayMs)
+                    }
+                    
+                } catch (e: Exception) {
+                    Timber.e(e, "Error sending SMS to ${customer.accountName}")
+                    sent++
+                    withContext(Dispatchers.Main) {
+                        onProgress(sent, total, (total - sent) * 12)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Bulk SMS sending failed")
+        } finally {
+            withContext(Dispatchers.Main) {
+                onComplete()
+                Toast.makeText(
+                    context,
+                    "SMS sending completed. $sent/$total messages processed.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+}
+
+/**
+ * Send individual SMS to a single customer
+ */
+private fun sendSingleSMS(
+    context: Context,
+    customer: OutstandingEntry,
+    template: String
+) {
+    try {
+        // Generate SMS message using template
+        val companyName = UserEnv.getCompanyName(context) ?: ""
+        val add1 = UserEnv.getAddress1(context) ?: ""
+        val add2 = UserEnv.getAddress2(context) ?: ""
+        val add3 = UserEnv.getAddress3(context) ?: ""
+        
+        val smsMessage = template
+            .replace("{CmpName}", companyName)
+            .replace("{add1}", add1)
+            .replace("{add2}", add2)
+            .replace("{add3}", add3)
+            .replace("[customer]", customer.accountName)
+            .replace("[TM]", customer.balance)
+            .replace("[Mobile]", customer.mobile)
+            .ifBlank { 
+                "Dear ${customer.accountName}, your outstanding balance is ${customer.balance}. Please contact us for payment. - $companyName"
+            }
+        
+        // Clean phone number
+        val phoneNumber = customer.mobile.filter { it.isDigit() }
+        
+        // Send SMS using Android Intent
+        val smsIntent = Intent(Intent.ACTION_SENDTO).apply {
+            data = android.net.Uri.parse("smsto:$phoneNumber")
+            putExtra("sms_body", smsMessage)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        
+        if (smsIntent.resolveActivity(context.packageManager) != null) {
+            context.startActivity(smsIntent)
+            Toast.makeText(context, "SMS app opened for ${customer.accountName}", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, "No SMS app available", Toast.LENGTH_SHORT).show()
+        }
+        
+    } catch (e: Exception) {
+        Timber.e(e, "Failed to send SMS to ${customer.accountName}")
+        Toast.makeText(context, "Failed to send SMS", Toast.LENGTH_SHORT).show()
     }
 }
 
