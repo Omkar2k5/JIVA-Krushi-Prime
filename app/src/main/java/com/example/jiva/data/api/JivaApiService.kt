@@ -232,4 +232,11 @@ interface JivaApiService {
     @Multipart
     @POST("api/JivaBusiness/UploadImage")
     suspend fun uploadImageJivaBusiness(@Part file: MultipartBody.Part): ImageUploadResponse
+
+    /**
+     * POST /api/JivaBusiness/DayEndInfo
+     */
+    @Headers("Content-Type: application/json")
+    @POST("api/JivaBusiness/DayEndInfo")
+    suspend fun getDayEndInfo(@Body request: com.example.jiva.data.api.models.DayEndInfoRequest): com.example.jiva.data.api.models.DayEndInfoResponse
 }

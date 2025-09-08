@@ -9,7 +9,9 @@ data class StockRequest(
     @SerializedName("userID")
     val userID: Int,
     @SerializedName("yearString")
-    val yearString: String
+    val yearString: String,
+    @SerializedName("filters")
+    val filters: Map<String, String>? = emptyMap()
 )
 
 /**

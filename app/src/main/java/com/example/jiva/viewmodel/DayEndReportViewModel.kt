@@ -18,6 +18,19 @@ data class DayEndReportUiState(
     val companyCode: Int = 1,
     val currentDate: String = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date()),
     val yearString: String = SimpleDateFormat("yyyy", Locale.getDefault()).format(Date()),
+
+    // DayEndInfo API state
+    val isDayEndLoading: Boolean = false,
+    val selectedDayDate: String = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()),
+    val dayEndPurchase: Double = 0.0,
+    val dayEndSale: Double = 0.0,
+    val dayEndCashOpening: Double = 0.0,
+    val dayEndCashClosing: Double = 0.0,
+    val dayEndBankOpening: Double = 0.0,
+    val dayEndBankClosing: Double = 0.0,
+    val dayEndExpenses: Double = 0.0,
+    val dayEndPayments: Double = 0.0,
+    val dayEndReceipts: Double = 0.0,
     
     // Summary metrics
     val totalAccounts: Int = 0,
@@ -53,6 +66,7 @@ class DayEndReportViewModel(
     private val jivaRepository: JivaRepository
 ) : ViewModel() {
     
+    private val remoteDataSource = com.example.jiva.data.network.RemoteDataSource()
     private val _uiState = MutableStateFlow(DayEndReportUiState())
     val uiState: StateFlow<DayEndReportUiState> = _uiState.asStateFlow()
     
@@ -174,5 +188,59 @@ class DayEndReportViewModel(
     
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+
+    fun updateSelectedDate(dateIso: String) {
+        _uiState.value = _uiState.value.copy(selectedDayDate = dateIso)
+    }
+
+    /**
+     * Fetch DayEndInfo using userID from env (stored as string) and selected ISO date (yyyy-MM-dd)
+     */
+    fun fetchDayEndInfo(context: android.content.Context) {
+        viewModelScope.launch {
+            try {
+                _uiState.value = _uiState.value.copy(isDayEndLoading = true, errorMessage = null)
+
+                val userIdStr = com.example.jiva.utils.UserEnv.getUserId(context).orEmpty()
+                val userId = userIdStr.toIntOrNull()
+                if (userId == null) {
+                    _uiState.value = _uiState.value.copy(isDayEndLoading = false, errorMessage = "User not logged in")
+                    return@launch
+                }
+
+                val dateIso = _uiState.value.selectedDayDate // yyyy-MM-dd
+
+                val result = remoteDataSource.getDayEndInfo(cmpCode = userId, dayDate = dateIso)
+                if (result.isSuccess) {
+                    val body = result.getOrNull()
+                    if (body?.isSuccess == true && body.data != null) {
+                        val d = body.data
+                        fun asDouble(s: String?): Double = s?.toDoubleOrNull() ?: 0.0
+
+                        _uiState.value = _uiState.value.copy(
+                            isDayEndLoading = false,
+                            companyCode = d.cmpCode?.toIntOrNull() ?: userId,
+                            dayEndPurchase = asDouble(d.purchase),
+                            dayEndSale = asDouble(d.sale),
+                            dayEndCashOpening = asDouble(d.cashOpening),
+                            dayEndCashClosing = asDouble(d.cashClosing),
+                            dayEndBankOpening = asDouble(d.bankOpening),
+                            dayEndBankClosing = asDouble(d.bankClosing),
+                            dayEndExpenses = asDouble(d.expenses),
+                            dayEndPayments = asDouble(d.payments),
+                            dayEndReceipts = asDouble(d.receipts)
+                        )
+                    } else {
+                        _uiState.value = _uiState.value.copy(isDayEndLoading = false, errorMessage = body?.message ?: "Failed to load Day End info")
+                    }
+                } else {
+                    _uiState.value = _uiState.value.copy(isDayEndLoading = false, errorMessage = result.exceptionOrNull()?.message)
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Error fetching DayEndInfo")
+                _uiState.value = _uiState.value.copy(isDayEndLoading = false, errorMessage = e.message)
+            }
+        }
     }
 }

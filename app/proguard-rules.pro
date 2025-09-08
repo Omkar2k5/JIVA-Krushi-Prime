@@ -1,21 +1,19 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Core keep rules for Jetpack Compose to avoid R8 verification issues
+-keep class androidx.compose.runtime.internal.ComposableLambdaImpl { *; }
+-keepclassmembers class ** { @androidx.compose.runtime.Composable <methods>; }
+-keep class kotlin.jvm.functions.** { *; }
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Keep the Day End screen and dispatcher screen wrappers
+-keep class com.example.jiva.screens.DayEndReportScreenKt { *; }
+-keep class com.example.jiva.screens.PlaceholderScreensKt { *; }
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Optional: broadly keep Compose runtime (can be relaxed later)
+-keep class androidx.compose.** { *; }
+-dontwarn androidx.compose.**
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Kotlin/Coroutines warnings suppression
+-dontwarn kotlin.**
+-keep class kotlin.coroutines.** { *; }
+
+# Preserve line numbers for better crash reports
+-keepattributes SourceFile,LineNumberTable

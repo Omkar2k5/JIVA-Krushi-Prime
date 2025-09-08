@@ -165,10 +165,10 @@ class RemoteDataSource {
     }
 
     /** Stock API */
-    suspend fun getStock(userId: Int, yearString: String): Result<com.example.jiva.data.api.models.StockResponse> {
+    suspend fun getStock(userId: Int, yearString: String, filters: Map<String, String>? = emptyMap()): Result<com.example.jiva.data.api.models.StockResponse> {
         return try {
-            Timber.d("Making Stock API call with userId: $userId, yearString: $yearString")
-            val request = com.example.jiva.data.api.models.StockRequest(userID = userId, yearString = yearString)
+            Timber.d("Making Stock API call with userId: $userId, yearString: $yearString, filters: $filters")
+            val request = com.example.jiva.data.api.models.StockRequest(userID = userId, yearString = yearString, filters = filters)
             Timber.d("Request body: $request")
 
             val response = apiService.getStock(request)
@@ -315,6 +315,20 @@ class RemoteDataSource {
             Result.success(response)
         } catch (e: Exception) {
             Timber.e(e, "Image upload failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    /** DayEndInfo API */
+    suspend fun getDayEndInfo(cmpCode: Int, dayDate: String): Result<com.example.jiva.data.api.models.DayEndInfoResponse> {
+        return try {
+            Timber.d("Making DayEndInfo API call with cmpCode: $cmpCode, dayDate: $dayDate")
+            val request = com.example.jiva.data.api.models.DayEndInfoRequest(cmpCode = cmpCode, dayDate = dayDate)
+            val response = apiService.getDayEndInfo(request)
+            Timber.d("DayEndInfo response: isSuccess=${response.isSuccess}")
+            Result.success(response)
+        } catch (e: Exception) {
+            Timber.e(e, "DayEndInfo API call failed: ${e.message}")
             Result.failure(e)
         }
     }

@@ -92,47 +92,42 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
 
     // High-performance loading states
     var isScreenLoading by remember { mutableStateOf(true) }
-    var isRefreshing by remember { mutableStateOf(false) }
     var loadingProgress by remember { mutableStateOf(0) }
     var loadingMessage by remember { mutableStateOf("") }
-    var dataLoadingProgress by remember { mutableStateOf(0f) }
 
-    // State management
-    var stockOf by remember { mutableStateOf("All Items") }
-    var viewAll by remember { mutableStateOf(false) }
+    // Filter state: only itemType, item_Name, company
+    var itemTypeFilter by remember { mutableStateOf("") }
     var itemNameSearch by remember { mutableStateOf("") }
     var companySearch by remember { mutableStateOf("") }
-    var isStockDropdownExpanded by remember { mutableStateOf(false) }
 
     // Get current year and user ID
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
+    val finalUserId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull() ?: 1024
 
-    // Handle initial screen loading with progress tracking
+    // Auto-fetch Stock API on screen load
     LaunchedEffect(Unit) {
-        isScreenLoading = true
-        loadingMessage = "Initializing Stock data..."
+        try {
+            isScreenLoading = true
+            loadingMessage = "Loading Stock data..."
+            loadingProgress = 10
 
-        // Simulate progressive loading for better UX
-        for (i in 0..100 step 10) {
-            loadingProgress = i
-            dataLoadingProgress = i.toFloat()
-            loadingMessage = when {
-                i < 30 -> "Loading Stock data..."
-                i < 70 -> "Processing ${i}% complete..."
-                i < 100 -> "Finalizing data..."
-                else -> "Complete!"
-            }
-            kotlinx.coroutines.delay(50) // Smooth progress animation
+            val result = com.example.jiva.utils.ApiDataManager.refreshStockData(
+                context = context,
+                repository = application.repository,
+                database = application.database,
+                userId = finalUserId,
+                year = year
+            )
+
+            loadingProgress = 80
+            loadingMessage = if (result.isSuccess) "Processing data..." else (result.exceptionOrNull()?.message ?: "Failed to load")
+        } catch (_: Exception) {
+            loadingMessage = "Failed to load"
+        } finally {
+            loadingProgress = 100
+            isScreenLoading = false
         }
-
-        isScreenLoading = false
     }
-
-    // Note: Data loading is now handled automatically by AppDataLoader at app startup
-    // No manual loading needed here - data is already available
-
-    // Re-read userId after potential initialization
-    val finalUserId = com.example.jiva.utils.UserEnv.getUserId(context)?.toIntOrNull()
 
     // Optimized data loading - only from Room DB for better performance
     val stockEntities by viewModel.observeStock(year).collectAsState(initial = emptyList())
@@ -163,46 +158,15 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
         }
     }
 
-    // Optimized filtering with error handling
-    val filteredEntries = remember(stockOf, viewAll, itemNameSearch, companySearch, allEntries) {
+    // Filtering: only itemType, item_Name, company
+    val filteredEntries = remember(itemTypeFilter, itemNameSearch, companySearch, allEntries) {
         try {
-            if (allEntries.isEmpty()) {
-                emptyList()
-            } else {
+            if (allEntries.isEmpty()) emptyList() else {
                 allEntries.filter { entry ->
-                    try {
-                        // Stock Type Filter
-                        val stockTypeMatch = when (stockOf) {
-                            "All Items" -> true
-                            "Pesticides" -> entry.itemType.equals("Pesticides", ignoreCase = true)
-                            "Fertilizers" -> entry.itemType.equals("Fertilizers", ignoreCase = true)
-                            "Seeds" -> entry.itemType.equals("Seeds", ignoreCase = true)
-                            "PGR" -> entry.itemType.equals("PGR", ignoreCase = true)
-                            "General" -> entry.itemType.equals("General", ignoreCase = true)
-                            else -> true
-                        }
-
-                        // Stock Status Filter
-                        val stockStatusMatch = if (viewAll) {
-                            true
-                        } else {
-                            val closingStock = entry.closingStock.toDoubleOrNull() ?: 0.0
-                            closingStock > 0
-                        }
-
-                        // Item Name Search Filter
-                        val nameMatch = if (itemNameSearch.isBlank()) true else
-                            entry.itemName.contains(itemNameSearch, ignoreCase = true)
-
-                        // Company Search Filter
-                        val companyMatch = if (companySearch.isBlank()) true else
-                            entry.company.contains(companySearch, ignoreCase = true)
-
-                        stockTypeMatch && stockStatusMatch && nameMatch && companyMatch
-                    } catch (e: Exception) {
-                        timber.log.Timber.e(e, "Error filtering entry: ${entry.itemId}")
-                        false
-                    }
+                    val typeMatch = itemTypeFilter.isBlank() || entry.itemType.contains(itemTypeFilter, ignoreCase = true)
+                    val nameMatch = itemNameSearch.isBlank() || entry.itemName.contains(itemNameSearch, ignoreCase = true)
+                    val companyMatch = companySearch.isBlank() || entry.company.contains(companySearch, ignoreCase = true)
+                    typeMatch && nameMatch && companyMatch
                 }
             }
         } catch (e: Exception) {
@@ -242,66 +206,11 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
             .fillMaxSize()
             .background(JivaColors.LightGray)
     ) {
-        // Responsive Header with Refresh Button
+        // Responsive Header (auto-refresh on load)
         ResponsiveReportHeader(
             title = "Stock Report",
             subtitle = "Manage stock inventory and valuation",
-            onBackClick = onBackClick,
-            actions = {
-                IconButton(
-                    onClick = {
-                        if (finalUserId != null) {
-                            isRefreshing = true
-                            scope.launch {
-                                try {
-                                    timber.log.Timber.d("🔄 Starting Stock API refresh for userId: $finalUserId, year: $year")
-
-                                    // Use ApiDataManager to handle API → Permanent Storage (same as Outstanding Report)
-                                    val result = com.example.jiva.utils.ApiDataManager.refreshStockData(
-                                        context = context,
-                                        repository = application.repository,
-                                        database = application.database,
-                                        userId = finalUserId,
-                                        year = year
-                                    )
-
-                                    if (result.isSuccess) {
-                                        timber.log.Timber.d("✅ Stock data refreshed successfully")
-                                        Toast.makeText(context, "Stock data refreshed successfully", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        timber.log.Timber.e("❌ Stock data refresh failed: ${result.exceptionOrNull()?.message}")
-                                        Toast.makeText(context, "Failed to refresh stock data", Toast.LENGTH_SHORT).show()
-                                    }
-
-                                    kotlinx.coroutines.delay(1000) // Show loading for at least 1 second
-                                    isRefreshing = false
-                                } catch (e: Exception) {
-                                    timber.log.Timber.e(e, "Error during stock refresh")
-                                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                                    isRefreshing = false
-                                }
-                            }
-                        } else {
-                            Toast.makeText(context, "User ID not available", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    enabled = !isRefreshing
-                ) {
-                    if (isRefreshing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = JivaColors.White,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh Stock Data",
-                            tint = JivaColors.White
-                        )
-                    }
-                }
-            }
+            onBackClick = onBackClick
         )
 
         // Unified loading screen (matches Outstanding)
@@ -340,7 +249,7 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
                         color = JivaColors.DarkGray
                     )
                     Text(
-                        text = "Tap the refresh button to load data from server",
+                        text = "Data loads automatically on open. Try again later or check connection.",
                         fontSize = 14.sp,
                         color = JivaColors.DarkGray,
                         textAlign = TextAlign.Center
@@ -357,16 +266,12 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
                 // Filter Section
                 item {
                     StockFilterSection(
-                        stockOf = stockOf,
-                        onStockOfChange = { stockOf = it },
-                        viewAll = viewAll,
-                        onViewAllChange = { viewAll = it },
+                        itemTypeFilter = itemTypeFilter,
+                        onItemTypeChange = { itemTypeFilter = it },
                         itemNameSearch = itemNameSearch,
                         onItemNameSearchChange = { itemNameSearch = it },
                         companySearch = companySearch,
                         onCompanySearchChange = { companySearch = it },
-                        isStockDropdownExpanded = isStockDropdownExpanded,
-                        onStockDropdownExpandedChange = { isStockDropdownExpanded = it },
                         filteredCount = filteredEntries.size,
                         totalCount = allEntries.size
                     )
@@ -388,13 +293,53 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
                 item {
                     StockTableSection(
                         entries = filteredEntries,
-                        totalValuation = totalValuation,
-                        onGeneratePDF = { data ->
-                            scope.launch {
-                                generateAndShareStockPDF(context, data)
+                        totalValuation = totalValuation
+                    )
+                }
+
+                // Share PDF Button (like Price report)
+                item {
+                    val tableWidth = 1302.dp
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Card(
+                            modifier = Modifier.width(tableWidth),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        generateAndShareStockPDF(context, filteredEntries)
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = JivaColors.Purple),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PictureAsPdf,
+                                        contentDescription = "Share PDF",
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text(
+                                        text = "SHARE PDF REPORT",
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 16.sp
+                                    )
+                                }
                             }
                         }
-                    )
+                    }
                 }
             }
         }
@@ -403,16 +348,12 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
 
 @Composable
 private fun StockFilterSection(
-    stockOf: String,
-    onStockOfChange: (String) -> Unit,
-    viewAll: Boolean,
-    onViewAllChange: (Boolean) -> Unit,
+    itemTypeFilter: String,
+    onItemTypeChange: (String) -> Unit,
     itemNameSearch: String,
     onItemNameSearchChange: (String) -> Unit,
     companySearch: String,
     onCompanySearchChange: (String) -> Unit,
-    isStockDropdownExpanded: Boolean,
-    onStockDropdownExpandedChange: (Boolean) -> Unit,
     filteredCount: Int,
     totalCount: Int
 ) {
@@ -427,46 +368,24 @@ private fun StockFilterSection(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "Stock Filter Options",
+                text = "Filters",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = JivaColors.DeepBlue
             )
 
-            // Stock Type Dropdown
-            ExposedDropdownMenuBox(
-                expanded = isStockDropdownExpanded,
-                onExpandedChange = onStockDropdownExpandedChange
-            ) {
-                OutlinedTextField(
-                    value = stockOf,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Stock Type") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isStockDropdownExpanded) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = JivaColors.DeepBlue,
-                        unfocusedBorderColor = JivaColors.DarkGray
-                    )
+            // Item Type
+            OutlinedTextField(
+                value = itemTypeFilter,
+                onValueChange = onItemTypeChange,
+                label = { Text("Item Type") },
+                placeholder = { Text("Filter by item type...") },
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = JivaColors.DeepBlue,
+                    unfocusedBorderColor = JivaColors.DarkGray
                 )
-                ExposedDropdownMenu(
-                    expanded = isStockDropdownExpanded,
-                    onDismissRequest = { onStockDropdownExpandedChange(false) }
-                ) {
-                    listOf("All Items", "Pesticides", "Fertilizers", "Seeds", "PGR", "General").forEach { option ->
-                        DropdownMenuItem(
-                            text = { Text(option) },
-                            onClick = {
-                                onStockOfChange(option)
-                                onStockDropdownExpandedChange(false)
-                            }
-                        )
-                    }
-                }
-            }
+            )
 
             // Search Fields
             Row(
@@ -497,29 +416,7 @@ private fun StockFilterSection(
                 )
             }
 
-            // View All Toggle
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "Show all items (including zero stock)",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = JivaColors.DeepBlue
-                )
-                Switch(
-                    checked = viewAll,
-                    onCheckedChange = onViewAllChange,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = JivaColors.White,
-                        checkedTrackColor = JivaColors.Green,
-                        uncheckedThumbColor = JivaColors.White,
-                        uncheckedTrackColor = JivaColors.DarkGray
-                    )
-                )
-            }
+
 
             // Filter Results Summary
             Card(
@@ -606,8 +503,7 @@ private fun SummaryItem(label: String, value: String) {
 @Composable
 private fun StockTableSection(
     entries: List<StockEntry>,
-    totalValuation: Double,
-    onGeneratePDF: (List<StockEntry>) -> Unit
+    totalValuation: Double
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -618,7 +514,7 @@ private fun StockTableSection(
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            // Header with PDF button
+            // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -631,19 +527,7 @@ private fun StockTableSection(
                     color = JivaColors.DeepBlue
                 )
 
-                Button(
-                    onClick = {
-                        onGeneratePDF(entries) // Generate PDF for all entries
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = JivaColors.Green)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PictureAsPdf,
-                        contentDescription = "Generate & Share PDF"
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Export & Share PDF")
-                }
+                // Removed inline export button as requested
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -865,79 +749,186 @@ private fun StockTotalRow(totalValuation: Double, totalEntries: Int) {
     }
 }
 
-// Enhanced PDF generation with auto-sharing
-private suspend fun generateAndShareStockPDF(context: Context, data: List<StockEntry>) {
+// Tabular PDF generation copied from Price Report, adapted for Stock data
+private suspend fun generateAndShareStockPDF(context: Context, entries: List<StockEntry>) {
     withContext(Dispatchers.IO) {
         try {
-            val pdfDocument = PdfDocument()
-            val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create()
-            val page = pdfDocument.startPage(pageInfo)
-            val canvas = page.canvas
-            val paint = Paint()
+            // Landscape A4 page: 842 x 595
+            val pageWidth = 842
+            val pageHeight = 595
+            val margin = 20f
+            val contentWidth = pageWidth - (2 * margin)
+            val bottomY = pageHeight - margin
+            val pdfDocument = android.graphics.pdf.PdfDocument()
 
-            // Simple PDF content
-            paint.textSize = 16f
-            paint.color = android.graphics.Color.BLACK
-            canvas.drawText("Stock Report", 50f, 50f, paint)
-
-            paint.textSize = 12f
-            var yPosition = 100f
-
-            data.take(15).forEach { entry -> // Limit to 15 items for better formatting
-                val line1 = "ID: ${entry.itemId} | ${entry.itemName}"
-                val line2 = "Opening: ${entry.opening} | InWard: ${entry.inWard} | OutWard: ${entry.outWard} | Closing: ${entry.closingStock}"
-                val line3 = "Rate: ₹${entry.avgRate} | Value: ₹${entry.valuation} | Type: ${entry.itemType} | Company: ${entry.company}"
-                val line4 = "CGST: ${entry.cgst}% | SGST: ${entry.sgst}% | IGST: ${entry.igst}%"
-
-                canvas.drawText(line1, 50f, yPosition, paint)
-                yPosition += 15f
-                canvas.drawText(line2, 50f, yPosition, paint)
-                yPosition += 15f
-                canvas.drawText(line3, 50f, yPosition, paint)
-                yPosition += 15f
-                canvas.drawText(line4, 50f, yPosition, paint)
-                yPosition += 25f // Extra space between entries
+            val titlePaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                textSize = 18f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+            val headerPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                textSize = 10f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+            }
+            val cellPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                textSize = 8f
+                typeface = android.graphics.Typeface.DEFAULT
+            }
+            val borderPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                style = android.graphics.Paint.Style.STROKE
+                strokeWidth = 0.5f
+            }
+            val fillHeaderPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.LTGRAY
+                style = android.graphics.Paint.Style.FILL
             }
 
-            pdfDocument.finishPage(page)
+            val startX = margin
+            val rowHeight = 18f
+            val headerHeight = 24f
 
-            // Save PDF
-            val fileName = "Stock_Report_${java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", java.util.Locale.getDefault()).format(java.util.Date())}.pdf"
-            val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), fileName)
-            pdfDocument.writeTo(FileOutputStream(file))
+            // Headers for Stock data
+            val headers = listOf("Item ID", "Item Name", "Opening", "InWard", "OutWard", "Closing", "Avg Rate", "Valuation", "Type", "Company", "CGST%", "SGST%", "IGST%")
+
+            // Compute column widths by weights similar to Price report
+            val weights = floatArrayOf(0.08f, 0.16f, 0.07f, 0.07f, 0.07f, 0.07f, 0.08f, 0.10f, 0.08f, 0.07f, 0.05f, 0.05f, 0.05f)
+            val weightSum = weights.sum()
+            val normalized = weights.map { it / weightSum }
+            val colWidths = FloatArray(headers.size) { i -> (contentWidth * normalized[i]) }
+
+            // Calculate rows per page
+            val titleBlockHeight = 30f + 20f + 15f + 25f
+            val availableHeightBase = pageHeight - titleBlockHeight - headerHeight - margin - margin
+            val rowsPerPage = (availableHeightBase / rowHeight).toInt().coerceAtLeast(1)
+
+            var currentPage = 1
+            var entryIndex = 0
+            val totalPages = ((entries.size + rowsPerPage - 1) / rowsPerPage).coerceAtLeast(1)
+
+            while (entryIndex < entries.size) {
+                val page = pdfDocument.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(pageWidth, pageHeight, currentPage).create())
+                val canvas = page.canvas
+                var currentY = 30f
+
+                // Title and page info
+                canvas.drawText("Stock Report", (pageWidth / 2).toFloat(), currentY, titlePaint)
+                currentY += 20f
+                canvas.drawText("Page $currentPage of $totalPages", (pageWidth / 2).toFloat(), currentY, cellPaint)
+                currentY += 25f
+
+                // Table header
+                var xCursor = startX
+                val headerTop = currentY
+                val headerBottom = currentY + headerHeight
+                for (i in headers.indices) {
+                    val rect = android.graphics.RectF(xCursor, headerTop, xCursor + colWidths[i], headerBottom)
+                    canvas.drawRect(rect, fillHeaderPaint)
+                    canvas.drawRect(rect, borderPaint)
+                    drawTextCentered(canvas, headers[i], xCursor + colWidths[i]/2, headerBottom - 6f, colWidths[i] - 10f, headerPaint)
+                    xCursor += colWidths[i]
+                }
+                currentY = headerBottom
+
+                // Rows
+                val endIndex = (entryIndex + rowsPerPage).coerceAtMost(entries.size)
+                for (i in entryIndex until endIndex) {
+                    if (currentY + rowHeight > bottomY) break
+                    val e = entries[i]
+                    xCursor = startX
+                    val data = listOf(
+                        e.itemId,
+                        e.itemName,
+                        e.opening,
+                        e.inWard,
+                        e.outWard,
+                        e.closingStock,
+                        "₹${e.avgRate}",
+                        "₹${e.valuation}",
+                        e.itemType,
+                        e.company,
+                        "${e.cgst}%",
+                        "${e.sgst}%",
+                        "${e.igst}%"
+                    )
+                    val rowTop = currentY
+                    val rowBottom = currentY + rowHeight
+                    for (j in data.indices) {
+                        val rect = android.graphics.RectF(xCursor, rowTop, xCursor + colWidths[j], rowBottom)
+                        canvas.drawRect(rect, borderPaint)
+                        drawTextCentered(canvas, data[j], xCursor + colWidths[j]/2, rowBottom - 4f, colWidths[j] - 10f, cellPaint)
+                        xCursor += colWidths[j]
+                    }
+                    currentY = rowBottom
+                }
+
+                pdfDocument.finishPage(page)
+                entryIndex = endIndex
+                currentPage++
+            }
+
+            // Save and share
+            val downloadsDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
+            val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
+            val fileName = "Stock_Report_$timestamp.pdf"
+            val file = java.io.File(downloadsDir, fileName)
+            java.io.FileOutputStream(file).use { out -> pdfDocument.writeTo(out) }
             pdfDocument.close()
 
-            // Auto-share PDF
             withContext(Dispatchers.Main) {
-                try {
-                    val uri = FileProvider.getUriForFile(
-                        context,
-                        "${context.packageName}.fileprovider",
-                        file
-                    )
-
-                    val shareIntent = Intent().apply {
-                        action = Intent.ACTION_SEND
-                        type = "application/pdf"
-                        putExtra(Intent.EXTRA_STREAM, uri)
-                        putExtra(Intent.EXTRA_SUBJECT, "Stock Report - ${java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()).format(java.util.Date())}")
-                        putExtra(Intent.EXTRA_TEXT, "Please find attached the Stock Report generated on ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}")
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-
-                    val chooserIntent = Intent.createChooser(shareIntent, "Share Stock Report")
-                    context.startActivity(chooserIntent)
-
-                    Toast.makeText(context, "PDF generated successfully!", Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Toast.makeText(context, "PDF saved but sharing failed: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+                android.widget.Toast.makeText(context, "PDF saved to Downloads folder", android.widget.Toast.LENGTH_LONG).show()
+                sharePDF(context, file)
             }
-
         } catch (e: Exception) {
             withContext(Dispatchers.Main) {
-                Toast.makeText(context, "Error generating PDF: ${e.message}", Toast.LENGTH_LONG).show()
+                android.widget.Toast.makeText(context, "Error generating PDF: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
             }
         }
+    }
+}
+
+// Reuse Price screen's helpers
+private fun drawTextCentered(
+    canvas: android.graphics.Canvas,
+    text: String,
+    centerX: Float,
+    y: Float,
+    maxWidth: Float,
+    paint: android.graphics.Paint
+) {
+    val ellipsis = "…"
+    val maxLen = paint.breakText(text, true, maxWidth - 6f, null)
+    val toDraw = if (maxLen < text.length && maxLen > 1) text.substring(0, maxLen - 1) + ellipsis else text
+    canvas.drawText(toDraw, centerX - paint.measureText(toDraw)/2, y, paint)
+}
+
+private fun sharePDF(context: Context, file: java.io.File) {
+    try {
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            context,
+            context.packageName + ".fileprovider",
+            file
+        )
+        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+            putExtra(android.content.Intent.EXTRA_SUBJECT, "Stock Report")
+            putExtra(android.content.Intent.EXTRA_TEXT, "Please find the Stock Report attached.")
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.packageManager.queryIntentActivities(shareIntent, 0).forEach { ri ->
+            val packageName = ri.activityInfo.packageName
+            context.grantUriPermission(packageName, uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        val chooser = android.content.Intent.createChooser(shareIntent, "Share Stock Report").apply {
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(chooser)
+    } catch (e: Exception) {
+        android.widget.Toast.makeText(context, "Error sharing PDF: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
     }
 }
