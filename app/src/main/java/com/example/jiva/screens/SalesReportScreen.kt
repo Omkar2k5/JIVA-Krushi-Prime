@@ -7,6 +7,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -18,7 +20,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -321,81 +325,14 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
                 }
             }
 
-            // Summary Card
+            // Responsive Summary Card
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = JivaColors.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "Total Amount",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = JivaColors.DarkGray
-                            )
-                            Text(
-                                text = "₹${String.format("%.2f", totalAmount)}",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = JivaColors.Green
-                            )
-                        }
-
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "Total Quantity",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = JivaColors.DarkGray
-                            )
-                            Text(
-                                text = String.format("%.2f", totalQty),
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = JivaColors.DeepBlue
-                            )
-                        }
-
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "Transactions",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = JivaColors.DarkGray
-                            )
-                            Text(
-                                text = "${filteredEntries.size}",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = JivaColors.Purple
-                            )
-                        }
-
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "Total Discount",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = JivaColors.DarkGray
-                            )
-                            Text(
-                                text = "₹${String.format("%.2f", totalDiscount)}",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = JivaColors.Orange
-                            )
-                        }
-                    }
-                }
+                ResponsiveSummaryCard(
+                    totalAmount = totalAmount,
+                    totalQty = totalQty,
+                    transactionCount = filteredEntries.size,
+                    totalDiscount = totalDiscount
+                )
             }
 
             // Data Table Card
@@ -431,107 +368,218 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // Outstanding Report style table with horizontal scrolling
-                        Column(
-                            modifier = Modifier
-                                .height(400.dp)
-                                .horizontalScroll(rememberScrollState())
-                        ) {
-                            // Header in Outstanding Report style
-                            SalesTableHeader()
-
-                            // Data rows in Outstanding Report style
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                if (filteredEntries.isEmpty()) {
-                                    item {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(200.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Column(
-                                                horizontalAlignment = Alignment.CenterHorizontally,
-                                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Info,
-                                                    contentDescription = "No Data",
-                                                    tint = JivaColors.DarkGray,
-                                                    modifier = Modifier.size(48.dp)
-                                                )
-                                                Text(
-                                                    text = if (allSalesEntries.isEmpty()) "No sales data available" else "No entries match your filters",
-                                                    fontSize = 16.sp,
-                                                    color = JivaColors.DarkGray,
-                                                    textAlign = TextAlign.Center
-                                                )
-                                                if (allSalesEntries.isEmpty()) {
-                                                    Text(
-                                                        text = "Tap the refresh button to sync data",
-                                                        fontSize = 14.sp,
-                                                        color = JivaColors.Purple,
-                                                        textAlign = TextAlign.Center
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    items(filteredEntries) { entry ->
-                                        SalesTableRow(entry = entry)
-                                    }
-
-                                    // Total row like Outstanding Report
-                                    item {
-                                        SalesTotalRow(
-                                            totalAmount = totalAmount,
-                                            totalQty = totalQty,
-                                            totalDiscount = totalDiscount,
-                                            totalEntries = filteredEntries.size
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                        // Responsive table with horizontal scrolling
+                        ResponsiveSalesTable(
+                            entries = filteredEntries,
+                            allEntries = allSalesEntries,
+                            totalAmount = totalAmount,
+                            totalQty = totalQty,
+                            totalDiscount = totalDiscount
+                        )
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // Action Button
-                        Button(
+                        // Responsive Action Button
+                        ResponsiveActionButton(
                             onClick = {
                                 scope.launch {
-                                    try {
-                                        val pdfData = generateSalesReportPDF(filteredEntries, totalAmount, totalQty, totalDiscount)
-                                        sharePDF(context, pdfData, "Sales_Report_${System.currentTimeMillis()}.pdf")
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "Error generating PDF: ${e.message}", Toast.LENGTH_SHORT).show()
-                                    }
+                                    generateAndShareSalesPDF(context, filteredEntries, totalAmount, totalQty, totalDiscount)
                                 }
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = JivaColors.Green
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Share,
-                                contentDescription = "Share PDF",
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "SHARE PDF",
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
+                            }
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ResponsiveSummaryCard(
+    totalAmount: Double,
+    totalQty: Double,
+    transactionCount: Int,
+    totalDiscount: Double
+) {
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val isCompact = screenWidth < 600.dp
+    
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = JivaColors.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = "Summary Statistics",
+                fontSize = if (isCompact) 16.sp else 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = JivaColors.DeepBlue
+            )
+            
+            if (isCompact) {
+                // Vertical layout for small screens
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    SummaryItem("Total Amount", "₹${String.format("%.2f", totalAmount)}", JivaColors.Green)
+                    SummaryItem("Total Quantity", String.format("%.2f", totalQty), JivaColors.DeepBlue)
+                    SummaryItem("Transactions", "$transactionCount", JivaColors.Purple)
+                    SummaryItem("Total Discount", "₹${String.format("%.2f", totalDiscount)}", JivaColors.Orange)
+                }
+            } else {
+                // Grid layout for larger screens
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(if (screenWidth > 900.dp) 4 else 2),
+                    modifier = Modifier.height(if (screenWidth > 900.dp) 80.dp else 160.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    item { SummaryItem("Total Amount", "₹${String.format("%.2f", totalAmount)}", JivaColors.Green) }
+                    item { SummaryItem("Total Quantity", String.format("%.2f", totalQty), JivaColors.DeepBlue) }
+                    item { SummaryItem("Transactions", "$transactionCount", JivaColors.Purple) }
+                    item { SummaryItem("Total Discount", "₹${String.format("%.2f", totalDiscount)}", JivaColors.Orange) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SummaryItem(label: String, value: String, color: Color) {
+    val configuration = LocalConfiguration.current
+    val isCompact = configuration.screenWidthDp.dp < 600.dp
+    
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            text = label,
+            fontSize = if (isCompact) 12.sp else 14.sp,
+            fontWeight = FontWeight.Medium,
+            color = JivaColors.DarkGray,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = value,
+            fontSize = if (isCompact) 16.sp else 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = color,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun ResponsiveSalesTable(
+    entries: List<SalesReportEntry>,
+    allEntries: List<SalesReportEntry>,
+    totalAmount: Double,
+    totalQty: Double,
+    totalDiscount: Double
+) {
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val isCompact = screenWidth < 600.dp
+    
+    Column(
+        modifier = Modifier
+            .height(if (isCompact) 350.dp else 400.dp)
+            .horizontalScroll(rememberScrollState())
+    ) {
+        // Header
+        SalesTableHeader()
+
+        // Data rows
+        LazyColumn(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            if (entries.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "No Data",
+                                tint = JivaColors.DarkGray,
+                                modifier = Modifier.size(if (isCompact) 40.dp else 48.dp)
+                            )
+                            Text(
+                                text = if (allEntries.isEmpty()) "No sales data available" else "No entries match your filters",
+                                fontSize = if (isCompact) 14.sp else 16.sp,
+                                color = JivaColors.DarkGray,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            } else {
+                items(entries) { entry ->
+                    SalesTableRow(entry = entry)
+                }
+
+                // Total row
+                item {
+                    SalesTotalRow(
+                        totalAmount = totalAmount,
+                        totalQty = totalQty,
+                        totalDiscount = totalDiscount,
+                        totalEntries = entries.size
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResponsiveActionButton(onClick: () -> Unit) {
+    val configuration = LocalConfiguration.current
+    val isCompact = configuration.screenWidthDp.dp < 600.dp
+    
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = JivaColors.Green
+        ),
+        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(
+            horizontal = if (isCompact) 16.dp else 24.dp,
+            vertical = if (isCompact) 12.dp else 16.dp
+        )
+    ) {
+        Icon(
+            imageVector = Icons.Default.Share,
+            contentDescription = "Share PDF",
+            modifier = Modifier.size(if (isCompact) 16.dp else 18.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = "SHARE PDF",
+            fontWeight = FontWeight.SemiBold,
+            fontSize = if (isCompact) 14.sp else 16.sp
+        )
     }
 }
 
@@ -559,15 +607,17 @@ private fun SalesTableHeader() {
         SalesHeaderCell("Rate", Modifier.width(100.dp))
         SalesHeaderCell("Amount", Modifier.width(120.dp))
         SalesHeaderCell("Discount", Modifier.width(100.dp))
-        SalesHeaderCell("GSTIN", Modifier.width(150.dp))
     }
 }
 
 @Composable
 private fun SalesHeaderCell(text: String, modifier: Modifier = Modifier) {
+    val configuration = LocalConfiguration.current
+    val isCompact = configuration.screenWidthDp.dp < 600.dp
+    
     Text(
         text = text,
-        fontSize = 12.sp,
+        fontSize = if (isCompact) 10.sp else 12.sp,
         fontWeight = FontWeight.Bold,
         color = JivaColors.DeepBlue,
         textAlign = TextAlign.Center,
@@ -635,7 +685,6 @@ private fun SalesTableRow(entry: SalesReportEntry) {
                 color = if (amountValue >= 0) JivaColors.Green else JivaColors.Red
             )
             SalesCell("₹${safeEntry.discount}", Modifier.width(100.dp), JivaColors.Orange)
-            SalesCell(safeEntry.gstin, Modifier.width(150.dp))
         }
 
         HorizontalDivider(
@@ -652,6 +701,9 @@ private fun SalesCell(
     modifier: Modifier = Modifier,
     color: Color = Color(0xFF374151)
 ) {
+    val configuration = LocalConfiguration.current
+    val isCompact = configuration.screenWidthDp.dp < 600.dp
+    
     // Safe text processing before rendering (Outstanding Report style)
     val safeText = remember(text) {
         try {
@@ -664,7 +716,7 @@ private fun SalesCell(
 
     Text(
         text = safeText,
-        fontSize = 11.sp,
+        fontSize = if (isCompact) 9.sp else 11.sp,
         color = color,
         textAlign = TextAlign.Center,
         maxLines = 1,
@@ -675,6 +727,9 @@ private fun SalesCell(
 
 @Composable
 private fun SalesTotalRow(totalAmount: Double, totalQty: Double, totalDiscount: Double, totalEntries: Int) {
+    val configuration = LocalConfiguration.current
+    val isCompact = configuration.screenWidthDp.dp < 600.dp
+    
     Column {
         HorizontalDivider(
             color = JivaColors.DeepBlue,
@@ -685,19 +740,19 @@ private fun SalesTotalRow(totalAmount: Double, totalQty: Double, totalDiscount: 
         Row(
             modifier = Modifier
                 .background(JivaColors.LightBlue.copy(alpha = 0.3f))
-                .padding(vertical = 12.dp, horizontal = 8.dp),
+                .padding(vertical = if (isCompact) 8.dp else 12.dp, horizontal = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Empty cells to align with data columns
-            repeat(7) {
+            repeat(6) {
                 Box(modifier = Modifier.width(80.dp))
             }
 
             // Total quantity cell
             Text(
                 text = "Total: ${String.format("%.2f", totalQty)}",
-                fontSize = 12.sp,
+                fontSize = if (isCompact) 10.sp else 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = JivaColors.DeepBlue,
                 textAlign = TextAlign.Center,
@@ -713,7 +768,7 @@ private fun SalesTotalRow(totalAmount: Double, totalQty: Double, totalDiscount: 
             // Total amount cell
             Text(
                 text = "Total: ₹${String.format("%.2f", totalAmount)}",
-                fontSize = 12.sp,
+                fontSize = if (isCompact) 10.sp else 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = JivaColors.Green,
                 textAlign = TextAlign.Center,
@@ -723,142 +778,280 @@ private fun SalesTotalRow(totalAmount: Double, totalQty: Double, totalDiscount: 
             // Total discount cell
             Text(
                 text = "Total: ₹${String.format("%.2f", totalDiscount)}",
-                fontSize = 12.sp,
+                fontSize = if (isCompact) 10.sp else 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = JivaColors.Orange,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.width(100.dp)
             )
-
-            // Total entries cell
-            Text(
-                text = "$totalEntries entries",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                color = JivaColors.DeepBlue,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.width(150.dp)
-            )
         }
     }
 }
 
 /**
- * Generate PDF for Sales Report
+ * Generate and Share PDF for Sales Report with proper pagination and table formatting
  */
-private suspend fun generateSalesReportPDF(
+private suspend fun generateAndShareSalesPDF(
+    context: android.content.Context,
     entries: List<SalesReportEntry>,
     totalAmount: Double,
     totalQty: Double,
     totalDiscount: Double
-): ByteArray {
-    return withContext(Dispatchers.IO) {
+) {
+    withContext(Dispatchers.IO) {
         try {
+            // Landscape A4 page: 842 x 595
+            val pageWidth = 842
+            val pageHeight = 595
+            val margin = 20f
+            val contentWidth = pageWidth - (2 * margin)
+            val bottomY = pageHeight - margin
             val pdfDocument = android.graphics.pdf.PdfDocument()
-            val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, 1).create()
-            val page = pdfDocument.startPage(pageInfo)
-            val canvas = page.canvas
-            val paint = android.graphics.Paint().apply { textSize = 12f }
 
-            var y = 40f
-            paint.textSize = 18f
-            paint.isFakeBoldText = true
-            canvas.drawText("Sales Report", 40f, y, paint)
-            paint.isFakeBoldText = false
-            paint.textSize = 10f
-            y += 16f
-            canvas.drawText(
-                "Generated on: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}",
-                40f,
-                y,
-                paint
-            )
-
-            y += 20f
-            paint.textSize = 12f
-            paint.isFakeBoldText = true
-            canvas.drawText("Summary:", 40f, y, paint)
-            paint.isFakeBoldText = false
-            y += 16f
-            canvas.drawText("Total Entries: ${entries.size}", 40f, y, paint)
-            y += 14f
-            canvas.drawText("Total Amount: ₹${String.format("%.2f", totalAmount)}", 40f, y, paint)
-            y += 14f
-            canvas.drawText("Total Quantity: ${String.format("%.2f", totalQty)}", 40f, y, paint)
-            y += 14f
-            canvas.drawText("Total Discount: ₹${String.format("%.2f", totalDiscount)}", 40f, y, paint)
-
-            y += 20f
-            paint.isFakeBoldText = true
-            canvas.drawText("Detailed Data:", 40f, y, paint)
-            paint.isFakeBoldText = false
-            y += 16f
-
-            val headers = listOf("Date", "Party", "Type", "Ref", "Item", "HSN", "Category", "Qty", "Unit", "Rate", "Amount", "Discount")
-            val colX = floatArrayOf(40f, 90f, 150f, 190f, 230f, 300f, 350f, 410f, 440f, 470f, 510f, 550f)
-            headers.forEachIndexed { idx, h -> canvas.drawText(h, colX[idx], y, paint) }
-            y += 12f
-            canvas.drawLine(40f, y, 555f, y, paint)
-            y += 12f
-
-            entries.take(35).forEach { entry ->
-                if (y > 800f) return@forEach
-                canvas.drawText(entry.trDate, colX[0], y, paint)
-                canvas.drawText(entry.partyName.take(16), colX[1], y, paint)
-                canvas.drawText(entry.entryType, colX[2], y, paint)
-                canvas.drawText(entry.refNo, colX[3], y, paint)
-                canvas.drawText(entry.itemName.take(16), colX[4], y, paint)
-                canvas.drawText(entry.hsnNo, colX[5], y, paint)
-                canvas.drawText(entry.itemType.take(12), colX[6], y, paint)
-                canvas.drawText(entry.qty, colX[7], y, paint)
-                canvas.drawText(entry.unit, colX[8], y, paint)
-                canvas.drawText(entry.rate, colX[9], y, paint)
-                canvas.drawText(entry.amount, colX[10], y, paint)
-                canvas.drawText(entry.discount, colX[11], y, paint)
-                y += 14f
+            val titlePaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                textSize = 18f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+            val headerPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                textSize = 10f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+            }
+            val cellPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                textSize = 8f
+                typeface = android.graphics.Typeface.DEFAULT
+            }
+            val borderPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                style = android.graphics.Paint.Style.STROKE
+                strokeWidth = 0.5f
+            }
+            val fillHeaderPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.LTGRAY
+                style = android.graphics.Paint.Style.FILL
             }
 
-            pdfDocument.finishPage(page)
-            val baos = java.io.ByteArrayOutputStream()
-            pdfDocument.writeTo(baos)
+            val startX = margin
+            val rowHeight = 18f
+            val headerHeight = 24f
+
+            // Calculate optimal column widths based on content
+            val headers = listOf("Date", "Party", "Type", "Ref No", "Item", "HSN", "Category", "Qty", "Unit", "Rate", "Amount", "Discount")
+            val colWidths = calculateOptimalSalesColumnWidths(entries, headers, contentWidth, cellPaint)
+
+            // Calculate how many rows fit per page
+            val titleBlockHeight = 30f + 20f + 15f + 25f // title + generated + page + spacing
+            val availableHeightBase = pageHeight - titleBlockHeight - headerHeight - margin - margin
+            val rowsPerPage = (availableHeightBase / rowHeight).toInt().coerceAtLeast(1)
+
+            var currentPage = 1
+            var entryIndex = 0
+            val totalPages = ((entries.size + rowsPerPage - 1) / rowsPerPage).coerceAtLeast(1)
+
+            while (entryIndex < entries.size) {
+                val page = pdfDocument.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(pageWidth, pageHeight, currentPage).create())
+                val canvas = page.canvas
+
+                var currentY = 30f
+
+                // Title and page info
+                canvas.drawText("Sales Report", (pageWidth / 2).toFloat(), currentY, titlePaint)
+                currentY += 20f
+                canvas.drawText("Generated on: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}", (pageWidth / 2).toFloat(), currentY, cellPaint)
+                currentY += 15f
+                canvas.drawText("Page $currentPage of $totalPages", (pageWidth / 2).toFloat(), currentY, cellPaint)
+                currentY += 25f
+
+                // Summary section (only on first page)
+                if (currentPage == 1) {
+                    canvas.drawText("Summary:", startX, currentY, headerPaint)
+                    currentY += 15f
+                    canvas.drawText("Total Transactions: ${entries.size}", startX, currentY, cellPaint)
+                    currentY += 12f
+                    canvas.drawText("Total Amount: ₹${String.format("%.2f", totalAmount)}", startX, currentY, cellPaint)
+                    currentY += 12f
+                    canvas.drawText("Total Quantity: ${String.format("%.2f", totalQty)}", startX, currentY, cellPaint)
+                    currentY += 12f
+                    canvas.drawText("Total Discount: ₹${String.format("%.2f", totalDiscount)}", startX, currentY, cellPaint)
+                    currentY += 20f
+                }
+
+                // Table header (repeated on each page)
+                var xCursor = startX
+                val headerTop = currentY
+                val headerBottom = currentY + headerHeight
+                for (i in headers.indices) {
+                    val rect = android.graphics.RectF(xCursor, headerTop, xCursor + colWidths[i], headerBottom)
+                    canvas.drawRect(rect, fillHeaderPaint)
+                    canvas.drawRect(rect, borderPaint)
+                    drawSalesTextCentered(canvas, headers[i], xCursor + colWidths[i]/2, headerBottom - 6f, colWidths[i] - 10f, headerPaint)
+                    xCursor += colWidths[i]
+                }
+                currentY = headerBottom
+
+                // Data rows for this page
+                val endIndex = (entryIndex + rowsPerPage).coerceAtMost(entries.size)
+                for (i in entryIndex until endIndex) {
+                    if (currentY + rowHeight > bottomY) break
+                    
+                    val entry = entries[i]
+                    xCursor = startX
+                    val data = listOf(
+                        entry.trDate,
+                        entry.partyName,
+                        entry.entryType,
+                        entry.refNo,
+                        entry.itemName,
+                        entry.hsnNo,
+                        entry.itemType,
+                        entry.qty,
+                        entry.unit,
+                        "₹${entry.rate}",
+                        "₹${entry.amount}",
+                        "₹${entry.discount}"
+                    )
+                    
+                    val rowTop = currentY
+                    val rowBottom = currentY + rowHeight
+                    for (j in data.indices) {
+                        val rect = android.graphics.RectF(xCursor, rowTop, xCursor + colWidths[j], rowBottom)
+                        canvas.drawRect(rect, borderPaint)
+                        drawSalesTextCentered(canvas, data[j], xCursor + colWidths[j]/2, rowBottom - 4f, colWidths[j] - 10f, cellPaint)
+                        xCursor += colWidths[j]
+                    }
+                    currentY = rowBottom
+                }
+
+                // Total row on last page
+                if (currentPage == totalPages && currentY + rowHeight <= bottomY) {
+                    val totalTop = currentY + 8f
+                    val totalBottom = totalTop + rowHeight
+                    val totalRect = android.graphics.RectF(startX, totalTop, startX + contentWidth, totalBottom)
+                    canvas.drawRect(totalRect, fillHeaderPaint)
+                    canvas.drawRect(totalRect, borderPaint)
+                    drawSalesTextCentered(canvas, "TOTAL: ${entries.size} transactions | Amount: ₹${String.format("%.2f", totalAmount)} | Qty: ${String.format("%.2f", totalQty)} | Discount: ₹${String.format("%.2f", totalDiscount)}", startX + contentWidth/2, totalBottom - 4f, contentWidth - 10f, headerPaint)
+                }
+
+                pdfDocument.finishPage(page)
+                entryIndex = endIndex
+                currentPage++
+            }
+
+            val downloadsDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
+            val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
+            val fileName = "Sales_Report_$timestamp.pdf"
+            val file = java.io.File(downloadsDir, fileName)
+
+            java.io.FileOutputStream(file).use { out ->
+                pdfDocument.writeTo(out)
+            }
             pdfDocument.close()
-            baos.toByteArray()
+
+            withContext(Dispatchers.Main) {
+                android.widget.Toast.makeText(context, "PDF saved to Downloads folder", android.widget.Toast.LENGTH_LONG).show()
+                shareSalesPDF(context, file)
+            }
         } catch (e: Exception) {
-            timber.log.Timber.e(e, "Error generating PDF")
-            throw e
+            withContext(Dispatchers.Main) {
+                android.widget.Toast.makeText(context, "Error generating PDF: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+            }
         }
     }
 }
 
 /**
- * Share PDF file
+ * Calculate optimal column widths based on content for Sales Report
  */
-private fun sharePDF(context: android.content.Context, pdfData: ByteArray, fileName: String) {
-    try {
-        // Create a temporary file
-        val file = java.io.File(context.cacheDir, fileName)
-        file.writeBytes(pdfData)
+private fun calculateOptimalSalesColumnWidths(
+    entries: List<SalesReportEntry>,
+    headers: List<String>,
+    totalWidth: Float,
+    paint: android.graphics.Paint
+): FloatArray {
+    val colWidths = FloatArray(headers.size)
 
-        // Create URI for the file
+    // Base weights for columns to stabilize layout on A4 landscape
+    val weights = floatArrayOf(
+        0.09f, // Date
+        0.18f, // Party
+        0.09f, // Type
+        0.07f, // Ref No
+        0.20f, // Item
+        0.07f, // HSN
+        0.09f, // Category
+        0.07f, // Qty
+        0.06f, // Unit
+        0.08f, // Rate
+        0.10f, // Amount
+        0.10f  // Discount
+    )
+
+    // Normalize weights in case of drift
+    val weightSum = weights.sum()
+    val normalized = weights.map { it / weightSum }
+
+    // Compute target widths by weights
+    for (i in headers.indices) {
+        colWidths[i] = (totalWidth * normalized[i]).coerceAtLeast(40f)
+    }
+
+    return colWidths
+}
+
+/**
+ * Draw text centered in a cell for Sales Report
+ */
+private fun drawSalesTextCentered(
+    canvas: android.graphics.Canvas,
+    text: String,
+    centerX: Float,
+    y: Float,
+    maxWidth: Float,
+    paint: android.graphics.Paint
+) {
+    // Ellipsize by measuring progressively
+    var display = text
+    while (paint.measureText(display) > maxWidth && display.isNotEmpty()) {
+        // Remove a chunk to speed up shrinking
+        val remove = ((paint.measureText(display) - maxWidth) / (paint.textSize / 1.8f)).toInt().coerceAtLeast(1)
+        val newLen = (display.length - remove).coerceAtLeast(0)
+        display = if (newLen > 3) display.substring(0, newLen - 3) + "..." else "..."
+    }
+    val x = centerX - paint.measureText(display) / 2
+    canvas.drawText(display, x, y, paint)
+}
+
+/**
+ * Share PDF file for Sales Report
+ */
+private fun shareSalesPDF(context: android.content.Context, file: java.io.File) {
+    try {
         val uri = androidx.core.content.FileProvider.getUriForFile(
             context,
-            "${context.packageName}.fileprovider",
+            context.packageName + ".fileprovider",
             file
         )
-
-        // Create share intent
-        val shareIntent = android.content.Intent().apply {
-            action = android.content.Intent.ACTION_SEND
+        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
             type = "application/pdf"
             putExtra(android.content.Intent.EXTRA_STREAM, uri)
             putExtra(android.content.Intent.EXTRA_SUBJECT, "Sales Report")
-            putExtra(android.content.Intent.EXTRA_TEXT, "Please find the attached Sales Report.")
+            putExtra(android.content.Intent.EXTRA_TEXT, "Please find the Sales Report attached.")
             addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-
-        context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Sales Report"))
+        // Grant URI permission to potential receivers
+        context.packageManager.queryIntentActivities(shareIntent, 0).forEach { ri ->
+            val packageName = ri.activityInfo.packageName
+            context.grantUriPermission(packageName, uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        val chooser = android.content.Intent.createChooser(shareIntent, "Share Sales Report").apply {
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(chooser)
     } catch (e: Exception) {
-        timber.log.Timber.e(e, "Error sharing PDF")
-        android.widget.Toast.makeText(context, "Error sharing PDF: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+        android.widget.Toast.makeText(context, "Error sharing PDF: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
     }
 }
