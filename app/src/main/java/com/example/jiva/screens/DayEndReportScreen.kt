@@ -46,6 +46,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -280,7 +281,9 @@ private fun DayEndReportContent(uiState: DayEndReportUiState, currencyFormatter:
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
-                .padding(16.dp),
+                .padding(horizontal = 16.dp)
+                .padding(top = 16.dp)
+                .navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Top action row with Share PDF like Price report
@@ -341,6 +344,7 @@ private fun DayEndReportContent(uiState: DayEndReportUiState, currencyFormatter:
             }
 
             // Cash & Bank opening/closing — single-line responsive pills
+            // On very small screens, allow wrap using FlowRow if available; else keep horizontal scroll
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -456,8 +460,19 @@ private fun SummaryCard(
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, style = MaterialTheme.typography.labelMedium, color = Color.Gray)
-                Text(text = value, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.Gray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
@@ -483,7 +498,12 @@ private fun MetricPill(label: String, value: String, color: Color) {
             Spacer(Modifier.width(8.dp))
             Text(text = "$label:", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
             Spacer(Modifier.width(6.dp))
-            Text(text = value, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
