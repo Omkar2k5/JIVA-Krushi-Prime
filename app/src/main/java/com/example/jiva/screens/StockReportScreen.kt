@@ -374,6 +374,19 @@ private fun StockFilterSection(
                 color = JivaColors.DeepBlue
             )
 
+            // Item Name
+            OutlinedTextField(
+                value = itemNameSearch,
+                onValueChange = onItemNameSearchChange,
+                label = { Text("Item Name") },
+                placeholder = { Text("Search by item name...") },
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = JivaColors.DeepBlue,
+                    unfocusedBorderColor = JivaColors.DarkGray
+                )
+            )
+
             // Item Type
             OutlinedTextField(
                 value = itemTypeFilter,
@@ -387,36 +400,18 @@ private fun StockFilterSection(
                 )
             )
 
-            // Search Fields
-            Row(
+            // Company Name
+            OutlinedTextField(
+                value = companySearch,
+                onValueChange = onCompanySearchChange,
+                label = { Text("Company") },
+                placeholder = { Text("Search by company...") },
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedTextField(
-                    value = itemNameSearch,
-                    onValueChange = onItemNameSearchChange,
-                    label = { Text("Item Name") },
-                    placeholder = { Text("Search by item name...") },
-                    modifier = Modifier.weight(1f),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = JivaColors.DeepBlue,
-                        unfocusedBorderColor = JivaColors.DarkGray
-                    )
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = JivaColors.DeepBlue,
+                    unfocusedBorderColor = JivaColors.DarkGray
                 )
-                OutlinedTextField(
-                    value = companySearch,
-                    onValueChange = onCompanySearchChange,
-                    label = { Text("Company") },
-                    placeholder = { Text("Search by company...") },
-                    modifier = Modifier.weight(1f),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = JivaColors.DeepBlue,
-                        unfocusedBorderColor = JivaColors.DarkGray
-                    )
-                )
-            }
-
-
+            )
 
             // Filter Results Summary
             Card(
