@@ -15,7 +15,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.google.gson.Gson
-import com.example.jiva.data.database.entities.TemplateEntity
+import com.example.jiva.data.api.models.MsgTemplateItem
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -160,14 +160,19 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
         }
     }
 
-    // WhatsApp/SMS template config from UserEnv (prefer category "OutStandingReport")
+    // WhatsApp/SMS template config from UserEnv (force Outstanding template)
     val (whatsappTemplate, waInstanceId, waAccessToken) = remember {
         try {
             val templateJson = UserEnv.getMsgTemplatesJson(context)
-            val templates = Gson().fromJson(templateJson, Array<TemplateEntity>::class.java)?.toList().orEmpty()
-            // Prefer the template with Category == "OutStandingReport" (case-insensitive); fallback to first
-            val outTemplate = templates.firstOrNull { it.category?.equals("OutStandingReport", ignoreCase = true) == true }
-                ?: templates.firstOrNull()
+            val templates = Gson().fromJson(templateJson, Array<MsgTemplateItem>::class.java)?.toList().orEmpty()
+
+            fun norm(s: String?) = s?.lowercase()?.replace(Regex("[\\s_-]+"), "")
+            val candidates = setOf("outstandingreport", "outstanding", "outstandingbalance", "osr")
+
+            // Strictly prefer Outstanding; do not pick unrelated templates
+            val outTemplate = templates.firstOrNull { norm(it.category) in candidates }
+                ?: templates.firstOrNull { it.category?.contains("outstanding", ignoreCase = true) == true }
+
             if (outTemplate != null) {
                 val rawMsg = outTemplate.msg ?: "test message"
                 val companyName = UserEnv.getCompanyName(context) ?: ""
@@ -179,8 +184,11 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                     .replace("{add1}", add1)
                     .replace("{add2}", add2)
                     .replace("{add3}", add3)
-                Triple(preview, outTemplate.instanceId.orEmpty(), outTemplate.accessToken.orEmpty())
-            } else Triple("test message", "", "")
+                Triple(preview, outTemplate.instanceID.orEmpty(), outTemplate.accessToken.orEmpty())
+            } else {
+                // No Outstanding template found; use safe neutral
+                Triple("test message", "", "")
+            }
         } catch (e: Exception) {
             Timber.e(e, "Failed to load WhatsApp template")
             Triple("test message", "", "")
@@ -1261,7 +1269,7 @@ private suspend fun sendBulkSMS(
                     val add2 = UserEnv.getAddress2(context) ?: ""
                     val add3 = UserEnv.getAddress3(context) ?: ""
                     
-                    val smsMessage = template
+                    val smsMessageRaw = template
                         .replace("{CmpName}", companyName)
                         .replace("{add1}", add1)
                         .replace("{add2}", add2)
@@ -1272,6 +1280,19 @@ private suspend fun sendBulkSMS(
                         .ifBlank { 
                             "Dear ${customer.accountName}, your outstanding balance is ${customer.balance}. Please contact us for payment. - $companyName"
                         }
+                    // Fallback: if template had placeholder lines like "**" (or blanks) for addresses, inject address1/2/3
+                    val smsMessage = smsMessageRaw
+                        .lines()
+                        .mapIndexed { idx, line ->
+                            when {
+                                idx == 1 && (line.trim() == "**" || line.isBlank()) -> add1
+                                idx == 2 && (line.trim() == "**" || line.isBlank()) -> add2
+                                idx == 3 && (line.trim() == "**" || line.isBlank()) -> add3
+                                else -> line
+                            }
+                        }
+                        .filter { it.isNotBlank() }
+                        .joinToString("\n")
                     
                     // Clean phone number
                     val phoneNumber = customer.mobile.filter { it.isDigit() }
@@ -1354,7 +1375,7 @@ private fun sendSingleSMS(
         val add2 = UserEnv.getAddress2(context) ?: ""
         val add3 = UserEnv.getAddress3(context) ?: ""
         
-        val smsMessage = template
+        val smsMessageRaw = template
             .replace("{CmpName}", companyName)
             .replace("{add1}", add1)
             .replace("{add2}", add2)
@@ -1365,6 +1386,18 @@ private fun sendSingleSMS(
             .ifBlank { 
                 "Dear ${customer.accountName}, your outstanding balance is ${customer.balance}. Please contact us for payment. - $companyName"
             }
+        val smsMessage = smsMessageRaw
+            .lines()
+            .mapIndexed { idx, line ->
+                when {
+                    idx == 1 && (line.trim() == "**" || line.isBlank()) -> add1
+                    idx == 2 && (line.trim() == "**" || line.isBlank()) -> add2
+                    idx == 3 && (line.trim() == "**" || line.isBlank()) -> add3
+                    else -> line
+                }
+            }
+            .filter { it.isNotBlank() }
+            .joinToString("\n")
         
         // Clean phone number
         val phoneNumber = customer.mobile.filter { it.isDigit() }
