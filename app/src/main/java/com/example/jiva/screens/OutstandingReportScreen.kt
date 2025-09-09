@@ -160,12 +160,14 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
         }
     }
 
-    // WhatsApp template config from UserEnv
+    // WhatsApp/SMS template config from UserEnv (prefer category "OutStandingReport")
     val (whatsappTemplate, waInstanceId, waAccessToken) = remember {
         try {
             val templateJson = UserEnv.getMsgTemplatesJson(context)
-            val templates = Gson().fromJson(templateJson, Array<TemplateEntity>::class.java)
-            val outTemplate = templates.firstOrNull()
+            val templates = Gson().fromJson(templateJson, Array<TemplateEntity>::class.java)?.toList().orEmpty()
+            // Prefer the template with Category == "OutStandingReport" (case-insensitive); fallback to first
+            val outTemplate = templates.firstOrNull { it.category?.equals("OutStandingReport", ignoreCase = true) == true }
+                ?: templates.firstOrNull()
             if (outTemplate != null) {
                 val rawMsg = outTemplate.msg ?: "test message"
                 val companyName = UserEnv.getCompanyName(context) ?: ""
