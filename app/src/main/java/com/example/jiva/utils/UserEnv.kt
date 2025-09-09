@@ -15,6 +15,7 @@ object UserEnv {
     private const val KEY_ADDRESS1 = "address1"
     private const val KEY_ADDRESS2 = "address2"
     private const val KEY_ADDRESS3 = "address3"
+    private const val KEY_COMPANY_MOBILE = "company_mobile"
 
     // MsgTemplates storage
     private const val KEY_MSG_TEMPLATES_JSON = "msg_templates_json"
@@ -158,6 +159,29 @@ object UserEnv {
             .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
             .edit()
             .remove(KEY_FINANCIAL_YEAR)
+            .apply()
+    }
+
+    // Company mobile helpers
+    fun setCompanyMobile(context: Context, mobile: String) {
+        context.applicationContext
+            .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_COMPANY_MOBILE, mobile)
+            .apply()
+    }
+
+    fun getCompanyMobile(context: Context): String? {
+        return context.applicationContext
+            .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_COMPANY_MOBILE, null)
+    }
+
+    fun clearCompanyMobile(context: Context) {
+        context.applicationContext
+            .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .remove(KEY_COMPANY_MOBILE)
             .apply()
     }
 

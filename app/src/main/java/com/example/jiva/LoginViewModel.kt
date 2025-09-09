@@ -154,6 +154,12 @@ class LoginViewModel(
                                                     com.example.jiva.utils.UserEnv.setCompanyName(ctx, name)
                                                 }
                                             }
+                                            val mob = companyRes.data?.mobile?.takeIf { !it.isNullOrBlank() }
+                                            if (mob != null) {
+                                                context?.let { ctx ->
+                                                    com.example.jiva.utils.UserEnv.setCompanyMobile(ctx, mob)
+                                                }
+                                            }
                                         }
                                         // Year list
                                         val yearRes = api.getYear(

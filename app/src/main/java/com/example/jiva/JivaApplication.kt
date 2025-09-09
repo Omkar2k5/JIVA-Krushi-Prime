@@ -92,6 +92,9 @@ class JivaApplication : MultiDexApplication() {
                             resp.data?.ownerName?.let { owner ->
                                 com.example.jiva.utils.UserEnv.setOwnerName(ctx, owner)
                             }
+                            resp.data?.mobile?.let { mob ->
+                                com.example.jiva.utils.UserEnv.setCompanyMobile(ctx, mob)
+                            }
                             resp.data?.address1?.let { v ->
                                 com.example.jiva.utils.UserEnv.setAddress1(ctx, v)
                             }

@@ -549,7 +549,7 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                                         .replace("{add3}", add3)
                                                         .replace("[customer]", entry.accountName)
                                                         .replace("[TM]", entry.balance)
-                                                        .replace("[Mobile]", entry.mobile)
+                                                        .replace("[Mobile]", (UserEnv.getCompanyMobile(context) ?: entry.mobile))
                                                         .ifBlank { "test message" }
                                                     val (ok, _) = com.example.jiva.data.network.JivabotApi.send(
                                                         number = number,
@@ -988,7 +988,7 @@ private suspend fun sendWhatsAppMessages(
                     .replace("{add3}", staticAdd3)
                     .replace("[customer]", entry.accountName)
                     .replace("[TM]", entry.balance)
-                    .replace("[Mobile]", entry.mobile)
+                    .replace("[Mobile]", (UserEnv.getCompanyMobile(context) ?: entry.mobile))
 
                 // Normalize number: add 91 for 10-digit numbers, pass-through for 12-digit
                 val digits = entry.mobile.filter { it.isDigit() }
@@ -1286,7 +1286,7 @@ private suspend fun sendBulkSMS(
                         .replace("{add3}", add3)
                         .replace("[customer]", customer.accountName)
                         .replace("[TM]", customer.balance)
-                        .replace("[Mobile]", customer.mobile)
+                        .replace("[Mobile]", (UserEnv.getCompanyMobile(context) ?: customer.mobile))
                         .ifBlank { 
                             "Dear ${customer.accountName}, your outstanding balance is ${customer.balance}. Please contact us for payment. - $companyName"
                         }
@@ -1392,7 +1392,7 @@ private fun sendSingleSMS(
             .replace("{add3}", add3)
             .replace("[customer]", customer.accountName)
             .replace("[TM]", customer.balance)
-            .replace("[Mobile]", customer.mobile)
+            .replace("[Mobile]", (UserEnv.getCompanyMobile(context) ?: customer.mobile))
             .ifBlank { 
                 "Dear ${customer.accountName}, your outstanding balance is ${customer.balance}. Please contact us for payment. - $companyName"
             }
