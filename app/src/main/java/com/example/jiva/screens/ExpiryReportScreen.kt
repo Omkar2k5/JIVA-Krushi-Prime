@@ -883,14 +883,23 @@ private fun ExpiryTotalRow(expiredCount: Int, expiringSoonCount: Int, totalQty: 
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Empty cells to align with data columns
-            repeat(4) {
-                Box(modifier = Modifier.width(80.dp))
-            }
-
-            // Summary text
+            // "TOTAL" text aligned with Item ID column
             Text(
-                text = "$totalItems items",
+                text = "TOTAL",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = JivaColors.DeepBlue,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(80.dp)
+            )
+            // Empty spaces for Item Name, Type, Batch No columns
+            Box(modifier = Modifier.width(180.dp))
+            Box(modifier = Modifier.width(120.dp))
+            Box(modifier = Modifier.width(100.dp))
+
+            // Total items count aligned with Expiry Date column
+            Text(
+                text = "${totalItems} items",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = JivaColors.DeepBlue,
@@ -898,9 +907,9 @@ private fun ExpiryTotalRow(expiredCount: Int, expiringSoonCount: Int, totalQty: 
                 modifier = Modifier.width(120.dp)
             )
 
-            // Total quantity cell
+            // Total quantity aligned with Quantity column
             Text(
-                text = "Total: ${String.format("%.2f", totalQty)}",
+                text = "${String.format("%.2f", totalQty)}",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = JivaColors.Green,
@@ -908,9 +917,9 @@ private fun ExpiryTotalRow(expiredCount: Int, expiringSoonCount: Int, totalQty: 
                 modifier = Modifier.width(100.dp)
             )
 
-            // Expired count
+            // Expired count aligned with Days Left column
             Text(
-                text = "$expiredCount expired",
+                text = "${expiredCount} expired",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 color = JivaColors.Red,
@@ -918,9 +927,9 @@ private fun ExpiryTotalRow(expiredCount: Int, expiringSoonCount: Int, totalQty: 
                 modifier = Modifier.width(100.dp)
             )
 
-            // Expiring soon count
+            // Expiring soon count aligned with Status column
             Text(
-                text = "$expiringSoonCount soon",
+                text = "${expiringSoonCount} soon",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 color = JivaColors.Orange,

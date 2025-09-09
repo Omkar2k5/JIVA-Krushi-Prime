@@ -904,14 +904,24 @@ private fun OutstandingTotalRow(totalBalance: Double) {
             fontWeight = FontWeight.Bold,
             color = JivaColors.DeepBlue,
             textAlign = TextAlign.Center,
-            modifier = Modifier.width(560.dp)
+            modifier = Modifier.width(80.dp)
         )
+        // Empty spaces for Account Name, Mobile, Under, Area columns
+        Box(modifier = Modifier.width(180.dp))
+        Box(modifier = Modifier.width(140.dp))
+        Box(modifier = Modifier.width(160.dp))
+        Box(modifier = Modifier.width(120.dp))
+        // Balance column
         OutstandingCell(
             text = "₹" + String.format("%.2f", totalBalance),
             modifier = Modifier.width(120.dp),
             color = if (totalBalance >= 0) JivaColors.Green else JivaColors.Red
         )
-        repeat(3) { Box(modifier = Modifier.width(140.dp)) }
+        // Empty spaces for remaining columns
+        Box(modifier = Modifier.width(140.dp))
+        Box(modifier = Modifier.width(80.dp))
+        Box(modifier = Modifier.width(140.dp))
+        Box(modifier = Modifier.width(140.dp))
     }
 }
 

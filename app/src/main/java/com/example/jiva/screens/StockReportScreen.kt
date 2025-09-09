@@ -711,14 +711,26 @@ private fun StockTotalRow(totalValuation: Double, totalEntries: Int) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Empty cells to align with data columns
-            repeat(7) {
-                Box(modifier = Modifier.width(80.dp))
-            }
-
-            // Total valuation cell
+            // "TOTAL" text aligned with Item ID column
             Text(
-                text = "Total: ₹${String.format("%.2f", totalValuation)}",
+                text = "TOTAL",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = JivaColors.DeepBlue,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(80.dp)
+            )
+            // Empty spaces for Item Name, Opening, InWard, OutWard, Closing, Avg Rate columns
+            Box(modifier = Modifier.width(150.dp))
+            Box(modifier = Modifier.width(80.dp))
+            Box(modifier = Modifier.width(80.dp))
+            Box(modifier = Modifier.width(80.dp))
+            Box(modifier = Modifier.width(80.dp))
+            Box(modifier = Modifier.width(90.dp))
+            
+            // Total valuation cell aligned with Valuation column
+            Text(
+                text = "₹${String.format("%.2f", totalValuation)}",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = JivaColors.Green,
@@ -726,9 +738,9 @@ private fun StockTotalRow(totalValuation: Double, totalEntries: Int) {
                 modifier = Modifier.width(100.dp)
             )
 
-            // Total entries cell
+            // Total entries cell aligned with Type column
             Text(
-                text = "$totalEntries items",
+                text = "${totalEntries} items",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 color = JivaColors.DeepBlue,
@@ -736,10 +748,11 @@ private fun StockTotalRow(totalValuation: Double, totalEntries: Int) {
                 modifier = Modifier.width(100.dp)
             )
 
-            // Empty cells for remaining columns
-            repeat(3) {
-                Box(modifier = Modifier.width(70.dp))
-            }
+            // Empty cells for remaining columns (Company, CGST%, SGST%, IGST%)
+            Box(modifier = Modifier.width(120.dp))
+            Box(modifier = Modifier.width(70.dp))
+            Box(modifier = Modifier.width(70.dp))
+            Box(modifier = Modifier.width(70.dp))
         }
     }
 }

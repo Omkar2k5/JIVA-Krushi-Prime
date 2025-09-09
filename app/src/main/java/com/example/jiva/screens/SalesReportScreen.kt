@@ -744,14 +744,26 @@ private fun SalesTotalRow(totalAmount: Double, totalQty: Double, totalDiscount: 
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Empty cells to align with data columns
-            repeat(6) {
-                Box(modifier = Modifier.width(80.dp))
-            }
-
-            // Total quantity cell
+            // "TOTAL" text aligned with Date column
             Text(
-                text = "Total: ${String.format("%.2f", totalQty)}",
+                text = "TOTAL",
+                fontSize = if (isCompact) 10.sp else 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = JivaColors.DeepBlue,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(100.dp)
+            )
+            // Empty spaces for Party, Type, Ref No, Item, HSN, Category columns
+            Box(modifier = Modifier.width(150.dp))
+            Box(modifier = Modifier.width(100.dp))
+            Box(modifier = Modifier.width(80.dp))
+            Box(modifier = Modifier.width(180.dp))
+            Box(modifier = Modifier.width(80.dp))
+            Box(modifier = Modifier.width(120.dp))
+
+            // Total quantity cell aligned with Qty column
+            Text(
+                text = "${String.format("%.2f", totalQty)}",
                 fontSize = if (isCompact) 10.sp else 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = JivaColors.DeepBlue,
@@ -759,15 +771,15 @@ private fun SalesTotalRow(totalAmount: Double, totalQty: Double, totalDiscount: 
                 modifier = Modifier.width(80.dp)
             )
 
-            // Empty unit cell
+            // Empty space for Unit column
             Box(modifier = Modifier.width(80.dp))
 
-            // Empty rate cell
+            // Empty space for Rate column
             Box(modifier = Modifier.width(100.dp))
 
-            // Total amount cell
+            // Total amount cell aligned with Amount column
             Text(
-                text = "Total: ₹${String.format("%.2f", totalAmount)}",
+                text = "₹${String.format("%.2f", totalAmount)}",
                 fontSize = if (isCompact) 10.sp else 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = JivaColors.Green,
@@ -775,9 +787,9 @@ private fun SalesTotalRow(totalAmount: Double, totalQty: Double, totalDiscount: 
                 modifier = Modifier.width(120.dp)
             )
 
-            // Total discount cell
+            // Total discount cell aligned with Discount column
             Text(
-                text = "Total: ₹${String.format("%.2f", totalDiscount)}",
+                text = "₹${String.format("%.2f", totalDiscount)}",
                 fontSize = if (isCompact) 10.sp else 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = JivaColors.Orange,
