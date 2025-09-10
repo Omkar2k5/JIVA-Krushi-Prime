@@ -239,24 +239,30 @@ class LoginViewModel(
     }
 
     /**
-     * Load saved credentials and check for auto-login
+     * Load saved credentials and check for auto-login (updated approach)
      */
     private fun loadSavedCredentials() {
         fileCredentialManager?.let { manager ->
             viewModelScope.launch {
                 try {
                     val credentials = manager.loadCredentials()
+                    val autoLoginPref = manager.getAutoLoginPreference()
+                    
                     if (credentials != null) {
                         _uiState.value = _uiState.value.copy(
                             username = if (credentials.rememberMe) credentials.username else "",
                             rememberMe = credentials.rememberMe,
-                            autoLogin = credentials.autoLogin
+                            autoLogin = autoLoginPref // Use separate preference
                         )
 
-                        // Check if auto-login should be performed
-                        if (credentials.autoLogin && manager.shouldAutoLogin()) {
+                        // Check if auto-login should be performed (always call API)
+                        if (autoLoginPref && manager.shouldAutoLogin()) {
                             performAutoLogin(credentials)
                         }
+                    } else if (autoLoginPref) {
+                        // Auto-login is enabled but no credentials - disable it
+                        manager.saveAutoLoginPreference(false)
+                        Timber.w("Auto-login disabled due to missing credentials")
                     }
                 } catch (e: Exception) {
                     Timber.e(e, "Error loading saved credentials")
@@ -329,21 +335,23 @@ class LoginViewModel(
 
                             Timber.d("Auto-login successful for user: ${response.user.username}")
                         } else {
-                            // Auto-login failed, clear credentials and show login form
+                            // Auto-login failed, clear credentials and auto-login preference
                             fileCredentialManager?.clearCredentials()
+                            fileCredentialManager?.saveAutoLoginPreference(false)
                             _uiState.value = _uiState.value.copy(
                                 isLoading = false,
                                 isAutoLoggingIn = false,
                                 password = "", // Clear password for security
                                 autoLogin = false,
-                                errorMessage = "Auto-login failed. Please login again."
+                                errorMessage = response.message ?: "Auto-login failed. Please login again."
                             )
-                            Timber.w("Auto-login failed, credentials cleared")
+                            Timber.w("Auto-login failed: ${response.message}, credentials and preference cleared")
                         }
                     },
                     onFailure = { exception ->
-                        // Auto-login failed, clear credentials and show login form
+                        // Auto-login failed, clear credentials and auto-login preference
                         fileCredentialManager?.clearCredentials()
+                        fileCredentialManager?.saveAutoLoginPreference(false)
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             isAutoLoggingIn = false,
@@ -351,16 +359,18 @@ class LoginViewModel(
                             autoLogin = false,
                             errorMessage = "Auto-login failed. Please login again."
                         )
-                        Timber.w("Auto-login failed with exception: ${exception.message}")
+                        Timber.w("Auto-login failed with exception: ${exception.message}, credentials and preference cleared")
                     }
                 )
             } catch (e: Exception) {
                 Timber.e(e, "Auto-login error")
                 fileCredentialManager?.clearCredentials()
+                fileCredentialManager?.saveAutoLoginPreference(false)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     isAutoLoggingIn = false,
                     password = "",
+                    autoLogin = false,
                     errorMessage = "Auto-login failed. Please login again."
                 )
             }
@@ -368,24 +378,34 @@ class LoginViewModel(
     }
 
     /**
-     * Save credentials after successful login
+     * Save credentials after successful login (updated approach)
      */
     private suspend fun saveCredentialsIfNeeded() {
         val currentState = _uiState.value
-        if (currentState.rememberMe || currentState.autoLogin) {
-            fileCredentialManager?.let { manager ->
-                val success = manager.saveCredentials(
+        
+        fileCredentialManager?.let { manager ->
+            // Always save username/password for remember me functionality
+            if (currentState.rememberMe || currentState.autoLogin) {
+                val credentialsSaved = manager.saveCredentials(
                     username = currentState.username,
                     password = currentState.password,
                     rememberMe = currentState.rememberMe,
                     autoLogin = currentState.autoLogin
                 )
-
-                if (success) {
+                
+                if (credentialsSaved) {
                     Timber.d("Credentials saved successfully to file")
                 } else {
                     Timber.w("Failed to save credentials to file")
                 }
+            }
+            
+            // Save auto-login preference separately (new approach)
+            val autoLoginPrefSaved = manager.saveAutoLoginPreference(currentState.autoLogin)
+            if (autoLoginPrefSaved) {
+                Timber.d("Auto-login preference saved: ${currentState.autoLogin}")
+            } else {
+                Timber.w("Failed to save auto-login preference")
             }
         }
     }

@@ -648,6 +648,10 @@ class JivaRepositoryImpl(
                             rate = java.math.BigDecimal(salePurchaseItem.rate.ifBlank { "0" }),
                             amount = java.math.BigDecimal(salePurchaseItem.amount.ifBlank { "0" }),
                             discount = java.math.BigDecimal(salePurchaseItem.discount.ifBlank { "0" }),
+                            cgst = salePurchaseItem.cgst,
+                            sgst = salePurchaseItem.sgst,
+                            igst = salePurchaseItem.igst,
+                            total = salePurchaseItem.total,
                             yearString = salePurchaseItem.yearString
                         )
                     }

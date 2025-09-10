@@ -76,6 +76,9 @@ data class SalePurchaseEntity(
     @ColumnInfo(name = "igst")
     val igst: String = "0.00",
     
+    @ColumnInfo(name = "total")
+    val total: String = "0.00",
+    
     @ColumnInfo(name = "YearString")
     val yearString: String? = null
 )

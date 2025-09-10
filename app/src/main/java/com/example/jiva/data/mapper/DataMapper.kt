@@ -118,24 +118,6 @@ object DataMapper {
         )
     }
 
-    // Convert SalePurchaseEntity to SalePurchaseEntry for SalePurchase Report Screen
-    fun SalePurchaseEntity.toSalePurchaseEntry(): SalePurchaseEntry {
-        return SalePurchaseEntry(
-            trDate = this.trDate?.let { dateFormat.format(it) } ?: "",
-            partyName = this.partyName ?: "",
-            gstin = this.gstin ?: "",
-            trType = this.trType ?: "",
-            refNo = this.refNo ?: "",
-            itemName = this.itemName ?: "",
-            hsn = this.hsn ?: "",
-            category = this.category ?: "",
-            qty = this.qty?.toString() ?: "0",
-            unit = this.unit ?: "",
-            rate = this.rate?.toString() ?: "0.00",
-            amount = this.amount?.toString() ?: "0.00",
-            discount = this.discount?.toString() ?: "0.00"
-        )
-    }
     
     // Convert AccountMasterEntity to CustomerContact for WhatsApp Marketing
     fun AccountMasterEntity.toCustomerContact(): CustomerContact {

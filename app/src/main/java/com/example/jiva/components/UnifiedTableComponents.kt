@@ -27,7 +27,6 @@ import timber.log.Timber
  * - SalesReportScreen (SalesHeaderCell, SalesCell)
  * - StockReportScreen (StockHeaderCell, StockCell) 
  * - PriceListReportScreen (PriceListHeaderCell, PriceListCell)
- * - SalePurchaseReportScreen (SalePurchaseHeaderCell, SalePurchaseCell)
  * - WhatsAppBulkMessageScreen (CustomerHeaderCell, CustomerCell)
  * - OutstandingReportScreen (HeaderCell, DataCell)
  */

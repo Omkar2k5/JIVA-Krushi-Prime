@@ -11,7 +11,7 @@ data class ApiLoginRequest(
 )
 
 // Response model from API login
-// Example: { "isSuccess": true, "message": "success", "data": { "userID": "123" } }
+// Updated structure: { "isSuccess": true, "message": "Success", "data": { "userID": "1026", "companyName": "Demo Krushi Seva Kendra", "isActive": "1", "validTill": "9/1/2027 12:00:00 AM" } }
 
 data class ApiLoginResponse(
     @SerializedName("isSuccess") val isSuccess: Boolean,
@@ -20,5 +20,8 @@ data class ApiLoginResponse(
 )
 
 data class ApiUserData(
-    @SerializedName("userID") val userID: String?
+    @SerializedName("userID") val userID: String?,
+    @SerializedName("companyName") val companyName: String?,
+    @SerializedName("isActive") val isActive: String?,
+    @SerializedName("validTill") val validTill: String?
 )

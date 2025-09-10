@@ -17,11 +17,12 @@ class FileCredentialManager private constructor(private val context: Context) {
     
     companion object {
         private const val CREDENTIALS_FILE_NAME = "jiva_credentials.properties"
-        private const val KEY_USERNAME = "username"
-        private const val KEY_PASSWORD = "password"
-        private const val KEY_AUTO_LOGIN = "auto_login"
-        private const val KEY_REMEMBER_ME = "remember_me"
-        private const val KEY_LAST_LOGIN_TIME = "last_login_time"
+    private const val KEY_USERNAME = "username"
+    private const val KEY_PASSWORD = "password"
+    private const val KEY_AUTO_LOGIN = "auto_login"
+    private const val KEY_REMEMBER_ME = "remember_me"
+    private const val KEY_LAST_LOGIN_TIME = "last_login_time"
+    private const val KEY_AUTO_LOGIN_ONLY = "auto_login_only"
         
         @Volatile
         private var INSTANCE: FileCredentialManager? = null
@@ -116,16 +117,24 @@ class FileCredentialManager private constructor(private val context: Context) {
     }
     
     /**
-     * Check if auto-login should be performed
+     * Check if auto-login should be performed (new approach - only check preference)
      */
     suspend fun shouldAutoLogin(): Boolean = withContext(Dispatchers.IO) {
         try {
+            // First check if auto-login preference is enabled
+            val autoLoginEnabled = getAutoLoginPreference()
+            if (!autoLoginEnabled) {
+                Timber.d("Auto-login disabled in preferences")
+                return@withContext false
+            }
+            
+            // If auto-login is enabled, we should attempt it with API call
             val credentials = loadCredentials()
-            val result = credentials?.autoLogin == true && 
+            val result = credentials != null && 
                         !credentials.username.isNullOrEmpty() && 
                         !credentials.password.isNullOrEmpty()
             
-            Timber.d("Should auto-login: $result")
+            Timber.d("Should auto-login: $result (preference enabled: $autoLoginEnabled)")
             result
         } catch (e: Exception) {
             Timber.e(e, "Error checking auto-login status")
@@ -225,6 +234,58 @@ class FileCredentialManager private constructor(private val context: Context) {
             }
         } catch (e: Exception) {
             Timber.e(e, "Error updating remember me preference")
+            false
+        }
+    }
+    
+    /**
+     * Save only auto-login preference to permanent storage (new approach)
+     */
+    suspend fun saveAutoLoginPreference(enabled: Boolean): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val properties = Properties()
+            
+            // Load existing properties if file exists
+            if (credentialsFile.exists()) {
+                FileInputStream(credentialsFile).use { input ->
+                    properties.load(input)
+                }
+            }
+            
+            // Update only the auto-login preference
+            properties.setProperty(KEY_AUTO_LOGIN_ONLY, enabled.toString())
+            
+            FileOutputStream(credentialsFile).use { output ->
+                properties.store(output, "JIVA Auto-Login Preference")
+            }
+            
+            Timber.d("Auto-login preference saved: $enabled")
+            true
+        } catch (e: Exception) {
+            Timber.e(e, "Error saving auto-login preference")
+            false
+        }
+    }
+    
+    /**
+     * Get auto-login preference from permanent storage
+     */
+    suspend fun getAutoLoginPreference(): Boolean = withContext(Dispatchers.IO) {
+        try {
+            if (!credentialsFile.exists()) {
+                return@withContext false
+            }
+            
+            val properties = Properties()
+            FileInputStream(credentialsFile).use { input ->
+                properties.load(input)
+            }
+            
+            val autoLoginOnly = properties.getProperty(KEY_AUTO_LOGIN_ONLY, "false").toBoolean()
+            Timber.d("Auto-login preference loaded: $autoLoginOnly")
+            autoLoginOnly
+        } catch (e: Exception) {
+            Timber.e(e, "Error loading auto-login preference")
             false
         }
     }

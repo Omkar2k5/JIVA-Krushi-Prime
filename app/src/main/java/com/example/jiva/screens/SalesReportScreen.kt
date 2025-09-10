@@ -60,7 +60,8 @@ data class SalesReportEntry(
     val discount: String,
     val cgst: String = "",
     val sgst: String = "",
-    val igst: String = ""
+    val igst: String = "",
+    val total: String = ""
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -85,6 +86,8 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
     var dataLoadingProgress by remember { mutableStateOf(0f) }
 
     // State management for filters
+    var selectedTransactionType by remember { mutableStateOf("Sale") } // Default to Sale
+    var shouldApplyFilter by remember { mutableStateOf(true) } // Apply filter immediately, show Sales by default
     var partyNameSearch by remember { mutableStateOf("") }
     var itemNameSearch by remember { mutableStateOf("") }
 
@@ -159,7 +162,8 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
                     discount = entity.discount?.toString() ?: "0.00",
                     cgst = entity.cgst,
                     sgst = entity.sgst,
-                    igst = entity.igst
+                    igst = entity.igst,
+                    total = entity.total ?: "0.00"
                 )
             }
         } catch (e: Exception) {
@@ -169,13 +173,28 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
     }
 
     // Optimized filtering with error handling
-    val filteredEntries = remember(partyNameSearch, itemNameSearch, allSalesEntries) {
+    val filteredEntries = remember(selectedTransactionType, shouldApplyFilter, partyNameSearch, itemNameSearch, allSalesEntries) {
         try {
-            if (allSalesEntries.isEmpty()) {
+            if (allSalesEntries.isEmpty() || !shouldApplyFilter) {
                 emptyList()
             } else {
                 allSalesEntries.filter { entry ->
                     try {
+                        // Transaction Type Filter - Sale or Purchase
+                        val typeMatch = when (selectedTransactionType) {
+                            "Sale" -> {
+                                entry.entryType.equals("Cash Sale", ignoreCase = true) ||
+                                entry.entryType.equals("Credit Sale", ignoreCase = true) ||
+                                entry.entryType.equals("Wholesale", ignoreCase = true) ||
+                                entry.entryType.equals("Pesticide Sale", ignoreCase = true)
+                            }
+                            "Purchase" -> {
+                                entry.entryType.equals("Cash Purchase", ignoreCase = true) ||
+                                entry.entryType.equals("Credit Purchase", ignoreCase = true)
+                            }
+                            else -> true
+                        }
+
                         // Party Name Search Filter
                         val partyMatch = if (partyNameSearch.isBlank()) true else
                             entry.partyName.contains(partyNameSearch, ignoreCase = true)
@@ -184,7 +203,7 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
                         val itemMatch = if (itemNameSearch.isBlank()) true else
                             entry.itemName.contains(itemNameSearch, ignoreCase = true)
 
-                        partyMatch && itemMatch
+                        typeMatch && partyMatch && itemMatch
                     } catch (e: Exception) {
                         timber.log.Timber.e(e, "Error filtering entry: ${entry.refNo}")
                         false
@@ -206,6 +225,9 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
     }
     val totalDiscount = remember(filteredEntries) {
         filteredEntries.sumOf { it.discount.toDoubleOrNull() ?: 0.0 }
+    }
+    val totalSum = remember(filteredEntries) {
+        filteredEntries.sumOf { it.total.toDoubleOrNull() ?: 0.0 }
     }
 
     // Show loading screen if still loading
@@ -246,8 +268,8 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
     ) {
         // Responsive Header
         ResponsiveReportHeader(
-            title = "Sales Report",
-            subtitle = "Transaction history and sales data",
+            title = "${selectedTransactionType} Report",
+            subtitle = "Transaction history and ${selectedTransactionType.lowercase()} data",
             onBackClick = onBackClick
         )
 
@@ -276,7 +298,90 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
                             color = JivaColors.DeepBlue
                         )
 
-                        // Party Name Search - First line
+                        // Transaction Type Radio Buttons
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "Transaction Type",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = JivaColors.DeepBlue,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(24.dp)
+                            ) {
+                                // Sale Radio Button
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    RadioButton(
+                                        selected = selectedTransactionType == "Sale",
+                                        onClick = { 
+                                            selectedTransactionType = "Sale"
+                                            shouldApplyFilter = false // Reset filter application
+                                        },
+                                        colors = RadioButtonDefaults.colors(
+                                            selectedColor = JivaColors.Purple,
+                                            unselectedColor = JivaColors.DarkGray
+                                        )
+                                    )
+                                    Text(
+                                        text = "Sale",
+                                        fontSize = 14.sp,
+                                        color = JivaColors.DeepBlue,
+                                        modifier = Modifier.padding(start = 4.dp)
+                                    )
+                                }
+                                
+                                // Purchase Radio Button
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    RadioButton(
+                                        selected = selectedTransactionType == "Purchase",
+                                        onClick = { 
+                                            selectedTransactionType = "Purchase"
+                                            shouldApplyFilter = false // Reset filter application
+                                        },
+                                        colors = RadioButtonDefaults.colors(
+                                            selectedColor = JivaColors.Purple,
+                                            unselectedColor = JivaColors.DarkGray
+                                        )
+                                    )
+                                    Text(
+                                        text = "Purchase",
+                                        fontSize = 14.sp,
+                                        color = JivaColors.DeepBlue,
+                                        modifier = Modifier.padding(start = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Show Button
+                        Button(
+                            onClick = {
+                                shouldApplyFilter = true
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = JivaColors.Purple
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = "SHOW",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = JivaColors.White
+                            )
+                        }
+
+                        // Party Name Search - moved down
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Text(
                                 text = "Search Party Name",
@@ -337,7 +442,8 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
                     totalAmount = totalAmount,
                     totalQty = totalQty,
                     transactionCount = filteredEntries.size,
-                    totalDiscount = totalDiscount
+                    totalDiscount = totalDiscount,
+                    totalSum = totalSum
                 )
             }
 
@@ -358,7 +464,7 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Sales Transactions",
+                                text = "${selectedTransactionType} Transactions",
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = JivaColors.DeepBlue
@@ -380,7 +486,8 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
                             allEntries = allSalesEntries,
                             totalAmount = totalAmount,
                             totalQty = totalQty,
-                            totalDiscount = totalDiscount
+                            totalDiscount = totalDiscount,
+                            totalSum = totalSum
                         )
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -389,7 +496,7 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
                         ResponsiveActionButton(
                             onClick = {
                                 scope.launch {
-                                    generateAndShareSalesPDF(context, filteredEntries, totalAmount, totalQty, totalDiscount)
+                                    generateAndShareSalesPDF(context, filteredEntries, totalAmount, totalQty, totalDiscount, totalSum)
                                 }
                             }
                         )
@@ -405,7 +512,8 @@ private fun ResponsiveSummaryCard(
     totalAmount: Double,
     totalQty: Double,
     transactionCount: Int,
-    totalDiscount: Double
+    totalDiscount: Double,
+    totalSum: Double
 ) {
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
@@ -438,12 +546,13 @@ private fun ResponsiveSummaryCard(
                     SummaryItem("Total Quantity", String.format("%.2f", totalQty), JivaColors.DeepBlue)
                     SummaryItem("Transactions", "$transactionCount", JivaColors.Purple)
                     SummaryItem("Total Discount", "₹${String.format("%.2f", totalDiscount)}", JivaColors.Orange)
+                    SummaryItem("Grand Total", "₹${String.format("%.2f", totalSum)}", JivaColors.Purple)
                 }
             } else {
                 // Grid layout for larger screens
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(if (screenWidth > 900.dp) 4 else 2),
-                    modifier = Modifier.height(if (screenWidth > 900.dp) 80.dp else 160.dp),
+                    columns = GridCells.Fixed(if (screenWidth > 900.dp) 5 else 2),
+                    modifier = Modifier.height(if (screenWidth > 900.dp) 80.dp else 200.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
@@ -451,6 +560,7 @@ private fun ResponsiveSummaryCard(
                     item { SummaryItem("Total Quantity", String.format("%.2f", totalQty), JivaColors.DeepBlue) }
                     item { SummaryItem("Transactions", "$transactionCount", JivaColors.Purple) }
                     item { SummaryItem("Total Discount", "₹${String.format("%.2f", totalDiscount)}", JivaColors.Orange) }
+                    item { SummaryItem("Grand Total", "₹${String.format("%.2f", totalSum)}", JivaColors.Purple) }
                 }
             }
         }
@@ -494,7 +604,8 @@ private fun ResponsiveSalesTable(
     allEntries: List<SalesReportEntry>,
     totalAmount: Double,
     totalQty: Double,
-    totalDiscount: Double
+    totalDiscount: Double,
+    totalSum: Double
 ) {
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
@@ -550,6 +661,7 @@ private fun ResponsiveSalesTable(
                         totalAmount = totalAmount,
                         totalQty = totalQty,
                         totalDiscount = totalDiscount,
+                        totalSum = totalSum,
                         totalEntries = entries.size
                     )
                 }
@@ -613,6 +725,7 @@ private fun SalesTableHeader() {
         SalesHeaderCell("Rate", Modifier.width(100.dp))
         SalesHeaderCell("Amount", Modifier.width(120.dp))
         SalesHeaderCell("Discount", Modifier.width(100.dp))
+        SalesHeaderCell("Total", Modifier.width(120.dp))
         SalesHeaderCell("CGST", Modifier.width(80.dp))
         SalesHeaderCell("SGST", Modifier.width(80.dp))
         SalesHeaderCell("IGST", Modifier.width(80.dp))
@@ -654,11 +767,12 @@ private fun SalesTableRow(entry: SalesReportEntry) {
                 unit = entry.unit.takeIf { it.isNotBlank() } ?: "",
                 rate = entry.rate.takeIf { it.isNotBlank() } ?: "0.00",
                 amount = entry.amount.takeIf { it.isNotBlank() } ?: "0.00",
-                discount = entry.discount.takeIf { it.isNotBlank() } ?: "0.00"
+                discount = entry.discount.takeIf { it.isNotBlank() } ?: "0.00",
+                total = entry.total.takeIf { it.isNotBlank() } ?: "0.00"
             )
         } catch (e: Exception) {
             timber.log.Timber.e(e, "Error processing entry: ${entry.refNo}")
-            SalesReportEntry("", "Error loading data", "", "", "", "", "", "", "0", "", "0.00", "0.00", "0.00")
+            SalesReportEntry("", "Error loading data", "", "", "", "", "", "", "0", "", "0.00", "0.00", "0.00", "", "", "", "0.00")
         }
     }
 
@@ -694,6 +808,7 @@ private fun SalesTableRow(entry: SalesReportEntry) {
                 color = if (amountValue >= 0) JivaColors.Green else JivaColors.Red
             )
             SalesCell("₹${safeEntry.discount}", Modifier.width(100.dp), JivaColors.Orange)
+            SalesCell("₹${safeEntry.total}", Modifier.width(120.dp), JivaColors.Green)
             SalesCell(safeEntry.cgst, Modifier.width(80.dp))
             SalesCell(safeEntry.sgst, Modifier.width(80.dp))
             SalesCell(safeEntry.igst, Modifier.width(80.dp))
@@ -738,7 +853,7 @@ private fun SalesCell(
 }
 
 @Composable
-private fun SalesTotalRow(totalAmount: Double, totalQty: Double, totalDiscount: Double, totalEntries: Int) {
+private fun SalesTotalRow(totalAmount: Double, totalQty: Double, totalDiscount: Double, totalSum: Double, totalEntries: Int) {
     val configuration = LocalConfiguration.current
     val isCompact = configuration.screenWidthDp.dp < 600.dp
     
@@ -808,6 +923,21 @@ private fun SalesTotalRow(totalAmount: Double, totalQty: Double, totalDiscount: 
                 textAlign = TextAlign.Center,
                 modifier = Modifier.width(100.dp)
             )
+
+            // Total sum cell aligned with Total column
+            Text(
+                text = "₹${String.format("%.2f", totalSum)}",
+                fontSize = if (isCompact) 10.sp else 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = JivaColors.Purple,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(120.dp)
+            )
+
+            // Empty spaces for CGST, SGST, IGST columns
+            Box(modifier = Modifier.width(80.dp))
+            Box(modifier = Modifier.width(80.dp))
+            Box(modifier = Modifier.width(80.dp))
         }
     }
 }
@@ -820,7 +950,8 @@ private suspend fun generateAndShareSalesPDF(
     entries: List<SalesReportEntry>,
     totalAmount: Double,
     totalQty: Double,
-    totalDiscount: Double
+    totalDiscount: Double,
+    totalSum: Double
 ) {
     withContext(Dispatchers.IO) {
         try {
@@ -840,12 +971,12 @@ private suspend fun generateAndShareSalesPDF(
             }
             val headerPaint = android.graphics.Paint().apply {
                 color = android.graphics.Color.BLACK
-                textSize = 8f   // reduced to fit extra columns
+                textSize = 7f   // further reduced to fit all columns properly
                 typeface = android.graphics.Typeface.DEFAULT_BOLD
             }
             val cellPaint = android.graphics.Paint().apply {
                 color = android.graphics.Color.BLACK
-                textSize = 6f   // reduced to avoid clipping with 15 columns
+                textSize = 5.5f   // further reduced to ensure no clipping
                 typeface = android.graphics.Typeface.DEFAULT
             }
             val borderPaint = android.graphics.Paint().apply {
@@ -859,20 +990,24 @@ private suspend fun generateAndShareSalesPDF(
             }
 
             val startX = margin
-            val rowHeight = 18f
-            val headerHeight = 24f
+            val rowHeight = 16f   // reduced row height for better fit
+            val headerHeight = 20f   // reduced header height
 
             // Calculate optimal column widths based on content
-            val headers = listOf("Date", "Party", "Type", "Ref No", "Item", "HSN", "Category", "Qty", "Unit", "Rate", "Amount", "Discount", "CGST", "SGST", "IGST")
+            val headers = listOf("Date", "Party", "Type", "Ref No", "Item", "HSN", "Category", "Qty", "Unit", "Rate", "Amount", "Discount", "Total", "CGST", "SGST", "IGST")
             val colWidths = calculateOptimalSalesColumnWidths(entries, headers, contentWidth, cellPaint)
-            // Slightly reduce item width dynamically to give room to IGST
-            colWidths[4] = (colWidths[4] * 0.85f).coerceAtLeast(80f)
-            // Distribute freed width to the three GST columns
-            val freed = (colWidths[4] * 0.15f)
-            val add = (freed / 3f)
-            colWidths[12] += add
-            colWidths[13] += add
-            colWidths[14] += add
+            // Optimize column distribution for better fit
+            // Reduce Party and Item columns to give more space to GST columns
+            colWidths[1] = (colWidths[1] * 0.85f).coerceAtLeast(70f) // Party column
+            colWidths[4] = (colWidths[4] * 0.75f).coerceAtLeast(65f) // Item column
+            // Distribute freed width to GST columns and Total
+            val freed = (colWidths[1] * 0.15f) + (colWidths[4] * 0.25f)
+            val addToGst = (freed * 0.6f) / 3f  // 60% to GST columns
+            val addToTotal = freed * 0.4f       // 40% to Total column
+            colWidths[12] += addToTotal // Total column
+            colWidths[13] += addToGst   // CGST column
+            colWidths[14] += addToGst   // SGST column  
+            colWidths[15] += addToGst   // IGST column
 
             // Calculate how many rows fit per page
             val titleBlockHeight = 30f + 20f + 15f + 25f // title + generated + page + spacing
@@ -908,6 +1043,8 @@ private suspend fun generateAndShareSalesPDF(
                     canvas.drawText("Total Quantity: ${String.format("%.2f", totalQty)}", startX, currentY, cellPaint)
                     currentY += 12f
                     canvas.drawText("Total Discount: ₹${String.format("%.2f", totalDiscount)}", startX, currentY, cellPaint)
+                    currentY += 12f
+                    canvas.drawText("Grand Total: ₹${String.format("%.2f", totalSum)}", startX, currentY, cellPaint)
                     currentY += 20f
                 }
 
@@ -944,6 +1081,7 @@ private suspend fun generateAndShareSalesPDF(
                         "₹${entry.rate}",
                         "₹${entry.amount}",
                         "₹${entry.discount}",
+                        "₹${entry.total}",
                         entry.cgst,
                         entry.sgst,
                         entry.igst
@@ -967,7 +1105,7 @@ private suspend fun generateAndShareSalesPDF(
                     val totalRect = android.graphics.RectF(startX, totalTop, startX + contentWidth, totalBottom)
                     canvas.drawRect(totalRect, fillHeaderPaint)
                     canvas.drawRect(totalRect, borderPaint)
-                    drawSalesTextCentered(canvas, "TOTAL: ${entries.size} transactions | Amount: ₹${String.format("%.2f", totalAmount)} | Qty: ${String.format("%.2f", totalQty)} | Discount: ₹${String.format("%.2f", totalDiscount)}", startX + contentWidth/2, totalBottom - 4f, contentWidth - 10f, headerPaint)
+                    drawSalesTextCentered(canvas, "TOTAL: ${entries.size} transactions | Amount: ₹${String.format("%.2f", totalAmount)} | Qty: ${String.format("%.2f", totalQty)} | Discount: ₹${String.format("%.2f", totalDiscount)} | Grand Total: ₹${String.format("%.2f", totalSum)}", startX + contentWidth/2, totalBottom - 4f, contentWidth - 10f, headerPaint)
                 }
 
                 pdfDocument.finishPage(page)
@@ -1008,23 +1146,24 @@ private fun calculateOptimalSalesColumnWidths(
 ): FloatArray {
     val colWidths = FloatArray(headers.size)
 
-    // Base weights for columns to stabilize layout on A4 landscape
+    // Base weights for columns to stabilize layout on A4 landscape - optimized for GST columns
     val weights = floatArrayOf(
-        0.08f, // Date
-        0.16f, // Party
-        0.08f, // Type
-        0.06f, // Ref No
-        0.18f, // Item
-        0.06f, // HSN
-        0.08f, // Category
-        0.06f, // Qty
-        0.05f, // Unit
-        0.07f, // Rate
-        0.09f, // Amount
-        0.08f, // Discount
-        0.05f, // CGST
-        0.05f, // SGST
-        0.05f  // IGST
+        0.065f, // Date
+        0.12f,  // Party (reduced)
+        0.065f, // Type
+        0.045f, // Ref No
+        0.13f,  // Item (reduced)
+        0.045f, // HSN
+        0.065f, // Category
+        0.045f, // Qty
+        0.035f, // Unit
+        0.055f, // Rate
+        0.075f, // Amount
+        0.065f, // Discount
+        0.085f, // Total (increased)
+        0.05f,  // CGST (increased)
+        0.05f,  // SGST (increased)
+        0.05f   // IGST (increased)
     )
 
     // Normalize weights in case of drift

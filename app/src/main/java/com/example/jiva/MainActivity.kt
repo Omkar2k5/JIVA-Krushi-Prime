@@ -176,12 +176,12 @@ fun SplashScreen(
                 val shouldAutoLogin = fileCredentialManager.shouldAutoLogin()
 
                 if (shouldAutoLogin) {
-                    Timber.d("Auto-login enabled, attempting auto-login")
+                    Timber.d("Auto-login enabled, attempting auto-login with API call")
 
                     // Get saved credentials from file
                     val credentials = fileCredentialManager.loadCredentials()
                     if (credentials != null) {
-                        // Perform auto-login
+                        // Always perform API login call (new approach)
                         val authRepository = ApiAuthRepository(com.example.jiva.data.network.RetrofitClient.jivaApiService)
                         val loginRequest = LoginRequest(
                             username = credentials.username,
@@ -192,22 +192,36 @@ fun SplashScreen(
                         result.fold(
                             onSuccess = { response ->
                                 if (response.success && response.user != null) {
-                                    Timber.d("Auto-login successful, navigating to home")
+                                    Timber.d("Auto-login API call successful, navigating to home")
+                                    
+                                    // Store user data in UserEnv
+                                    response.user?.let { user ->
+                                        com.example.jiva.utils.UserEnv.setUserId(context, user.id.toString())
+                                        user.firstName?.let { companyName ->
+                                            com.example.jiva.utils.UserEnv.setCompanyName(context, companyName)
+                                        }
+                                    }
+                                    
                                     onNavigateToHome()
                                 } else {
-                                    Timber.w("Auto-login failed, clearing credentials file")
+                                    Timber.w("Auto-login API failed: ${response.message}")
+                                    // Clear credentials and auto-login preference
                                     fileCredentialManager.clearCredentials()
+                                    fileCredentialManager.saveAutoLoginPreference(false)
                                     onNavigateToLogin()
                                 }
                             },
                             onFailure = { exception ->
-                                Timber.w("Auto-login failed with exception: ${exception.message}")
+                                Timber.w("Auto-login API call failed with exception: ${exception.message}")
+                                // Clear credentials and auto-login preference
                                 fileCredentialManager.clearCredentials()
+                                fileCredentialManager.saveAutoLoginPreference(false)
                                 onNavigateToLogin()
                             }
                         )
                     } else {
                         Timber.w("No credentials found in file for auto-login")
+                        fileCredentialManager.saveAutoLoginPreference(false)
                         onNavigateToLogin()
                     }
                 } else {
