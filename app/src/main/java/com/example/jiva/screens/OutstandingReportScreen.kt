@@ -150,6 +150,8 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
 
     var selectedEntries by remember { mutableStateOf(setOf<String>()) }
     var selectAll by remember { mutableStateOf(false) }
+    // Toggle to show all accounts vs only those with positive balance
+    var showAllAccounts by remember { mutableStateOf(false) }
 
     // SMS Permission launcher
     val smsPermissionLauncher = rememberLauncherForActivityResult(
@@ -255,13 +257,21 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
             it.mobile.contains(mobileQuery, ignoreCase = true)
         }
     }
-    val finalEntries = remember(partyNameQuery, mobileQuery, filteredEntriesAfterSearch) {
+    val finalEntries = remember(partyNameQuery, mobileQuery, filteredEntriesAfterSearch, showAllAccounts) {
         try {
             if (filteredEntriesAfterSearch.isEmpty()) emptyList() else filteredEntriesAfterSearch.filter { entry ->
                 try {
                     val nameMatch = if (partyNameQuery.isBlank()) true else entry.accountName.contains(partyNameQuery, true)
                     val mobileMatch = if (mobileQuery.isBlank()) true else entry.mobile.contains(mobileQuery, true)
-                    nameMatch && mobileMatch
+                    val positiveBalanceMatch = if (showAllAccounts) true else run {
+                        val clean = entry.balance
+                            .replace("₹", "")
+                            .replace(",", "")
+                            .replace(" ", "")
+                            .trim()
+                        (clean.toDoubleOrNull() ?: 0.0) > 0.0
+                    }
+                    nameMatch && mobileMatch && positiveBalanceMatch
                 } catch (e: Exception) {
                     Timber.e(e, "Error filtering entry: ${'$'}{entry.acId}")
                     false
@@ -440,6 +450,23 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                 // Filters after data loads
                                 if (!uiState.isLoading && uiState.outstandingEntries.isNotEmpty()) {
                                     Spacer(modifier = Modifier.height(8.dp))
+
+                                    // Toggle: Show all accounts vs accounts with balance > 0
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Checkbox(
+                                            checked = showAllAccounts,
+                                            onCheckedChange = { checked -> showAllAccounts = checked },
+                                            colors = CheckboxDefaults.colors(checkedColor = JivaColors.Purple)
+                                        )
+                                        val groupLabel = if (outstandingOf.equals("Customer", true)) "customers" else "suppliers"
+                                        Text(
+                                            text = "Show all $groupLabel",
+                                            color = JivaColors.DarkGray
+                                        )
+                                    }
 
                                     OutlinedTextField(
                                         value = partyNameSearch,

@@ -776,12 +776,12 @@ private suspend fun generateAndShareStockPDF(context: Context, entries: List<Sto
             }
             val headerPaint = android.text.TextPaint().apply {
                 color = android.graphics.Color.BLACK
-                textSize = 9f   // reduced
+                textSize = 8f   // further reduced to fit more columns
                 typeface = android.graphics.Typeface.DEFAULT_BOLD
             }
             val cellPaint = android.text.TextPaint().apply {
                 color = android.graphics.Color.BLACK
-                textSize = 7f   // reduced
+                textSize = 6f   // further reduced to avoid clipping
                 typeface = android.graphics.Typeface.DEFAULT
             }
             val borderPaint = android.graphics.Paint().apply {

@@ -57,7 +57,10 @@ data class SalesReportEntry(
     val unit: String,
     val rate: String,
     val amount: String,
-    val discount: String
+    val discount: String,
+    val cgst: String = "",
+    val sgst: String = "",
+    val igst: String = ""
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -153,7 +156,10 @@ fun SalesReportScreen(onBackClick: () -> Unit = {}) {
                     unit = entity.unit ?: "",
                     rate = entity.rate?.toString() ?: "0.00",
                     amount = entity.amount?.toString() ?: "0.00",
-                    discount = entity.discount?.toString() ?: "0.00"
+                    discount = entity.discount?.toString() ?: "0.00",
+                    cgst = entity.cgst,
+                    sgst = entity.sgst,
+                    igst = entity.igst
                 )
             }
         } catch (e: Exception) {
@@ -607,6 +613,9 @@ private fun SalesTableHeader() {
         SalesHeaderCell("Rate", Modifier.width(100.dp))
         SalesHeaderCell("Amount", Modifier.width(120.dp))
         SalesHeaderCell("Discount", Modifier.width(100.dp))
+        SalesHeaderCell("CGST", Modifier.width(80.dp))
+        SalesHeaderCell("SGST", Modifier.width(80.dp))
+        SalesHeaderCell("IGST", Modifier.width(80.dp))
     }
 }
 
@@ -685,6 +694,9 @@ private fun SalesTableRow(entry: SalesReportEntry) {
                 color = if (amountValue >= 0) JivaColors.Green else JivaColors.Red
             )
             SalesCell("₹${safeEntry.discount}", Modifier.width(100.dp), JivaColors.Orange)
+            SalesCell(safeEntry.cgst, Modifier.width(80.dp))
+            SalesCell(safeEntry.sgst, Modifier.width(80.dp))
+            SalesCell(safeEntry.igst, Modifier.width(80.dp))
         }
 
         HorizontalDivider(
@@ -828,12 +840,12 @@ private suspend fun generateAndShareSalesPDF(
             }
             val headerPaint = android.graphics.Paint().apply {
                 color = android.graphics.Color.BLACK
-                textSize = 10f
+                textSize = 8f   // reduced to fit extra columns
                 typeface = android.graphics.Typeface.DEFAULT_BOLD
             }
             val cellPaint = android.graphics.Paint().apply {
                 color = android.graphics.Color.BLACK
-                textSize = 8f
+                textSize = 6f   // reduced to avoid clipping with 15 columns
                 typeface = android.graphics.Typeface.DEFAULT
             }
             val borderPaint = android.graphics.Paint().apply {
@@ -851,8 +863,16 @@ private suspend fun generateAndShareSalesPDF(
             val headerHeight = 24f
 
             // Calculate optimal column widths based on content
-            val headers = listOf("Date", "Party", "Type", "Ref No", "Item", "HSN", "Category", "Qty", "Unit", "Rate", "Amount", "Discount")
+            val headers = listOf("Date", "Party", "Type", "Ref No", "Item", "HSN", "Category", "Qty", "Unit", "Rate", "Amount", "Discount", "CGST", "SGST", "IGST")
             val colWidths = calculateOptimalSalesColumnWidths(entries, headers, contentWidth, cellPaint)
+            // Slightly reduce item width dynamically to give room to IGST
+            colWidths[4] = (colWidths[4] * 0.85f).coerceAtLeast(80f)
+            // Distribute freed width to the three GST columns
+            val freed = (colWidths[4] * 0.15f)
+            val add = (freed / 3f)
+            colWidths[12] += add
+            colWidths[13] += add
+            colWidths[14] += add
 
             // Calculate how many rows fit per page
             val titleBlockHeight = 30f + 20f + 15f + 25f // title + generated + page + spacing
@@ -923,7 +943,10 @@ private suspend fun generateAndShareSalesPDF(
                         entry.unit,
                         "₹${entry.rate}",
                         "₹${entry.amount}",
-                        "₹${entry.discount}"
+                        "₹${entry.discount}",
+                        entry.cgst,
+                        entry.sgst,
+                        entry.igst
                     )
                     
                     val rowTop = currentY
@@ -987,18 +1010,21 @@ private fun calculateOptimalSalesColumnWidths(
 
     // Base weights for columns to stabilize layout on A4 landscape
     val weights = floatArrayOf(
-        0.09f, // Date
-        0.18f, // Party
-        0.09f, // Type
-        0.07f, // Ref No
-        0.20f, // Item
-        0.07f, // HSN
-        0.09f, // Category
-        0.07f, // Qty
-        0.06f, // Unit
-        0.08f, // Rate
-        0.10f, // Amount
-        0.10f  // Discount
+        0.08f, // Date
+        0.16f, // Party
+        0.08f, // Type
+        0.06f, // Ref No
+        0.18f, // Item
+        0.06f, // HSN
+        0.08f, // Category
+        0.06f, // Qty
+        0.05f, // Unit
+        0.07f, // Rate
+        0.09f, // Amount
+        0.08f, // Discount
+        0.05f, // CGST
+        0.05f, // SGST
+        0.05f  // IGST
     )
 
     // Normalize weights in case of drift

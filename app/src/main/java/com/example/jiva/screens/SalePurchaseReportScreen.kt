@@ -52,7 +52,10 @@ data class SalePurchaseEntry(
     val unit: String,
     val rate: String,
     val amount: String,
-    val discount: String
+    val discount: String,
+    val cgst: String = "",
+    val sgst: String = "",
+    val igst: String = ""
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -150,7 +153,11 @@ fun SalePurchaseReportScreen(onBackClick: () -> Unit = {}) {
                     unit = entity.unit ?: "",
                     rate = entity.rate.toString(),
                     amount = entity.amount.toString(),
-                    discount = entity.discount.toString()
+                    discount = entity.discount.toString(),
+                    // DB doesn't yet store GST splits; show empty until sync layer is updated
+                    cgst = "",
+                    sgst = "",
+                    igst = ""
                 )
             }
         } catch (e: Exception) {
@@ -655,15 +662,18 @@ private fun SalePurchaseTableHeader() {
         SalePurchaseHeaderCell("Party", Modifier.width(150.dp))
         SalePurchaseHeaderCell("Type", Modifier.width(100.dp))
         SalePurchaseHeaderCell("Ref No", Modifier.width(80.dp))
-        SalePurchaseHeaderCell("Item", Modifier.width(180.dp))
-        SalePurchaseHeaderCell("HSN", Modifier.width(80.dp))
-        SalePurchaseHeaderCell("Category", Modifier.width(120.dp))
-        SalePurchaseHeaderCell("Qty", Modifier.width(80.dp))
-        SalePurchaseHeaderCell("Unit", Modifier.width(80.dp))
-        SalePurchaseHeaderCell("Rate", Modifier.width(100.dp))
-        SalePurchaseHeaderCell("Amount", Modifier.width(120.dp))
-        SalePurchaseHeaderCell("Discount", Modifier.width(100.dp))
-        SalePurchaseHeaderCell("GSTIN", Modifier.width(150.dp))
+        SalePurchaseHeaderCell("Item", Modifier.width(160.dp))
+        SalePurchaseHeaderCell("HSN", Modifier.width(70.dp))
+        SalePurchaseHeaderCell("Category", Modifier.width(110.dp))
+        SalePurchaseHeaderCell("Qty", Modifier.width(70.dp))
+        SalePurchaseHeaderCell("Unit", Modifier.width(70.dp))
+        SalePurchaseHeaderCell("Rate", Modifier.width(90.dp))
+        SalePurchaseHeaderCell("Amount", Modifier.width(110.dp))
+        SalePurchaseHeaderCell("Discount", Modifier.width(90.dp))
+        SalePurchaseHeaderCell("CGST", Modifier.width(70.dp))
+        SalePurchaseHeaderCell("SGST", Modifier.width(70.dp))
+        SalePurchaseHeaderCell("IGST", Modifier.width(70.dp))
+        SalePurchaseHeaderCell("GSTIN", Modifier.width(130.dp))
     }
 }
 
@@ -699,7 +709,10 @@ private fun SalePurchaseTableRow(entry: SalePurchaseEntry) {
                 unit = entry.unit.takeIf { it.isNotBlank() } ?: "",
                 rate = entry.rate.takeIf { it.isNotBlank() } ?: "0.00",
                 amount = entry.amount.takeIf { it.isNotBlank() } ?: "0.00",
-                discount = entry.discount.takeIf { it.isNotBlank() } ?: "0.00"
+                discount = entry.discount.takeIf { it.isNotBlank() } ?: "0.00",
+                cgst = entry.cgst.takeIf { it.isNotBlank() } ?: "0.00",
+                sgst = entry.sgst.takeIf { it.isNotBlank() } ?: "0.00",
+                igst = entry.igst.takeIf { it.isNotBlank() } ?: "0.00"
             )
         } catch (e: Exception) {
             timber.log.Timber.e(e, "Error processing entry: ${entry.refNo}")
@@ -727,19 +740,22 @@ private fun SalePurchaseTableRow(entry: SalePurchaseEntry) {
             SalePurchaseCell(safeEntry.partyName, Modifier.width(150.dp), JivaColors.DeepBlue)
             SalePurchaseCell(safeEntry.trType, Modifier.width(100.dp), JivaColors.Purple)
             SalePurchaseCell(safeEntry.refNo, Modifier.width(80.dp))
-            SalePurchaseCell(safeEntry.itemName, Modifier.width(180.dp), JivaColors.DarkGray)
-            SalePurchaseCell(safeEntry.hsn, Modifier.width(80.dp))
-            SalePurchaseCell(safeEntry.category, Modifier.width(120.dp), JivaColors.Orange)
-            SalePurchaseCell(safeEntry.qty, Modifier.width(80.dp), JivaColors.DeepBlue)
-            SalePurchaseCell(safeEntry.unit, Modifier.width(80.dp))
-            SalePurchaseCell("₹${safeEntry.rate}", Modifier.width(100.dp))
+            SalePurchaseCell(safeEntry.itemName, Modifier.width(160.dp), JivaColors.DarkGray)
+            SalePurchaseCell(safeEntry.hsn, Modifier.width(70.dp))
+            SalePurchaseCell(safeEntry.category, Modifier.width(110.dp), JivaColors.Orange)
+            SalePurchaseCell(safeEntry.qty, Modifier.width(70.dp), JivaColors.DeepBlue)
+            SalePurchaseCell(safeEntry.unit, Modifier.width(70.dp))
+            SalePurchaseCell("₹${safeEntry.rate}", Modifier.width(90.dp))
             SalePurchaseCell(
                 text = "₹${safeEntry.amount}",
-                modifier = Modifier.width(120.dp),
+                modifier = Modifier.width(110.dp),
                 color = if (amountValue >= 0) JivaColors.Green else JivaColors.Red
             )
-            SalePurchaseCell("₹${safeEntry.discount}", Modifier.width(100.dp), JivaColors.Orange)
-            SalePurchaseCell(safeEntry.gstin, Modifier.width(150.dp))
+            SalePurchaseCell("₹${safeEntry.discount}", Modifier.width(90.dp), JivaColors.Orange)
+            SalePurchaseCell(safeEntry.cgst, Modifier.width(70.dp))
+            SalePurchaseCell(safeEntry.sgst, Modifier.width(70.dp))
+            SalePurchaseCell(safeEntry.igst, Modifier.width(70.dp))
+            SalePurchaseCell(safeEntry.gstin, Modifier.width(130.dp))
         }
 
         HorizontalDivider(
@@ -793,56 +809,73 @@ private fun SalePurchaseTotalRow(totalAmount: Double, totalQty: Double, totalDis
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Empty cells to align with data columns
-            repeat(7) {
-                Box(modifier = Modifier.width(80.dp))
-            }
-
-            // Total quantity cell
+            // "TOTAL" text aligned with Date column
             Text(
-                text = "Total: ${String.format("%.2f", totalQty)}",
+                text = "TOTAL",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = JivaColors.DeepBlue,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.width(80.dp)
+                modifier = Modifier.width(100.dp)
+            )
+            // Empty spaces for Party, Type, Ref No, Item, HSN, Category columns
+            Box(modifier = Modifier.width(150.dp))
+            Box(modifier = Modifier.width(100.dp))
+            Box(modifier = Modifier.width(80.dp))
+            Box(modifier = Modifier.width(160.dp))
+            Box(modifier = Modifier.width(70.dp))
+            Box(modifier = Modifier.width(110.dp))
+
+            // Total quantity aligned with Qty column
+            Text(
+                text = "${String.format("%.2f", totalQty)}",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = JivaColors.DeepBlue,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(70.dp)
             )
 
-            // Empty unit cell
-            Box(modifier = Modifier.width(80.dp))
+            // Empty space for Unit column
+            Box(modifier = Modifier.width(70.dp))
 
-            // Empty rate cell
-            Box(modifier = Modifier.width(100.dp))
+            // Empty space for Rate column
+            Box(modifier = Modifier.width(90.dp))
 
-            // Total amount cell
+            // Total amount aligned with Amount column
             Text(
-                text = "Total: ₹${String.format("%.2f", totalAmount)}",
+                text = "₹${String.format("%.2f", totalAmount)}",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = JivaColors.Green,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.width(120.dp)
+                modifier = Modifier.width(110.dp)
             )
 
-            // Total discount cell
+            // Total discount aligned with Discount column
             Text(
-                text = "Total: ₹${String.format("%.2f", totalDiscount)}",
+                text = "₹${String.format("%.2f", totalDiscount)}",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = JivaColors.Orange,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.width(100.dp)
+                modifier = Modifier.width(90.dp)
             )
 
-            // Total entries cell
+            // Total entries aligned with CGST column
             Text(
-                text = "$totalEntries entries",
+                text = "${totalEntries} entries",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 color = JivaColors.DeepBlue,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.width(150.dp)
+                modifier = Modifier.width(70.dp)
             )
+
+            // Empty spaces for remaining columns (SGST, IGST, GSTIN)
+            Box(modifier = Modifier.width(70.dp))
+            Box(modifier = Modifier.width(70.dp))
+            Box(modifier = Modifier.width(130.dp))
         }
     }
 }

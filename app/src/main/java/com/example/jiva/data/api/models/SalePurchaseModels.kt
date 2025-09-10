@@ -41,5 +41,11 @@ data class SalePurchaseItem(
     val rate: String,
     val amount: String,
     val discount: String,
+    val cgsT_Per: String = "", // matches API key casing
+    val sgsT_Per: String = "",
+    val cgst: String = "",
+    val sgst: String = "",
+    val igst: String = "",
+    val total: String = "",
     val yearString: String
 )

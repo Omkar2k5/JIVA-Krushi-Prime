@@ -65,6 +65,16 @@ data class SalePurchaseEntity(
     @ColumnInfo(name = "Discount")
     @Contextual
     val discount: BigDecimal = BigDecimal.ZERO,
+
+    // New tax split columns (stored as text for simplicity and consistency across responses)
+    @ColumnInfo(name = "cgst")
+    val cgst: String = "0.00",
+
+    @ColumnInfo(name = "sgst")
+    val sgst: String = "0.00",
+
+    @ColumnInfo(name = "igst")
+    val igst: String = "0.00",
     
     @ColumnInfo(name = "YearString")
     val yearString: String? = null

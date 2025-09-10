@@ -64,7 +64,10 @@ object DataMapper {
             unit = this.unit ?: "",
             rate = this.rate.toPlainString(),
             amount = this.amount.toPlainString(),
-            discount = this.discount.toPlainString()
+            discount = this.discount.toPlainString(),
+            cgst = this.cgst,
+            sgst = this.sgst,
+            igst = this.igst
         )
     }
     

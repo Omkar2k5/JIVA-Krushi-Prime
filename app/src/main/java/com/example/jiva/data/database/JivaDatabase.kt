@@ -28,7 +28,7 @@ import com.example.jiva.data.database.entities.*
         PriceDataEntity::class,
         OutstandingEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -119,6 +119,16 @@ abstract class JivaDatabase : RoomDatabase() {
             }
         }
         
+        // Migration from version 4 to 5 - add GST split columns to tb_salepurchase
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Add columns with defaults for existing rows
+                database.execSQL("ALTER TABLE `tb_salepurchase` ADD COLUMN `cgst` TEXT NOT NULL DEFAULT '0.00'")
+                database.execSQL("ALTER TABLE `tb_salepurchase` ADD COLUMN `sgst` TEXT NOT NULL DEFAULT '0.00'")
+                database.execSQL("ALTER TABLE `tb_salepurchase` ADD COLUMN `igst` TEXT NOT NULL DEFAULT '0.00'")
+            }
+        }
+
         fun getDatabase(context: Context): JivaDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -126,7 +136,7 @@ abstract class JivaDatabase : RoomDatabase() {
                     JivaDatabase::class.java,
                     "jiva_database"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
