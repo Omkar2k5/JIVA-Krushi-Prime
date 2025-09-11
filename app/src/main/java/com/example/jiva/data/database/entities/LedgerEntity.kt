@@ -61,6 +61,9 @@ data class LedgerEntity(
     @ColumnInfo(name = "TrascType")
     val trascType: String? = null,
     
+    @ColumnInfo(name = "Details")
+    val details: String? = null,
+    
     @ColumnInfo(name = "GSTRate")
     @Contextual
     val gstRate: BigDecimal = BigDecimal.ZERO,

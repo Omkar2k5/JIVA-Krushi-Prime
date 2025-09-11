@@ -86,6 +86,7 @@ object DataMapper {
             narration = this.narration ?: "",
             isClere = if (this.isClere == true) "True" else "False",
             trascType = this.trascType ?: "",
+            details = this.details ?: "",
             gstRate = this.gstRate?.toString() ?: "0.00",
             amt = this.amt?.toString() ?: "0.00",
             igst = this.igst?.toString() ?: "0.00"

@@ -184,7 +184,16 @@ class RemoteDataSource {
     suspend fun getLedger(userId: Int, yearString: String, filters: Map<String, String>? = null): Result<com.example.jiva.data.api.models.LedgerResponse> {
         return try {
             Timber.d("Making Ledger API call with userId: $userId, yearString: $yearString, filters: $filters")
-            val request = com.example.jiva.data.api.models.LedgerRequest(userID = userId, yearString = yearString, filters = filters)
+
+            // Extract aC_ID from filters (backwards-compat) but send filters as empty object per API contract
+            val accountId = filters?.get("aC_ID") ?: ""
+
+            val request = com.example.jiva.data.api.models.LedgerRequest(
+                userID = userId,
+                yearString = yearString,
+                aC_ID = accountId,
+                filters = emptyMap()
+            )
             Timber.d("Request body: $request")
 
             val response = apiService.getLedger(request)

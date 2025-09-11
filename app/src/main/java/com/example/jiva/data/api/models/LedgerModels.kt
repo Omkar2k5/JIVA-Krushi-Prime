@@ -9,7 +9,8 @@ import kotlinx.serialization.Serializable
 data class LedgerRequest(
     val userID: Int,
     val yearString: String,
-    val filters: Map<String, String>? = null // e.g., { "aC_ID": "2" }
+    val aC_ID: String,
+    val filters: Map<String, String> = emptyMap() // additional filters (aC_ID moved to top level)
 )
 
 /**
@@ -40,6 +41,7 @@ data class LedgerItem(
     val narration: String,
     val isClere: String,
     val trascType: String,
+    val details: String,
     val gstRate: String,
     val amt: String,
     val igst: String,

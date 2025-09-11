@@ -58,6 +58,7 @@ data class LedgerEntry(
     val narration: String,
     val isClere: String,
     val trascType: String,
+    val details: String,
     val gstRate: String,
     val amt: String,
     val igst: String
@@ -73,9 +74,63 @@ private fun drawTextCentered(
     paint: android.graphics.Paint
 ) {
     val ellipsis = "…"
-    val maxLen = paint.breakText(text, true, maxWidth - 6f, null)
+    val maxLen = paint.breakText(text, true, maxWidth - 12f, null)  // More padding for larger fonts
     val toDraw = if (maxLen < text.length && maxLen > 1) text.substring(0, maxLen - 1) + ellipsis else text
     canvas.drawText(toDraw, centerX - paint.measureText(toDraw) / 2, y, paint)
+}
+
+private fun drawTextWrapped(
+    canvas: android.graphics.Canvas,
+    text: String,
+    startX: Float,  // Changed from centerX to startX for left alignment
+    startY: Float,
+    maxWidth: Float,
+    maxLines: Int,
+    lineHeight: Float,
+    paint: android.graphics.Paint
+) {
+    if (text.isBlank()) return
+    
+    val words = text.split(" ", ",", "~", ".").filter { it.isNotEmpty() }
+    val lines = mutableListOf<String>()
+    var currentLine = ""
+    
+    for (word in words) {
+        val testLine = if (currentLine.isEmpty()) word else "$currentLine $word"
+        val testWidth = paint.measureText(testLine)
+        
+        if (testWidth <= maxWidth - 12f) {
+            currentLine = testLine
+        } else {
+            if (currentLine.isNotEmpty()) {
+                lines.add(currentLine)
+                currentLine = word
+            } else {
+                // Single word is too long, try to break it
+                if (word.length > 10) {
+                    lines.add(word.substring(0, 10) + "-")
+                    currentLine = word.substring(10)
+                } else {
+                    lines.add(word)
+                }
+            }
+        }
+    }
+    
+    if (currentLine.isNotEmpty()) {
+        lines.add(currentLine)
+    }
+    
+    // Draw lines up to maxLines (left-aligned)
+    for (i in 0 until minOf(lines.size, maxLines)) {
+        val lineY = startY + (i * lineHeight)
+        val lineText = if (i == maxLines - 1 && lines.size > maxLines) {
+            lines[i] + "..."
+        } else {
+            lines[i]
+        }
+        canvas.drawText(lineText, startX, lineY, paint)
+    }
 }
 
 private fun shareLedgerPDF(context: android.content.Context, file: java.io.File) {
@@ -116,8 +171,8 @@ private suspend fun generateAndShareLedgerPDF(
 ) {
     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         try {
-            val pageWidth = 842
-            val pageHeight = 595
+            val pageWidth = 1190  // A3 landscape width
+            val pageHeight = 842   // A3 landscape height
             val margin = 20f
             val contentWidth = pageWidth - (2 * margin)
             val bottomY = pageHeight - margin
@@ -126,18 +181,18 @@ private suspend fun generateAndShareLedgerPDF(
 
             val titlePaint = android.graphics.Paint().apply {
                 color = android.graphics.Color.BLACK
-                textSize = 18f
+                textSize = 22f  // Increased from 18f
                 typeface = android.graphics.Typeface.DEFAULT_BOLD
                 textAlign = android.graphics.Paint.Align.CENTER
             }
             val headerPaint = android.graphics.Paint().apply {
                 color = android.graphics.Color.BLACK
-                textSize = 10f
+                textSize = 14f  // Increased from 10f
                 typeface = android.graphics.Typeface.DEFAULT_BOLD
             }
             val cellPaint = android.graphics.Paint().apply {
                 color = android.graphics.Color.BLACK
-                textSize = 8f
+                textSize = 11f  // Increased from 8f
                 typeface = android.graphics.Typeface.DEFAULT
             }
             val borderPaint = android.graphics.Paint().apply {
@@ -150,15 +205,15 @@ private suspend fun generateAndShareLedgerPDF(
                 style = android.graphics.Paint.Style.FILL
             }
 
-            val headers = listOf("Entry No", "Manual No", "Type", "Date", "Ref No", "AC ID", "DR", "CR", "Narration")
-            val weights = floatArrayOf(0.08f, 0.08f, 0.10f, 0.10f, 0.08f, 0.08f, 0.10f, 0.10f, 0.28f)
+            val headers = listOf("Type", "Date", "Ref No", "DR", "CR", "Narration", "Details")
+            val weights = floatArrayOf(0.12f, 0.12f, 0.10f, 0.12f, 0.12f, 0.18f, 0.24f)  // More space distributed evenly
             val weightSum = weights.sum()
             val normalized = weights.map { it / weightSum }
             val colWidths = FloatArray(headers.size) { i -> (contentWidth * normalized[i]).coerceAtLeast(60f) }
 
-            val titleBlockHeight = 30f + 20f + 15f + 15f + 25f  // Added 15f for owner name
-            val headerHeight = 24f
-            val rowHeight = 18f
+            val titleBlockHeight = 40f + 25f + 20f + 20f + 30f  // Increased for larger fonts
+            val headerHeight = 30f  // Increased for larger header font
+            val rowHeight = 70f  // Increased for larger fonts and 4-line details
             val availableHeightBase = pageHeight - titleBlockHeight - headerHeight - margin - margin
             val rowsPerPage = (availableHeightBase / rowHeight).toInt().coerceAtLeast(1)
 
@@ -175,23 +230,23 @@ private suspend fun generateAndShareLedgerPDF(
                 var currentY = 30f
 
                 canvas.drawText(companyName, (pageWidth / 2).toFloat(), currentY, titlePaint)
-                currentY += 20f
+                currentY += 25f
                 
                 // Add owner name below company name with medium font size
                 if (!ownerName.isNullOrBlank()) {
                     val ownerPaint = android.graphics.Paint().apply {
                         color = android.graphics.Color.BLACK
-                        textSize = 12f  // Medium font size (between company name 18f and table data 8f)
+                        textSize = 16f  // Increased font size for better readability
                         typeface = android.graphics.Typeface.DEFAULT
                         textAlign = android.graphics.Paint.Align.CENTER
                     }
                     canvas.drawText(ownerName, (pageWidth / 2).toFloat(), currentY, ownerPaint)
-                    currentY += 15f
+                    currentY += 20f
                 }
 
-                currentY += 15f
+                currentY += 20f
                 canvas.drawText("Page $currentPage of $totalPages", (pageWidth / 2).toFloat(), currentY, cellPaint)
-                currentY += 25f
+                currentY += 30f
 
                 var xCursor = margin
                 val headerTop = currentY
@@ -200,7 +255,7 @@ private suspend fun generateAndShareLedgerPDF(
                     val rect = android.graphics.RectF(xCursor, headerTop, xCursor + colWidths[i], headerBottom)
                     canvas.drawRect(rect, fillHeaderPaint)
                     canvas.drawRect(rect, borderPaint)
-                    drawTextCentered(canvas, headers[i], xCursor + colWidths[i] / 2, headerBottom - 6f, colWidths[i] - 10f, headerPaint)
+                    drawTextCentered(canvas, headers[i], xCursor + colWidths[i] / 2, headerBottom - 8f, colWidths[i] - 10f, headerPaint)
                     xCursor += colWidths[i]
                 }
                 currentY = headerBottom
@@ -213,20 +268,33 @@ private suspend fun generateAndShareLedgerPDF(
                     val rowTop = currentY
                     val rowBottom = currentY + rowHeight
                     val cells = listOf(
-                        e.entryNo,
-                        e.manualNo,
                         e.entryType,
                         e.entryDate,
                         e.refNo,
-                        e.acId,
                         "₹${e.dr}",
                         "₹${e.cr}",
-                        e.narration
+                        e.narration,
+                        e.details
                     )
                     for (j in cells.indices) {
                         val rect = android.graphics.RectF(xCursor, rowTop, xCursor + colWidths[j], rowBottom)
                         canvas.drawRect(rect, borderPaint)
-                        drawTextCentered(canvas, cells[j], xCursor + colWidths[j] / 2, rowBottom - 4f, colWidths[j] - 10f, cellPaint)
+                        
+                        // Special handling for details column (last column)
+                        if (j == cells.size - 1) {
+                            drawTextWrapped(
+                                canvas, 
+                                cells[j], 
+                                xCursor + 8f,  // Left align for better readability
+                                rowTop + 18f,  // Adjusted for larger font
+                                colWidths[j], 
+                                4,  // Allow 4 lines
+                                15f,  // Increased line height for larger font
+                                cellPaint
+                            )
+                        } else {
+                            drawTextCentered(canvas, cells[j], xCursor + colWidths[j] / 2, rowBottom - 15f, colWidths[j] - 10f, cellPaint)
+                        }
                         xCursor += colWidths[j]
                     }
                     currentY = rowBottom
@@ -242,7 +310,7 @@ private suspend fun generateAndShareLedgerPDF(
                         canvas,
                         "Totals — DR: ₹${String.format("%.2f", totalDr)}  CR: ₹${String.format("%.2f", totalCr)}  Closing: ₹${String.format("%.2f", closingBalance)}",
                         margin + contentWidth / 2,
-                        totalBottom - 4f,
+                        totalBottom - 8f,  // Adjusted for larger font
                         contentWidth - 10f,
                         headerPaint
                     )
@@ -355,6 +423,7 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                         narration = item.narration,
                         isClere = item.isClere,
                         trascType = item.trascType,
+                        details = item.details,
                         gstRate = item.gstRate,
                         amt = item.amt,
                         igst = item.igst
@@ -377,6 +446,7 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                         narration = entity.narration ?: "",
                         isClere = if (entity.isClere) "True" else "False",
                         trascType = entity.trascType ?: "",
+                        details = entity.details ?: "",
                         gstRate = entity.gstRate.toString(),
                         amt = entity.amt.toString(),
                         igst = entity.igst.toString()
@@ -698,7 +768,7 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                         // Outstanding Report style table with horizontal scrolling
                         Column(
                             modifier = Modifier
-                                .height(400.dp)
+                                .height(600.dp)  // Increased height to accommodate larger rows
                                 .horizontalScroll(rememberScrollState())
                         ) {
                             // Header in Outstanding Report style
@@ -847,7 +917,8 @@ private fun LedgerTableHeader() {
         LedgerHeaderCell("AC ID", Modifier.width(80.dp))
         LedgerHeaderCell("DR", Modifier.width(100.dp))
         LedgerHeaderCell("CR", Modifier.width(100.dp))
-        LedgerHeaderCell("Narration", Modifier.width(200.dp))
+        LedgerHeaderCell("Narration", Modifier.width(120.dp))
+        LedgerHeaderCell("Details", Modifier.width(240.dp))  // Wider for better display
     }
 }
 
@@ -881,22 +952,25 @@ private fun LedgerTableRow(entry: LedgerEntry) {
                 cr = entry.cr.takeIf { it.isNotBlank() } ?: "0.00",
                 narration = entry.narration.takeIf { it.isNotBlank() } ?: "",
                 isClere = entry.isClere.takeIf { it.isNotBlank() } ?: "False",
+                details = entry.details.takeIf { it.isNotBlank() } ?: "",
                 gstRate = entry.gstRate.takeIf { it.isNotBlank() } ?: "0.00",
                 amt = entry.amt.takeIf { it.isNotBlank() } ?: "0.00",
                 igst = entry.igst.takeIf { it.isNotBlank() } ?: "0.00"
             )
         } catch (e: Exception) {
             Timber.e(e, "Error processing entry: ${entry.entryNo}")
-            LedgerEntry("Error", "Error loading data", "", "", "", "", "", "", "", "", "", "", "", "", "")
+            LedgerEntry("Error", "Error loading data", "", "", "", "", "", "", "", "", "", "", "", "", "", "")
         }
     }
 
     Column {
         Row(
             modifier = Modifier
-                .padding(vertical = 8.dp, horizontal = 8.dp),
+                .padding(vertical = 8.dp, horizontal = 8.dp)
+                .fillMaxWidth()
+                .heightIn(min = 60.dp),  // Minimum height to accommodate 4-line details
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Top  // Top align for multi-line content
         ) {
             LedgerCell(safeEntry.entryNo, Modifier.width(80.dp), JivaColors.DeepBlue)
             LedgerCell(safeEntry.manualNo, Modifier.width(80.dp))
@@ -906,7 +980,8 @@ private fun LedgerTableRow(entry: LedgerEntry) {
             LedgerCell(safeEntry.acId, Modifier.width(80.dp), JivaColors.DeepBlue)
             LedgerCell("₹${safeEntry.dr}", Modifier.width(100.dp), JivaColors.Red)
             LedgerCell("₹${safeEntry.cr}", Modifier.width(100.dp), JivaColors.Green)
-            LedgerCell(safeEntry.narration, Modifier.width(200.dp))
+            LedgerCell(safeEntry.narration, Modifier.width(120.dp))
+            LedgerDetailsCell(safeEntry.details, Modifier.width(240.dp))
         }
 
         HorizontalDivider(
@@ -942,6 +1017,44 @@ private fun LedgerCell(
         overflow = TextOverflow.Ellipsis,
         modifier = modifier
     )
+}
+
+@Composable
+private fun LedgerDetailsCell(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = Color(0xFF374151)
+) {
+    // Safe text processing with better formatting
+    val safeText = remember(text) {
+        try {
+            // Replace common separators with spaces for better word wrapping
+            text.takeIf { it.isNotBlank() }?.replace(",", ", ")?.replace("~", " ") ?: ""
+        } catch (e: Exception) {
+            Timber.e(e, "Error processing details text: $text")
+            "Error"
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .padding(2.dp)
+            .fillMaxWidth()
+    ) {
+        Text(
+            text = safeText,
+            fontSize = 9.sp,
+            color = color,
+            textAlign = TextAlign.Start,  // Left align for better readability
+            maxLines = 4,  // Allow 4 lines for details
+            overflow = TextOverflow.Ellipsis,
+            lineHeight = 11.sp,
+            softWrap = true,  // Enable soft wrapping
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(2.dp)
+        )
+    }
 }
 
 @Composable
@@ -985,14 +1098,17 @@ private fun LedgerTotalRow(totalDr: Double, totalCr: Double, totalEntries: Int) 
                 modifier = Modifier.width(100.dp)
             )
 
-            // Total entries cell (Narration column width)
+            // Narration column (empty)
+            Box(modifier = Modifier.width(120.dp))
+            
+            // Total entries cell (Details column width)
             Text(
                 text = "$totalEntries entries",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 color = JivaColors.DeepBlue,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.width(200.dp)
+                modifier = Modifier.width(240.dp)
             )
         }
     }

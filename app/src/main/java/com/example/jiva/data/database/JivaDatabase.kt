@@ -28,7 +28,7 @@ import com.example.jiva.data.database.entities.*
         PriceDataEntity::class,
         OutstandingEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -136,6 +136,14 @@ abstract class JivaDatabase : RoomDatabase() {
                 database.execSQL("ALTER TABLE `tb_salepurchase` ADD COLUMN `total` TEXT NOT NULL DEFAULT '0.00'")
             }
         }
+        
+        // Migration from version 6 to 7 - add details column to tb_ledger
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Add details column with default value for existing rows
+                database.execSQL("ALTER TABLE `tb_ledger` ADD COLUMN `Details` TEXT")
+            }
+        }
 
         fun getDatabase(context: Context): JivaDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -144,7 +152,7 @@ abstract class JivaDatabase : RoomDatabase() {
                     JivaDatabase::class.java,
                     "jiva_database"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
