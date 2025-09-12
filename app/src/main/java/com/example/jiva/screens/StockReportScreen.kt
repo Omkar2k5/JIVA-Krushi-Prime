@@ -167,6 +167,9 @@ fun StockReportScreen(onBackClick: () -> Unit = {}) {
                     val nameMatch = itemNameSearch.isBlank() || entry.itemName.contains(itemNameSearch, ignoreCase = true)
                     val companyMatch = companySearch.isBlank() || entry.company.contains(companySearch, ignoreCase = true)
                     typeMatch && nameMatch && companyMatch
+                }.sortedBy { entry ->
+                    // Sort by itemId in ascending order
+                    entry.itemId.toIntOrNull() ?: Int.MAX_VALUE
                 }
             }
         } catch (e: Exception) {

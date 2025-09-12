@@ -205,6 +205,9 @@ fun ExpiryReportScreen(onBackClick: () -> Unit = {}) {
                         timber.log.Timber.e(e, "Error filtering entry: ${entry.itemId}")
                         false
                     }
+                }.sortedBy { entry ->
+                    // Sort by itemId in ascending order
+                    entry.itemId.toIntOrNull() ?: Int.MAX_VALUE
                 }
             }
         } catch (e: Exception) {

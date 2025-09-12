@@ -187,6 +187,9 @@ fun PriceListReportScreen(onBackClick: () -> Unit = {}) {
                     "Credit Rate (High to Low)" -> filtered.sortedByDescending { it.creditSaleRate.toDoubleOrNull() ?: 0.0 }
                     "Credit Rate (Low to High)" -> filtered.sortedBy { it.creditSaleRate.toDoubleOrNull() ?: 0.0 }
                     else -> filtered
+                }.sortedBy { entry ->
+                    // Sort by itemId in ascending order as secondary sort
+                    entry.itemId.toIntOrNull() ?: Int.MAX_VALUE
                 }
             }
         } catch (e: Exception) {
