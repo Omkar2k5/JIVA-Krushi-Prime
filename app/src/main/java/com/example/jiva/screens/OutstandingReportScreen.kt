@@ -320,7 +320,24 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
             title = "Outstanding Report",
             subtitle = "Manage outstanding payments and dues",
             onBackClick = onBackClick,
-            actions = { }
+            actions = {
+                // Share PDF action
+                IconButton(onClick = {
+                    scope.launch {
+                        generateAndSharePDF(
+                            context = context,
+                            entries = finalEntries,
+                            totalBalance = totalBalance
+                        )
+                    }
+                }) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = "Share PDF",
+                        tint = JivaColors.White
+                    )
+                }
+            }
         )
 
         // Error screen
@@ -392,14 +409,22 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                                 selected = outstandingOf == "Customer",
                                                 onClick = { outstandingOf = "Customer" }
                                             )
-                                            Text("Customer", fontSize = 14.sp)
+                                            Text(
+                                                text = "Customer",
+                                                fontSize = 14.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
                                         }
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             RadioButton(
                                                 selected = outstandingOf == "Supplier",
                                                 onClick = { outstandingOf = "Supplier" }
                                             )
-                                            Text("Supplier", fontSize = 14.sp)
+                                            Text(
+                                                text = "Supplier",
+                                                fontSize = 14.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
                                         }
                                     }
                                 }
@@ -464,7 +489,7 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                         val groupLabel = if (outstandingOf.equals("Customer", true)) "customers" else "suppliers"
                                         Text(
                                             text = "Show all $groupLabel",
-                                            color = JivaColors.DarkGray
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                         )
                                     }
 
@@ -481,8 +506,8 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                             }
                                         },
                                         colors = OutlinedTextFieldDefaults.colors(
-                                            focusedTextColor = Color.Black,
-                                            unfocusedTextColor = Color.Black,
+                                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                                             cursorColor = JivaColors.DeepBlue
                                         ),
                                         modifier = Modifier.fillMaxWidth(),
@@ -504,8 +529,8 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                             }
                                         },
                                         colors = OutlinedTextFieldDefaults.colors(
-                                            focusedTextColor = Color.Black,
-                                            unfocusedTextColor = Color.Black,
+                                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                                             cursorColor = JivaColors.DeepBlue
                                         ),
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
@@ -546,7 +571,10 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                     onCheckedChange = { isChecked -> selectAll = isChecked },
                                     colors = CheckboxDefaults.colors(checkedColor = JivaColors.Purple)
                                 )
-                                Text("Select all contacts")
+                                Text(
+                                    text = "Select all contacts",
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
                             }
 
                             // WhatsApp Button
@@ -772,7 +800,7 @@ fun OutstandingReportScreenImpl(onBackClick: () -> Unit = {}) {
                                                 text = "No outstanding data found. Click Show to load data.",
                                                 modifier = Modifier.padding(16.dp),
                                                 fontSize = 14.sp,
-                                                color = JivaColors.DarkGray,
+                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                                                 textAlign = TextAlign.Center
                                             )
                                         }
@@ -807,8 +835,8 @@ private fun OutstandingTableHeader() {
         OutstandingHeaderCell("Balance", Modifier.width(120.dp))
         OutstandingHeaderCell("Last Date", Modifier.width(140.dp))
         OutstandingHeaderCell("Days", Modifier.width(80.dp))
-        OutstandingHeaderCell("Credit Limit Amt", Modifier.width(140.dp))
-        OutstandingHeaderCell("Credit Limit Days", Modifier.width(140.dp))
+        OutstandingHeaderCell("Cr. Limit Amt", Modifier.width(140.dp))
+        OutstandingHeaderCell("Cr. Limit Days", Modifier.width(140.dp))
     }
 }
 
@@ -861,7 +889,7 @@ private fun OutstandingTableRow(
 private fun OutstandingCell(
     text: String,
     modifier: Modifier = Modifier,
-    color: Color = Color(0xFF374151)
+    color: Color = MaterialTheme.colorScheme.onSurface
 ) {
     val safeText = remember(text) {
         try { text.takeIf { it.isNotBlank() } ?: "" } catch (e: Exception) { Timber.e(e, "Error processing text: ${'$'}text"); "Error" }
@@ -1107,16 +1135,17 @@ private suspend fun generateAndSharePDF(
             }
 
             val startX = margin
-            val startY = 90f
+            val startY = 60f  // Reduced from 90f since we removed timestamp lines
             val rowHeight = 18f
 
             // 10 columns to match on-screen table
             val headers = arrayOf(
                 "AC ID", "Account Name", "Mobile", "Under", "Area", "Balance",
-                "Last Date", "Days", "Credit Limit Amt", "Credit Limit Days"
+                "Last Date", "Days", "Cr Limit Amt", "Cr. Limit Days"
             )
             // Column widths as percentages of content width (sum = 1.0)
-            val colPercents = floatArrayOf(0.07f, 0.18f, 0.11f, 0.13f, 0.10f, 0.11f, 0.10f, 0.05f, 0.08f, 0.07f)
+            // Reduced balance column from 0.11f to 0.08f, added 0.015f each to credit limit columns
+            val colPercents = floatArrayOf(0.07f, 0.18f, 0.11f, 0.13f, 0.10f, 0.08f, 0.10f, 0.05f, 0.095f, 0.085f)
             val colWidths = FloatArray(headers.size) { contentWidth * colPercents[it] }
             val totalWidth = colWidths.sum()
 
@@ -1141,10 +1170,7 @@ private suspend fun generateAndSharePDF(
                 val page = pdfDocument.startPage(pageInfo)
                 val canvas = page.canvas
 
-                val currentDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
                 canvas.drawText("Outstanding Report", pageWidth / 2f, 40f, titlePaint)
-                canvas.drawText("Generated on: ${currentDate}", pageWidth / 2f, 60f, cellPaint)
-                canvas.drawText("Page ${pageNum} of ${totalPages}", pageWidth / 2f, 75f, cellPaint)
 
                 var currentX = startX
                 var currentY = startY
