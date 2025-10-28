@@ -106,13 +106,20 @@ fun HomeScreen(
         actualViewModel.loadUserSession()
     }
     
-    // Show toast for sync status (suppress "No active session found")
-    LaunchedEffect(uiState.isSyncing, uiState.syncSuccess, uiState.errorMessage) {
+    // Show toast for sync/update status (suppress "No active session found")
+    LaunchedEffect(uiState.isSyncing, uiState.syncSuccess, uiState.updateSuccess, uiState.errorMessage) {
         when {
             uiState.syncSuccess -> {
                 android.widget.Toast.makeText(
                     context,
                     "Data synchronized successfully!",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+            uiState.updateSuccess -> {
+                android.widget.Toast.makeText(
+                    context,
+                    "Server configuration updated successfully!",
                     android.widget.Toast.LENGTH_SHORT
                 ).show()
             }
@@ -333,7 +340,34 @@ private fun ModernHeader(
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-
+                // Update button
+                IconButton(
+                    onClick = {
+                        viewModel.updateServerConfig()
+                    },
+                    modifier = Modifier
+                        .background(
+                            JivaColors.White.copy(alpha = 0.2f),
+                            CircleShape
+                        )
+                        .size(iconSize + 12.dp),
+                    enabled = !uiState.isUpdatingConfig
+                ) {
+                    if (uiState.isUpdatingConfig) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(iconSize),
+                            color = JivaColors.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Update Server Config",
+                            tint = JivaColors.White,
+                            modifier = Modifier.size(iconSize)
+                        )
+                    }
+                }
                 
                 // Logout button
                 IconButton(

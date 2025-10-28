@@ -19,6 +19,7 @@ import com.example.jiva.data.api.models.ExpiryResponse
 import com.example.jiva.data.api.models.PriceListRequest
 import com.example.jiva.data.api.models.PriceListResponse
 import com.example.jiva.data.api.models.ImageUploadResponse
+import com.example.jiva.data.api.models.AppInfoResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -239,4 +240,11 @@ interface JivaApiService {
     @Headers("Content-Type: application/json")
     @POST("api/JivaBusiness/DayEndInfo")
     suspend fun getDayEndInfo(@Body request: com.example.jiva.data.api.models.DayEndInfoRequest): com.example.jiva.data.api.models.DayEndInfoResponse
+
+    /**
+     * GET /api/JivaBusiness/GetAppInfo
+     * Fetch app configuration including server IP address
+     */
+    @GET("api/JivaBusiness/GetAppInfo")
+    suspend fun getAppInfo(): AppInfoResponse
 }

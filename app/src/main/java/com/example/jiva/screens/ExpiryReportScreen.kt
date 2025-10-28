@@ -1007,6 +1007,9 @@ private suspend fun generateAndSharePDF(
             var entryIndex = 0
             val totalPages = ((entries.size + rowsPerPage - 1) / rowsPerPage).coerceAtLeast(1)
 
+            // Get company name for PDF title
+            val companyName = com.example.jiva.utils.UserEnv.getCompanyName(context) ?: "Expiry Report"
+
             while (entryIndex < entries.size) {
                 val page = pdfDocument.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(pageWidth, pageHeight, currentPage).create())
                 val canvas = page.canvas
@@ -1014,7 +1017,7 @@ private suspend fun generateAndSharePDF(
                 var currentY = 30f
 
                 // Title and page info
-                canvas.drawText("Expiry Report", (pageWidth / 2).toFloat(), currentY, titlePaint)
+                canvas.drawText(companyName, (pageWidth / 2).toFloat(), currentY, titlePaint)
                 currentY += 20f
                 canvas.drawText("Generated on: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}", (pageWidth / 2).toFloat(), currentY, cellPaint)
                 currentY += 15f

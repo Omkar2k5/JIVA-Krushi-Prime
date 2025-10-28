@@ -133,6 +133,112 @@ private fun drawTextWrapped(
     }
 }
 
+private fun drawFooterContent(
+    canvas: android.graphics.Canvas,
+    margin: Float,
+    contentWidth: Float,
+    totalTop: Float,
+    sectionHeight: Float,
+    openingDr: Double,
+    openingCr: Double,
+    totalDr: Double,
+    totalCr: Double,
+    closingBalance: Double,
+    headerPaint: android.graphics.Paint,
+    cellPaint: android.graphics.Paint,
+    closingBalancePaint: android.graphics.Paint
+) {
+    var textY = totalTop + 20f
+    
+    // Account Opening (if any)
+    if (openingDr > 0.0 || openingCr > 0.0) {
+        drawTextCentered(
+            canvas,
+            "Account Opening",
+            margin + contentWidth / 2,
+            textY,
+            contentWidth - 10f,
+            headerPaint
+        )
+        textY += 20f
+        
+        drawTextCentered(
+            canvas,
+            "DR: ₹${String.format("%.2f", openingDr)}    CR: ₹${String.format("%.2f", openingCr)}",
+            margin + contentWidth / 2,
+            textY,
+            contentWidth - 10f,
+            cellPaint
+        )
+        textY += 25f
+    }
+    
+    // Transaction Totals
+    val totalDrWithoutOpening = totalDr - openingDr
+    val totalCrWithoutOpening = totalCr - openingCr
+    
+    if (openingDr > 0.0 || openingCr > 0.0) {
+        drawTextCentered(
+            canvas,
+            "Transaction Totals",
+            margin + contentWidth / 2,
+            textY,
+            contentWidth - 10f,
+            headerPaint
+        )
+        textY += 20f
+        
+        drawTextCentered(
+            canvas,
+            "DR: ₹${String.format("%.2f", totalDrWithoutOpening)}    CR: ₹${String.format("%.2f", totalCrWithoutOpening)}",
+            margin + contentWidth / 2,
+            textY,
+            contentWidth - 10f,
+            cellPaint
+        )
+        textY += 25f
+        
+        // Grand Totals
+        drawTextCentered(
+            canvas,
+            "Grand Total - DR: ₹${String.format("%.2f", totalDr)}    CR: ₹${String.format("%.2f", totalCr)}",
+            margin + contentWidth / 2,
+            textY,
+            contentWidth - 10f,
+            headerPaint
+        )
+    } else {
+        // Simple totals when no opening balance
+        drawTextCentered(
+            canvas,
+            "Total - DR: ₹${String.format("%.2f", totalDr)}    CR: ₹${String.format("%.2f", totalCr)}",
+            margin + contentWidth / 2,
+            textY,
+            contentWidth - 10f,
+            headerPaint
+        )
+    }
+    textY += 25f
+    
+    // Closing Balance with DR/CR indicator
+    val closingBalanceText = if (closingBalance < 0) {
+        "Closing Balance: DR - (₹${String.format("%.2f", kotlin.math.abs(closingBalance))})"
+    } else if (closingBalance > 0) {
+        "Closing Balance: CR - (₹${String.format("%.2f", closingBalance)})"
+    } else {
+        "Closing Balance: ₹0.00"
+    }
+    
+    drawTextCentered(
+        canvas,
+        closingBalanceText,
+        margin + contentWidth / 2,
+        textY,
+        contentWidth - 10f,
+        closingBalancePaint
+    )
+}
+
 private fun shareLedgerPDF(context: android.content.Context, file: java.io.File) {
     try {
         val uri = androidx.core.content.FileProvider.getUriForFile(
@@ -167,7 +273,10 @@ private suspend fun generateAndShareLedgerPDF(
     entries: List<LedgerEntry>,
     totalDr: Double,
     totalCr: Double,
-    closingBalance: Double
+    closingBalance: Double,
+    openingDr: Double = 0.0,
+    openingCr: Double = 0.0,
+    accountName: String? = null
 ) {
     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         try {
@@ -219,12 +328,14 @@ private suspend fun generateAndShareLedgerPDF(
 
             var currentPage = 1
             var entryIndex = 0
-            val totalPages = ((entries.size + rowsPerPage - 1) / rowsPerPage).coerceAtLeast(1)
+            var totalPages = ((entries.size + rowsPerPage - 1) / rowsPerPage).coerceAtLeast(1)
 
             val companyName = com.example.jiva.utils.UserEnv.getCompanyName(context) ?: "Ledger Report"
             val ownerName = com.example.jiva.utils.UserEnv.getOwnerName(context)
 
-            while (entryIndex < entries.size || (entries.isEmpty() && currentPage == 1)) {
+            // Ensure we generate at least one page and footer even for empty ledgers
+            var footerGenerated = false
+            while (entryIndex < entries.size || (entries.isEmpty() && currentPage == 1) || (!footerGenerated && currentPage <= totalPages)) {
                 val page = pdfDocument.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(pageWidth, pageHeight, currentPage).create())
                 val canvas = page.canvas
                 var currentY = 30f
@@ -241,6 +352,18 @@ private suspend fun generateAndShareLedgerPDF(
                         textAlign = android.graphics.Paint.Align.CENTER
                     }
                     canvas.drawText(ownerName, (pageWidth / 2).toFloat(), currentY, ownerPaint)
+                    currentY += 20f
+                }
+                
+                // Add account name below owner name
+                if (!accountName.isNullOrBlank()) {
+                    val accountPaint = android.graphics.Paint().apply {
+                        color = android.graphics.Color.BLACK
+                        textSize = 14f  // Medium font size for account name
+                        typeface = android.graphics.Typeface.DEFAULT_BOLD  // Make account name bold for better visibility
+                        textAlign = android.graphics.Paint.Align.CENTER
+                    }
+                    canvas.drawText("Account: ${accountName.trim()}", (pageWidth / 2).toFloat(), currentY, accountPaint)
                     currentY += 20f
                 }
 
@@ -300,20 +423,96 @@ private suspend fun generateAndShareLedgerPDF(
                     currentY = rowBottom
                 }
 
-                if (currentPage == totalPages && currentY + rowHeight <= bottomY) {
-                    val totalTop = currentY + 8f
-                    val totalBottom = totalTop + rowHeight
-                    val totalRect = android.graphics.RectF(margin, totalTop, margin + contentWidth, totalBottom)
-                    canvas.drawRect(totalRect, fillHeaderPaint)
-                    canvas.drawRect(totalRect, borderPaint)
-                    drawTextCentered(
-                        canvas,
-                        "Totals — DR: ₹${String.format("%.2f", totalDr)}  CR: ₹${String.format("%.2f", totalCr)}  Closing: ₹${String.format("%.2f", closingBalance)}",
-                        margin + contentWidth / 2,
-                        totalBottom - 8f,  // Adjusted for larger font
-                        contentWidth - 10f,
-                        headerPaint
-                    )
+                // Always generate footer on the last page, create new page if needed
+                if (currentPage == totalPages) {
+                    Timber.d("PDF Footer: Generating footer on last page $currentPage")
+                    val sectionHeight = if (openingDr > 0.0 || openingCr > 0.0) rowHeight * 2.5f else rowHeight * 1.5f
+                    val requiredSpace = sectionHeight + 16f // Extra padding
+                    
+                    // Check if footer fits on current page
+                    if (currentY + requiredSpace <= bottomY) {
+                        Timber.d("PDF Footer: Footer fits on current page. CurrentY: $currentY, RequiredSpace: $requiredSpace, BottomY: $bottomY")
+                        // Footer fits on current page
+                        val totalTop = currentY + 8f
+                        val totalBottom = totalTop + sectionHeight
+                        val totalRect = android.graphics.RectF(margin, totalTop, margin + contentWidth, totalBottom)
+                        canvas.drawRect(totalRect, fillHeaderPaint)
+                        canvas.drawRect(totalRect, borderPaint)
+                        
+                        drawFooterContent(canvas, margin, contentWidth, totalTop, sectionHeight, 
+                                        openingDr, openingCr, totalDr, totalCr, closingBalance, 
+                                        headerPaint, cellPaint, closingBalancePaint = android.graphics.Paint().apply {
+                                            color = android.graphics.Color.BLACK
+                                            textSize = 14f
+                                            typeface = android.graphics.Typeface.DEFAULT_BOLD
+                                            textAlign = android.graphics.Paint.Align.CENTER
+                                        })
+                        footerGenerated = true
+                    } else {
+                        // Footer doesn't fit, finish current page and create new page for footer
+                        Timber.d("PDF Footer: Footer doesn't fit on current page. CurrentY: $currentY, RequiredSpace: $requiredSpace, BottomY: $bottomY. Creating new page.")
+                        pdfDocument.finishPage(page)
+                        
+                        // Create footer page
+                        val footerPageNumber = currentPage + 1
+                        val footerPage = pdfDocument.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(pageWidth, pageHeight, footerPageNumber).create())
+                        val footerCanvas = footerPage.canvas
+                        
+                        // Draw header on footer page
+                        var footerY = 30f
+                        footerCanvas.drawText(companyName, (pageWidth / 2).toFloat(), footerY, titlePaint)
+                        footerY += 25f
+                        
+                        if (!ownerName.isNullOrBlank()) {
+                            val ownerPaint = android.graphics.Paint().apply {
+                                color = android.graphics.Color.BLACK
+                                textSize = 16f
+                                typeface = android.graphics.Typeface.DEFAULT
+                                textAlign = android.graphics.Paint.Align.CENTER
+                            }
+                            footerCanvas.drawText(ownerName, (pageWidth / 2).toFloat(), footerY, ownerPaint)
+                            footerY += 20f
+                        }
+                        
+                        if (!accountName.isNullOrBlank()) {
+                            val accountPaint = android.graphics.Paint().apply {
+                                color = android.graphics.Color.BLACK
+                                textSize = 14f
+                                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                                textAlign = android.graphics.Paint.Align.CENTER
+                            }
+                            footerCanvas.drawText("Account: ${accountName.trim()}", (pageWidth / 2).toFloat(), footerY, accountPaint)
+                            footerY += 20f
+                        }
+                        
+                        footerY += 20f
+                        footerCanvas.drawText("Summary Page", (pageWidth / 2).toFloat(), footerY, cellPaint)
+                        footerY += 50f
+                        
+                        // Draw footer content on new page
+                        val totalTop = footerY
+                        val totalBottom = totalTop + sectionHeight
+                        val totalRect = android.graphics.RectF(margin, totalTop, margin + contentWidth, totalBottom)
+                        footerCanvas.drawRect(totalRect, fillHeaderPaint)
+                        footerCanvas.drawRect(totalRect, borderPaint)
+                        
+                        drawFooterContent(footerCanvas, margin, contentWidth, totalTop, sectionHeight,
+                                        openingDr, openingCr, totalDr, totalCr, closingBalance,
+                                        headerPaint, cellPaint, closingBalancePaint = android.graphics.Paint().apply {
+                                            color = android.graphics.Color.BLACK
+                                            textSize = 14f
+                                            typeface = android.graphics.Typeface.DEFAULT_BOLD
+                                            textAlign = android.graphics.Paint.Align.CENTER
+                                        })
+                        
+                        pdfDocument.finishPage(footerPage)
+                        footerGenerated = true
+                        
+                        // Skip the normal page finishing since we already finished both pages
+                        entryIndex = endIndex
+                        currentPage++
+                        continue
+                    }
                 }
 
                 pdfDocument.finishPage(page)
@@ -374,6 +573,12 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
     // Account Opening fields (static for now; will be set via API later)
     var openingDr by remember { mutableStateOf("0") }
     var openingCr by remember { mutableStateOf("0") }
+    
+    // Selected account state (moved to main scope for PDF access)
+    var selectedAccount by remember { mutableStateOf<com.example.jiva.viewmodel.LedgerReportViewModel.AccountOption?>(null) }
+    
+    // Store the selected account name explicitly for PDF generation
+    var selectedAccountNameForPDF by remember { mutableStateOf<String?>(null) }
 
     // Get current year and user ID
     val year = com.example.jiva.utils.UserEnv.getFinancialYear(context) ?: "2025-26"
@@ -550,12 +755,24 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                 IconButton(onClick = {
                     // Launch coroutine to generate and share using paginated PDF similar to Price List
                     scope.launch {
+                        // Use the explicitly stored account name for PDF generation
+                        val accountNameForPDF = selectedAccountNameForPDF
+                        
+                        // Debug: Show what account name will be used in PDF
+                        if (accountNameForPDF.isNullOrBlank()) {
+                            Toast.makeText(context, "No account selected for PDF", Toast.LENGTH_SHORT).show()
+                            return@launch
+                        }
+                        
                         generateAndShareLedgerPDF(
                             context = context,
                             entries = filteredEntries,
                             totalDr = totalDrWithOpening,
                             totalCr = totalCrWithOpening,
-                            closingBalance = closingBalance
+                            closingBalance = closingBalance,
+                            openingDr = openingDrValue,
+                            openingCr = openingCrValue,
+                            accountName = accountNameForPDF
                         )
                     }
                 }) {
@@ -594,7 +811,6 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                         val accountOptions by viewModel.accountOptions.collectAsState()
                         var accountNameSearch by remember { mutableStateOf("") }
                         var isAccountDropdownExpanded by remember { mutableStateOf(false) }
-                        var selectedAccount by remember { mutableStateOf<com.example.jiva.viewmodel.LedgerReportViewModel.AccountOption?>(null) }
 
                         val filteredAccountOptions = remember(accountNameSearch, accountOptions) {
                             if (accountNameSearch.isBlank()) {
@@ -622,6 +838,11 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                                     onValueChange = {
                                         accountNameSearch = it
                                         isAccountDropdownExpanded = true
+                                        // Clear the selected account if user is typing manually
+                                        if (selectedAccount?.name != it) {
+                                            selectedAccount = null
+                                            selectedAccountNameForPDF = null
+                                        }
                                     },
                                     placeholder = { Text("Type to search account") },
                                     modifier = Modifier.fillMaxWidth().menuAnchor(),
@@ -639,6 +860,7 @@ fun LedgerReportScreen(onBackClick: () -> Unit = {}) {
                                                 onClick = {
                                                     selectedAccount = option
                                                     accountNameSearch = option.name
+                                                    selectedAccountNameForPDF = option.name
                                                     isAccountDropdownExpanded = false
                                                 }
                                             )

@@ -50,6 +50,9 @@ class JivaApplication : MultiDexApplication() {
 
         // Initialize Timber for logging
         initializeLogging()
+        
+        // Initialize RetrofitClient with stored IP (must be done early)
+        initializeRetrofitClient()
 
         // Performance optimizations
         initializePerformanceOptimizations()
@@ -72,6 +75,19 @@ class JivaApplication : MultiDexApplication() {
         fetchCompanyInfoAndMsgTemplates()
     }
 
+    /**
+     * Initialize RetrofitClient with stored server IP
+     * This must be called early in app startup before any API calls
+     */
+    private fun initializeRetrofitClient() {
+        try {
+            com.example.jiva.data.network.RetrofitClient.initialize(this)
+            Timber.d("✅ RetrofitClient initialized with stored server configuration")
+        } catch (e: Exception) {
+            Timber.e(e, "❌ Failed to initialize RetrofitClient - will use default IP")
+        }
+    }
+    
     private fun fetchCompanyInfoAndMsgTemplates() {
         applicationScope.launch(Dispatchers.IO) {
             try {

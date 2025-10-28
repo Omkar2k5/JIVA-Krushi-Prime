@@ -1165,12 +1165,15 @@ private suspend fun generateAndSharePDF(
             val totalPages = kotlin.math.ceil(entries.size.toDouble() / maxRowsPerPage).toInt().coerceAtLeast(1)
             var entryIndex = 0
 
+            // Get company name for PDF title
+            val companyName = UserEnv.getCompanyName(context) ?: "Outstanding Report"
+
             for (pageNum in 1..totalPages) {
                 val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNum).create()
                 val page = pdfDocument.startPage(pageInfo)
                 val canvas = page.canvas
 
-                canvas.drawText("Outstanding Report", pageWidth / 2f, 40f, titlePaint)
+                canvas.drawText(companyName, pageWidth / 2f, 40f, titlePaint)
 
                 var currentX = startX
                 var currentY = startY

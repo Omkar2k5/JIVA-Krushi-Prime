@@ -837,6 +837,9 @@ private suspend fun generateAndShareStockPDF(context: Context, entries: List<Sto
             var entryIndex = 0
             val totalPages = ((entries.size + rowsPerPage - 1) / rowsPerPage).coerceAtLeast(1)
 
+            // Get company name for PDF title
+            val companyName = com.example.jiva.utils.UserEnv.getCompanyName(context) ?: "Stock Report"
+
             while (entryIndex < entries.size) {
                 val page = pdfDocument.startPage(
                     android.graphics.pdf.PdfDocument.PageInfo.Builder(pageWidth, pageHeight, currentPage).create()
@@ -845,7 +848,7 @@ private suspend fun generateAndShareStockPDF(context: Context, entries: List<Sto
                 var currentY = 30f
 
                 // Title
-                canvas.drawText("Stock Report", (pageWidth / 2).toFloat(), currentY, titlePaint)
+                canvas.drawText(companyName, (pageWidth / 2).toFloat(), currentY, titlePaint)
                 currentY += 20f
                 canvas.drawText("Page $currentPage of $totalPages", (pageWidth / 2).toFloat(), currentY, cellPaint)
                 currentY += 25f

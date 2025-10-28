@@ -719,8 +719,11 @@ private suspend fun generateAndShareDayEndPDF(
             val canvas = page.canvas
             var y = margin
 
+            // Get company name for PDF title
+            val companyName = com.example.jiva.utils.UserEnv.getCompanyName(context) ?: "Day End Report"
+
             // Title
-            canvas.drawText("Day End Report", (pageWidth / 2).toFloat(), y, titlePaint); y += 24f
+            canvas.drawText(companyName, (pageWidth / 2).toFloat(), y, titlePaint); y += 24f
             canvas.drawText("Company: ${uiState.companyCode}  |  Date: ${uiState.selectedDayDate}", (pageWidth / 2).toFloat(), y, textPaint); y += 24f
 
             // Summary grid (Sale, Purchase, Receipts, Payments, Expenses)

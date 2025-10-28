@@ -153,7 +153,7 @@ Authoritative spec: see API_DATA_REQUIREMENTS.txt and DATABASE_SETUP_GUIDE.md.
 
 ## Networking and API
 Base URL (RetrofitClient):
-- http://202.21.32.47:8081/
+- http://103.48.42.125:8081/
 
 Aggregated sync (initial/full):
 - GET api/sync-all-data → SyncDataResponse (users, accounts, closing_balances, stocks, sale_purchases, ledgers, expiries, templates, price_data)
@@ -239,7 +239,7 @@ Backend alignment suggestions:
 
 ## Configuration
 - Base URL: app/src/main/java/com/example/jiva/data/network/RetrofitClient.kt → BASE_URL
-  - Development default: http://202.21.32.47:8081/
+  - Development default: http://103.48.42.125:8081/
   - For production, prefer HTTPS and move baseUrl to BuildConfig fields per buildType.
 - Cleartext traffic: enabled for development (network_security_config.xml). Disable in production.
 - WhatsApp (Jivabot): supply instanceId and accessToken via secure storage (see utils/UserEnv & CredentialManager).

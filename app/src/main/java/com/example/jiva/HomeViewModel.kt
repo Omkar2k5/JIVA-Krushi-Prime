@@ -20,6 +20,8 @@ data class HomeUiState(
     val isLoading: Boolean = false,
     val isSyncing: Boolean = false,
     val syncSuccess: Boolean = false,
+    val isUpdatingConfig: Boolean = false,
+    val updateSuccess: Boolean = false,
     val errorMessage: String? = null
 )
 
@@ -80,6 +82,68 @@ class HomeViewModel(
     
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+    
+    /**
+     * Update server configuration by fetching from GetAppInfo API
+     */
+    fun updateServerConfig() {
+        viewModelScope.launch {
+            try {
+                _uiState.value = _uiState.value.copy(
+                    isUpdatingConfig = true,
+                    updateSuccess = false,
+                    errorMessage = null
+                )
+                
+                Timber.d("🔄 Fetching server configuration from GetAppInfo API...")
+                
+                // Call GetAppInfo API
+                val response = com.example.jiva.data.network.RetrofitClient.jivaApiService.getAppInfo()
+                
+                if (response.isSuccess && response.data != null) {
+                    val serverIp = response.data.ip
+                    val appName = response.data.appName
+                    val appVersion = response.data.appVersion
+                    
+                    Timber.d("✅ GetAppInfo success - App: $appName, Version: $appVersion, IP: $serverIp")
+                    
+                    // Store the new IP
+                    val context = getApplication<JivaApplication>().applicationContext
+                    com.example.jiva.utils.UserEnv.setServerIp(context, serverIp)
+                    
+                    // Update RetrofitClient with new IP
+                    com.example.jiva.data.network.RetrofitClient.updateBaseUrl(serverIp)
+                    
+                    _uiState.value = _uiState.value.copy(
+                        isUpdatingConfig = false,
+                        updateSuccess = true,
+                        errorMessage = null
+                    )
+                    
+                    Timber.d("✅ Server configuration updated successfully to: $serverIp")
+                    
+                    // Reset success state after 3 seconds
+                    kotlinx.coroutines.delay(3000)
+                    _uiState.value = _uiState.value.copy(updateSuccess = false)
+                } else {
+                    val errorMsg = response.message ?: "Failed to fetch app info"
+                    Timber.w("❌ GetAppInfo failed: $errorMsg")
+                    _uiState.value = _uiState.value.copy(
+                        isUpdatingConfig = false,
+                        updateSuccess = false,
+                        errorMessage = errorMsg
+                    )
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "❌ Error updating server configuration")
+                _uiState.value = _uiState.value.copy(
+                    isUpdatingConfig = false,
+                    updateSuccess = false,
+                    errorMessage = "Failed to update server config: ${e.message}"
+                )
+            }
+        }
     }
     
     /**

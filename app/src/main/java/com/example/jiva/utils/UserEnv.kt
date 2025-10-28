@@ -16,6 +16,7 @@ object UserEnv {
     private const val KEY_ADDRESS2 = "address2"
     private const val KEY_ADDRESS3 = "address3"
     private const val KEY_COMPANY_MOBILE = "company_mobile"
+    private const val KEY_SERVER_IP = "server_ip"
 
     // MsgTemplates storage
     private const val KEY_MSG_TEMPLATES_JSON = "msg_templates_json"
@@ -205,6 +206,29 @@ object UserEnv {
             .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
             .edit()
             .remove(KEY_MSG_TEMPLATES_JSON)
+            .apply()
+    }
+
+    // Server IP storage for dynamic API configuration
+    fun setServerIp(context: Context, ip: String) {
+        context.applicationContext
+            .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_SERVER_IP, ip)
+            .apply()
+    }
+
+    fun getServerIp(context: Context): String? {
+        return context.applicationContext
+            .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_SERVER_IP, null)
+    }
+
+    fun clearServerIp(context: Context) {
+        context.applicationContext
+            .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .remove(KEY_SERVER_IP)
             .apply()
     }
 }
